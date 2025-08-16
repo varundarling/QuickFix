@@ -1,3 +1,4 @@
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_screen.dart';
@@ -11,6 +12,24 @@ import '../../presentation/screens/provider/provider_dashboard_screen.dart';
 class AppRouter {
   static final GoRouter router = GoRouter(  
     initialLocation: '/splash',
+    redirect: (context, state) {
+      final user = FirebaseAuth.instance.currentUser;
+      final isLoggedIn = user != null;
+      final isLoggingIn = state.matchedLocation == '/login' || state.matchedLocation == '/signup';
+      
+      // If user is logged in and trying to access login/signup, redirect to home
+      if (isLoggedIn && isLoggingIn) {
+        return '/home';
+      }
+      
+      // If user is not logged in and trying to access protected routes, redirect to login
+      if (!isLoggedIn && !isLoggingIn && state.matchedLocation != '/splash') {
+        return '/login';
+      }
+      
+      return null; // No redirect
+    },
+
     routes: [
       GoRoute(
         path: '/splash',

@@ -133,6 +133,7 @@ class AuthProvider extends ChangeNotifier {
       await _firebaseService.signOut();
       _user = null;
       _userModel = null;
+      _clearError();
       notifyListeners();
     } catch (e) {
       _setError(_getErrorMessage(e));

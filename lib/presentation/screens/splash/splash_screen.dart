@@ -68,8 +68,8 @@ class _SplashScreenState extends State<SplashScreen>
               children: [
                 //App logo
                 Container(
-                  width: 120,
-                  height: 120,
+                  width: 180,
+                  height: 180,
                   decoration: BoxDecoration(
                     color: Colors.white,
                     borderRadius: BorderRadius.circular(30),
@@ -81,11 +81,7 @@ class _SplashScreenState extends State<SplashScreen>
                       ),
                     ],
                   ),
-                  child: const Icon(
-                    Icons.build_circle,
-                    size: 60,
-                    color: AppColors.primary,
-                  ),
+                  child: _buildLogo(),
                 ),
                 const SizedBox(height: 30),
 
@@ -107,7 +103,7 @@ class _SplashScreenState extends State<SplashScreen>
                   style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
 
-                const SizedBox(height: 50,),
+                const SizedBox(height: 50),
 
                 //loading indicator
                 const CircularProgressIndicator(
@@ -118,6 +114,30 @@ class _SplashScreenState extends State<SplashScreen>
           ),
         ),
       ),
+    );
+  }
+
+  Widget _buildLogo() {
+    return Image.asset(
+      'assets/logo/logo',
+      width: 200,
+      height: 200,
+      errorBuilder: (context, error, stackTrace) {
+        debugPrint('❌ Failed to load logo: $error');
+        return Container(
+          width: 180,
+          height: 180,
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: const Icon(
+            Icons.build_circle,
+            size: 120,
+            color: AppColors.primary,
+          ),
+        );
+      },
     );
   }
 }

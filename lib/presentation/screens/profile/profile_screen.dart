@@ -25,14 +25,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserData();
-    _loadUserBookings();
+    // ✅ Defer loading until after the build completes
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadUserData();
+      _loadUserBookings();
+    });
   }
 
   void _loadUserData() {
     final authProvider = context.read<AuthProvider>();
     final user = authProvider.userModel;
-    
+
     if (user != null) {
       _nameController.text = user.name;
       _phoneController.text = user.phone;
@@ -40,11 +43,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
-  
   void _loadUserBookings() {
     final authProvider = context.read<AuthProvider>();
     final bookingProvider = context.read<BookingProvider>();
-    
+
     if (authProvider.user != null) {
       bookingProvider.loadUserBookings(authProvider.user!.uid);
     }
@@ -52,7 +54,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _updateProfile() async {
     final authProvider = context.read<AuthProvider>();
-    
+
     final success = await authProvider.updateProfile(
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
@@ -63,8 +65,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _isEditing = false;
       });
-      Helpers.showSnackBar(context, 'Profile updated successfully', 
-          backgroundColor: AppColors.success);
+      Helpers.showSnackBar(
+        context,
+        'Profile updated successfully',
+        backgroundColor: AppColors.success,
+      );
     }
   }
 
@@ -127,19 +132,19 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Profile Header
                 _buildProfileHeader(authProvider),
                 const SizedBox(height: 30),
-                
+
                 // Profile Form
                 _buildProfileForm(),
                 const SizedBox(height: 30),
-                
+
                 // Statistics
                 _buildStatistics(),
                 const SizedBox(height: 30),
-                
+
                 // Settings Options
                 _buildSettingsOptions(),
                 const SizedBox(height: 30),
-                
+
                 // Sign Out Button
                 _buildSignOutButton(),
               ],
@@ -152,7 +157,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Widget _buildProfileHeader(AuthProvider authProvider) {
     final user = authProvider.userModel;
-    
+
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(20),
@@ -161,10 +166,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
             CircleAvatar(
               radius: 50,
               backgroundColor: AppColors.primary,
-              backgroundImage: user?.photoUrl != null 
-                  ? NetworkImage(user!.photoUrl!) 
+              backgroundImage: user?.photoUrl != null
+                  ? NetworkImage(user!.photoUrl!)
                   : null,
-              child: user?.photoUrl == null 
+              child: user?.photoUrl == null
                   ? Text(
                       user?.name[0].toUpperCase() ?? 'U',
                       style: const TextStyle(
@@ -230,7 +235,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             ),
             const SizedBox(height: 20),
-            
+
             CustomTextField(
               controller: _nameController,
               label: 'Full Name',
@@ -239,7 +244,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               prefixIcon: Icons.person_outline,
             ),
             const SizedBox(height: 16),
-            
+
             CustomTextField(
               controller: _phoneController,
               label: 'Phone Number',
@@ -249,7 +254,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               keyboardType: TextInputType.phone,
             ),
             const SizedBox(height: 16),
-            
+
             CustomTextField(
               controller: _addressController,
               label: 'Address',
@@ -258,7 +263,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
               prefixIcon: Icons.location_on_outlined,
               maxLines: 2,
             ),
-            
+
             if (_isEditing) ...[
               const SizedBox(height: 20),
               Row(
@@ -279,7 +284,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Consumer<AuthProvider>(
                       builder: (context, authProvider, child) {
                         return PrimaryButton(
-                          onPressed: authProvider.isUpdatingProfile ? null : _updateProfile,
+                          onPressed: authProvider.isUpdatingProfile
+                              ? null
+                              : _updateProfile,
                           text: 'Save',
                           isLoading: authProvider.isUpdatingProfile,
                         );
@@ -299,10 +306,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
         final bookings = bookingProvider.userBookings;
-        final completedBookings = bookings.where((b) => 
-            b.status == BookingStatus.completed).length;
-        final totalSpent = bookings.where((b) => 
-            b.status == BookingStatus.completed)
+        final completedBookings = bookings
+            .where((b) => b.status == BookingStatus.completed)
+            .length;
+        final totalSpent = bookings
+            .where((b) => b.status == BookingStatus.completed)
             .fold(0.0, (sum, booking) => sum + booking.totalAmount);
 
         return Card(
@@ -369,10 +377,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         const SizedBox(height: 4),
         Text(
           label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
+          style: const TextStyle(fontSize: 12, color: AppColors.textSecondary),
           textAlign: TextAlign.center,
         ),
       ],
@@ -383,48 +388,24 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Card(
       child: Column(
         children: [
-          _buildSettingsTile(
-            'My Bookings',
-            Icons.calendar_today,
-            () {
-              //Navigate to bookings
-            },
-          ),
-          _buildSettingsTile(
-            'Favorite Services',
-            Icons.favorite,
-            () {
-              // Navigate to favorites
-            },
-          ),
-          _buildSettingsTile(
-            'Payment Methods',
-            Icons.payment,
-            () {
-              // Navigate to payment methods
-            },
-          ),
-          _buildSettingsTile(
-            'Notifications',
-            Icons.notifications,
-            () {
-              // Navigate to notification settings
-            },
-          ),
-          _buildSettingsTile(
-            'Help & Support',
-            Icons.help,
-            () {
-              // Navigate to help
-            },
-          ),
-          _buildSettingsTile(
-            'About',
-            Icons.info,
-            () {
-              // Navigate to about
-            },
-          ),
+          _buildSettingsTile('My Bookings', Icons.calendar_today, () {
+            //Navigate to bookings
+          }),
+          _buildSettingsTile('Favorite Services', Icons.favorite, () {
+            // Navigate to favorites
+          }),
+          _buildSettingsTile('Payment Methods', Icons.payment, () {
+            // Navigate to payment methods
+          }),
+          _buildSettingsTile('Notifications', Icons.notifications, () {
+            // Navigate to notification settings
+          }),
+          _buildSettingsTile('Help & Support', Icons.help, () {
+            // Navigate to help
+          }),
+          _buildSettingsTile('About', Icons.info, () {
+            // Navigate to about
+          }),
         ],
       ),
     );

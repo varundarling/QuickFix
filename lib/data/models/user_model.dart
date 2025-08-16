@@ -52,7 +52,7 @@ class UserModel {
       'phone': phone,
       'photoUrl': photoUrl,
       'userType': userType,
-      'createdAt': createdAt.millisecondsSinceEpoch,
+      'createdAt': createdAt.minute,
       'isActive': isActive,
       'latitude': latitude,
       'longitude': longitude,
