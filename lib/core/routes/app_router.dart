@@ -3,6 +3,10 @@ import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
+import '../../presentation/screens/auth/sign_up_Screen.dart';
+import '../../presentation/screens/booking/booking_details_screen.dart';
+import '../../presentation/screens/profile/profile_screen.dart';
+import '../../presentation/screens/provider/provider_dashboard_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(  
@@ -20,11 +24,11 @@ class AppRouter {
         builder: (context, state) => const LoginScreen(),
       ),
 
-      // GoRoute(
-      //   path: '/signup',
-      //   name: 'signup',
-      //   builder: (context, state) => const SignUpScreen(),
-      // ),
+      GoRoute(
+        path: '/signup',
+        name: 'signup',
+        builder: (context, state) => const SignUpScreen(),
+      ),
 
       GoRoute(
         path: '/home',
@@ -41,26 +45,28 @@ class AppRouter {
         },
       ),
 
-      // GoRoute(
-      //   path: '/booking-details/:bookingId',
-      //   name: 'booking-details',
-      //   builder: (context, state) {
-      //     final bookingId = state.pathParameters['bookingId']!;
-      //     return BookingDetailsScreen(bookingId: bookingId);
-      //   },
-      // ),
+      GoRoute(
+        path: '/booking-details/:bookingId',
+        name: 'booking-details',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          return BookingDetailsScreen(bookingId: bookingId);
+        },
+      ),
 
-      // GoRoute(
-      //   path: '/profile',
-      //   name: 'profile',
-      //   builder: (context, state) => const ProfileScreen(),
-      // ),
+      GoRoute(
+        path: '/profile',
+        name: 'profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
 
-      // GoRoute(
-      //   path: '/provider-dashboard',
-      //   name: 'provider-dashboard',
-      //   builder: (context, state) => const ProviderDashBoardScreen(),
-      // ),
+      GoRoute(
+        path: '/provider-dashboard',
+        name: 'provider-dashboard',
+        builder: (context, state) => const ProviderDashboardScreen(),
+      ),
     ],
   );
 }
+
+

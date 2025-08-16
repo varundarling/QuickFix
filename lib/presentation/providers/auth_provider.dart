@@ -176,7 +176,7 @@ class AuthProvider extends ChangeNotifier {
           return 'No user found with this email.';
         case 'wrong-password':
           return 'Wrong password provided.';
-        case 'eamil-already-in-user':
+        case 'email-already-in-use':
           return 'Email is already in use.';
         case 'weak-password':
           return 'Password is too weak.';

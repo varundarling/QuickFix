@@ -56,6 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(24),
           child: Form(
+            key: _formKey,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -110,7 +111,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
                     return PrimaryButton(
-                      onPressed: authProvider.isLoading ? null : _handlingLogin,
+                      onPressed: authProvider.isLoading ?null : _handlingLogin ,
                       text: AppStrings.login,
                       isLoading: authProvider.isLoading,
                     );
@@ -127,7 +128,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
-                      onPressed: () => context.go('signup'),
+                      onPressed: () => context.go('/signup'),
                       child: const Text(
                         AppStrings.signUp,
                         style: TextStyle(

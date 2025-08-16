@@ -32,7 +32,7 @@ class Validators {
       return 'Phone number is required';
     }
 
-    final phoneRegExp = RegExp(r'^[6-9] \d{9}');
+    final phoneRegExp = RegExp(r'^(?:[+0]9)?[0-9]{10,12}$');
 
     if(!phoneRegExp.hasMatch(value)) {
       return 'Please enter a valid mobile number';
