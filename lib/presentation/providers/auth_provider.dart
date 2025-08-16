@@ -10,12 +10,33 @@ class AuthProvider extends ChangeNotifier {
   UserModel? _userModel;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _isSigningIn = false;
+  bool _isSigningUp = false;
+  bool _isUpdatingProfile = false;
 
   User? get user => _user;
   UserModel? get userModel => _userModel;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isAuthenticated => _user != null;
+  bool get isSigningIn => _isSigningIn;
+  bool get isSigningUp => _isSigningUp;
+  bool get isUpdatingProfile => _isUpdatingProfile;
+
+  void _setSignInLoading(bool loading) {
+    _isSigningIn = loading;
+    notifyListeners();
+  }
+
+  void _setSignUpLoading(bool loading) {
+    _isSigningUp = loading;
+    notifyListeners();
+  }
+
+  void _setUpdateProfileLoading(bool loading) {
+    _isUpdatingProfile = loading;
+    notifyListeners();
+  }
 
   AuthProvider() {
     //Auth state changes
@@ -34,9 +55,13 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return;
 
     try {
-      final doc = await _firebaseService.getDocument('users', _user!.uid);
+      final doc = await _firebaseService.getUserData(
+        _user!.uid,
+      ); // ✅ Use Realtime DB
       if (doc.exists) {
-        _userModel = UserModel.fromFireStore(doc);
+        _userModel = UserModel.fromRealtimeDatabase(
+          doc.value as Map<dynamic, dynamic>,
+        );
         notifyListeners();
       }
     } catch (e) {
@@ -46,7 +71,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<bool> signIn(String email, String password) async {
     try {
-      _setLoading(true);
+      _setSignInLoading(true);
       _clearError();
 
       await _firebaseService.signInWithEmailPassword(email, password);
@@ -55,7 +80,7 @@ class AuthProvider extends ChangeNotifier {
       _setError(_getErrorMessage(e));
       return false;
     } finally {
-      _setLoading(false);
+      _setSignInLoading(false);
     }
   }
 
@@ -67,19 +92,18 @@ class AuthProvider extends ChangeNotifier {
     String userType = 'customer',
   }) async {
     try {
-      _setLoading(true);
+      _setSignUpLoading(true);
       _clearError();
 
-      // ignore: non_constant_identifier_names
-      final UserCredential = await _firebaseService.signUpWithEmailPassword(
+      final userCredential = await _firebaseService.signUpWithEmailPassword(
         email,
         password,
       );
 
-      if (UserCredential?.user != null) {
+      if (userCredential?.user != null) {
         //create new user
         final userModel = UserModel(
-          id: UserCredential!.user!.uid,
+          id: userCredential!.user!.uid,
           name: name,
           email: email,
           phone: phone,
@@ -87,10 +111,10 @@ class AuthProvider extends ChangeNotifier {
           createdAt: DateTime.now(),
         );
 
-        await _firebaseService.createDocument(
-          'users',
-          UserCredential.user!.uid,
-          userModel.toFireStore(),
+        await _firebaseService.createUserData(
+          // ✅ Use Realtime DB for user data
+          userCredential.user!.uid,
+          userModel.toRealtimeDatabase(),
         );
 
         return true;
@@ -100,7 +124,7 @@ class AuthProvider extends ChangeNotifier {
       _setError(_getErrorMessage(e));
       return false;
     } finally {
-      _setLoading(false);
+      _setSignUpLoading(false);
     }
   }
 
@@ -126,37 +150,39 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null || _userModel == null) return false;
 
     try {
-      _setLoading(true);
+      _setUpdateProfileLoading(true);
 
-      final updatedUser = _userModel!.copyWith(
-        name: name,
-        phone: phone,
-        photoUrl: photoUrl,
-        latitude: latitude,
-        longitude: longitude,
-        address: address,
-      );
+      // Create update data (only non-null values)
+      final Map<String, dynamic> updateData = {};
+      if (name != null) updateData['name'] = name;
+      if (phone != null) updateData['phone'] = phone;
+      if (photoUrl != null) updateData['photoUrl'] = photoUrl;
+      if (latitude != null) updateData['latitude'] = latitude;
+      if (longitude != null) updateData['longitude'] = longitude;
+      if (address != null) updateData['address'] = address;
+      updateData['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
 
-      await _firebaseService.updateDocument(
-        'users',
+      await _firebaseService.updateUserData(
+        // ✅ Use Realtime DB
         _user!.uid,
-        updatedUser.toFireStore(),
+        updateData,
       );
 
-      _userModel = updatedUser;
-      notifyListeners();
+      debugPrint('✅ Profile updated successfully');
+
+      // Immediately reload fresh data from Firestore
+      await _loadUserModel();
+
       return true;
-    } catch (e) {
+    } catch (e, stackTrace) {
+      debugPrint('❌ Profile update failed: $e');
+      debugPrint('Stack: $stackTrace');
       _setError(_getErrorMessage(e));
       return false;
     } finally {
-      _setLoading(false);
+      debugPrint('🏁 Resetting loading state');
+      _setUpdateProfileLoading(false);
     }
-  }
-
-  void _setLoading(bool loading) {
-    _isLoading = loading;
-    notifyListeners();
   }
 
   void _setError(String error) {

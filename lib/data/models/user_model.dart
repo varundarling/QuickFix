@@ -1,4 +1,3 @@
-import 'package:cloud_firestore/cloud_firestore.dart';
 
 class UserModel {
   final String id;
@@ -27,31 +26,33 @@ class UserModel {
     this.address,
   });
 
-  factory UserModel.fromFireStore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory UserModel.fromRealtimeDatabase(Map<dynamic, dynamic> data) {
     return UserModel(
-      id: doc.id,
-      name: data['name'] ?? "",
-      email: data['email'] ?? "",
-      phone: data['phone'] ?? "",
-      photoUrl: data['photoUrl'],
-      userType: data['userType'] ?? 'customer',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      id: data['id']?.toString() ?? '',
+      name: data['name']?.toString() ?? '',
+      email: data['email']?.toString() ?? '',
+      phone: data['phone']?.toString() ?? '',
+      photoUrl: data['photoUrl']?.toString(),
+      userType: data['userType']?.toString() ?? 'customer',
+      createdAt: data['createdAt'] != null 
+          ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
+          : DateTime.now(),
       isActive: data['isActive'] ?? true,
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
-      address: data['address'],
+      address: data['address']?.toString(),
     );
   }
 
-  Map<String, dynamic> toFireStore() {
+  Map<String, dynamic> toRealtimeDatabase() {
     return {
+      'id': id,
       'name': name,
       'email': email,
       'phone': phone,
       'photoUrl': photoUrl,
       'userType': userType,
-      'createdAt': createdAt,
+      'createdAt': createdAt.millisecondsSinceEpoch,
       'isActive': isActive,
       'latitude': latitude,
       'longitude': longitude,
@@ -83,7 +84,7 @@ class UserModel {
       isActive: isActive ?? this.isActive,
       latitude: latitude ?? this.latitude,
       longitude: longitude ?? this.longitude,
-      address: address ?? address,
+      address: address ?? this.address,
     );
   }
 }

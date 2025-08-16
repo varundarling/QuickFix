@@ -62,7 +62,7 @@ class Helpers {
   }
 
   static Future<void> launchWhatsApp(String phoneNumber, {String? message}) async {
-    final uri = Uri.parse('https://wa.me/$phoneNumber${message != null ? '?text=${Uri.encodeComponent(message)}' : ''}');
+    final uri = Uri.parse('$phoneNumber${message != null ? '?text=${Uri.encodeComponent(message)}' : ''}');
     if (await canLaunchUrl(uri)) {
       await launchUrl(uri);
     }

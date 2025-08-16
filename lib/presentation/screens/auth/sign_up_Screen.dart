@@ -226,9 +226,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
                     return PrimaryButton(
-                      onPressed: authProvider.isLoading ? null : _handleSignUp,
+                      onPressed: authProvider.isSigningUp ? null : _handleSignUp,
                       text: AppStrings.signUp,
-                      isLoading: authProvider.isLoading,
+                      isLoading: authProvider.isSigningUp,
                     );
                   },
                 ),

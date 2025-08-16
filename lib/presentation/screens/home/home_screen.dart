@@ -9,9 +9,9 @@ import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/widgets/common/ad_banner_widget.dart';
-import 'package:quickfix/presentation/widgets/common/provider_card.dart';
+import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 
-import '../../widgets/common/service_card.dart';
+import '../../widgets/cards/service_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

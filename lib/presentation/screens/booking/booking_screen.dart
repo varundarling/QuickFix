@@ -11,7 +11,7 @@ import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
-import 'package:quickfix/presentation/widgets/common/provider_card.dart';
+import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 
 
 class BookingScreen extends StatefulWidget {

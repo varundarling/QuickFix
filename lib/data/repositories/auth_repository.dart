@@ -46,7 +46,7 @@ class AuthRepository {
       if (user != null) {
         final doc = await _firebaseService.getDocument('users', user.uid);
         if (doc.exists) {
-          return UserModel.fromFireStore(doc);
+          return UserModel.fromRealtimeDatabase(doc as Map);
         }
       }
       return null;
@@ -60,7 +60,7 @@ class AuthRepository {
       await _firebaseService.createDocument(
         'users',
         userModel.id,
-        userModel.toFireStore(),
+        userModel.toRealtimeDatabase(),
       );
     } catch (e) {
       rethrow;
@@ -72,7 +72,7 @@ class AuthRepository {
       await _firebaseService.updateDocument(
         'users',
         userModel.id,
-        userModel.toFireStore(),
+        userModel.toRealtimeDatabase(),
       );
     } catch (e) {
       rethrow;

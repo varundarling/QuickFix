@@ -111,9 +111,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
                     return PrimaryButton(
-                      onPressed: authProvider.isLoading ?null : _handlingLogin ,
+                      onPressed: authProvider.isSigningIn ?null : _handlingLogin ,
                       text: AppStrings.login,
-                      isLoading: authProvider.isLoading,
+                      isLoading: authProvider.isSigningIn,
                     );
                   },
                 ),

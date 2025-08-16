@@ -40,6 +40,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  
   void _loadUserBookings() {
     final authProvider = context.read<AuthProvider>();
     final bookingProvider = context.read<BookingProvider>();
@@ -195,7 +196,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -278,9 +279,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     child: Consumer<AuthProvider>(
                       builder: (context, authProvider, child) {
                         return PrimaryButton(
-                          onPressed: authProvider.isLoading ? null : _updateProfile,
+                          onPressed: authProvider.isUpdatingProfile ? null : _updateProfile,
                           text: 'Save',
-                          isLoading: authProvider.isLoading,
+                          isLoading: authProvider.isUpdatingProfile,
                         );
                       },
                     ),
