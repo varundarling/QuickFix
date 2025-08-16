@@ -1,5 +1,5 @@
 class AppStrings {
-  static const String appName = 'QuickFIx';
+  static const String appName = 'QuickFix';
   static const String tagline = 'Your Local Service Partner';
 
   //Auth
@@ -13,7 +13,7 @@ class AppStrings {
   //Home
   static const String findServices = 'Find Services Near You';
   static const String popularServices = "Popular Services";
-  static const String recentBookings = 'Recent Bokkings';
+  static const String recentBookings = 'Recent Bookings';
 
   //Services
   static const String plumbing = 'Plumbing';
@@ -27,7 +27,7 @@ class AppStrings {
   static const String bookNow = 'Book Now';
   static const String selectDateTime = 'Select Date & Time';
   static const String addDescription = 'Add Description';
-  static const String confirmBokking = 'Confirm Booking';
+  static const String confirmBooking = 'Confirm Booking';
   static const String bookingConfirmed = 'Booking Confirmed';
 
   //Payment
@@ -40,7 +40,7 @@ class AppStrings {
   static const String passwordRequired = 'Password is required';
   static const String phoneRequired = 'Phone number is required';
   static const String invalidEmail = 'Please enter a valid Email';
-  static const String passwordTooShort = 'Password must be atleast 6 characters';
+  static const String passwordTooShort = 'Password must be at least 6 characters';
 
   //Error messages
   static const String somethingWentWrong = 'Something went wrong';

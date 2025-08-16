@@ -104,7 +104,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 ),
                 const SizedBox(height: 8),
                 const Text(
-                  'Sign up to get started',
+                  'Sign up to Get Started',
                   style: TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
