@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:quickfix/app.dart';
+import 'package:quickfix/QuickFix.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 

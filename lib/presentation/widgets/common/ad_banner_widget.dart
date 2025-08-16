@@ -37,9 +37,9 @@ class _AdBannerWidgetState extends State<AdBannerWidget> {
 
     return Container(
       alignment: Alignment.center,
-      child: AdWidget(ad: _bannerAd!),
       width: _bannerAd!.size.width.toDouble(),
       height: _bannerAd!.size.height.toDouble(),
+      child: AdWidget(ad: _bannerAd!),
     );
   }
 }

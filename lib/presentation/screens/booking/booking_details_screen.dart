@@ -538,8 +538,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         return Icons.cancel;
       case BookingStatus.refunded:
         return Icons.money_off;
-      default:
-        return Icons.info;
-    }
+      }
   }
 }

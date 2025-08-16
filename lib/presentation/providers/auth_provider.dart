@@ -40,7 +40,7 @@ class AuthProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      print('Error loading user model: $e');
+      debugPrint('Error loading user model: $e');
     }
   }
 

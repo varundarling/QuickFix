@@ -34,7 +34,7 @@ class BookingProvider extends ChangeNotifier {
   DateTime? get selectedDateTime => _selectedDateTime;
   String get description => _description;
   String get customerAddress => _customerAddress;
-  double get TotalAmount => _totalAmount;
+  double get totalAmount => _totalAmount;
 
   Future<void> loadUserBookings(String userId) async {
     try {

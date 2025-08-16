@@ -7,7 +7,7 @@ import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 
 class QuickFix extends StatelessWidget {
-  const QuickFix({Key? key}): super(key:key);
+  const QuickFix({super.key});
 
   @override
   Widget build(BuildContext context) {

@@ -175,7 +175,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               const SizedBox(height: 12),
               
               ...bookings.take(3).map((booking) => 
-                  _buildBookingCard(booking)).toList(),
+                  _buildBookingCard(booking)),
               
               if (bookings.isEmpty)
                 const Card(
@@ -348,6 +348,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
+                    // ignore: deprecated_member_use
                     color: statusColor.withOpacity(0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
