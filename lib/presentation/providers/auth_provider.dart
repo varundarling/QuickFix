@@ -62,19 +62,6 @@ class AuthProvider extends ChangeNotifier {
     debugPrint('🗑️ Cleared saved user type');
   }
 
-  Future<void> _clearAllUserTypes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final keys = prefs.getKeys();
-
-    // Remove all user_type_* keys
-    for (final key in keys) {
-      if (key.startsWith('user_type_')) {
-        await prefs.remove(key);
-        debugPrint('🗑️ Cleared user type: $key');
-      }
-    }
-  }
-
   AuthProvider() {
     //Auth state changes
     _firebaseService.auth.authStateChanges().listen((User? user) async {
@@ -93,17 +80,16 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return;
 
     try {
-      final doc = await _firebaseService.getUserData(
-        _user!.uid,
-      ); // ✅ Use Realtime DB
+      final doc = await _firebaseService.getUserData(_user!.uid);
       if (doc.exists) {
         _userModel = UserModel.fromRealtimeDatabase(
           doc.value as Map<dynamic, dynamic>,
         );
-        notifyListeners();
+        debugPrint('✅ User model updated: ${_userModel?.address}');
+        notifyListeners(); // ✅ Make sure this is called
       }
     } catch (e) {
-      debugPrint('Error loading user model: $e');
+      debugPrint('❌ Error loading user model: $e');
     }
   }
 
@@ -272,12 +258,15 @@ class AuthProvider extends ChangeNotifier {
     double? longitude,
     String? address,
   }) async {
+    debugPrint('🔄 Starting profile update...');
+    debugPrint('📍 New address: $address');
+    debugPrint('📍 New coords: $latitude, $longitude');
+
     if (_user == null || _userModel == null) return false;
 
     try {
       _setUpdateProfileLoading(true);
 
-      // Create update data (only non-null values)
       final Map<String, dynamic> updateData = {};
       if (name != null) updateData['name'] = name;
       if (phone != null) updateData['phone'] = phone;
@@ -287,25 +276,20 @@ class AuthProvider extends ChangeNotifier {
       if (address != null) updateData['address'] = address;
       updateData['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
 
-      await _firebaseService.updateUserData(
-        // ✅ Use Realtime DB
-        _user!.uid,
-        updateData,
-      );
+      await _firebaseService.updateUserData(_user!.uid, updateData);
+      debugPrint('✅ Firebase update successful');
 
-      debugPrint('✅ Profile updated successfully');
-
-      // Immediately reload fresh data from Firestore
+      // ✅ Reload user model
       await _loadUserModel();
+      debugPrint('✅ User model reloaded');
+      debugPrint('📍 New user address: ${_userModel?.address}');
 
       return true;
     } catch (e, stackTrace) {
       debugPrint('❌ Profile update failed: $e');
-      debugPrint('Stack: $stackTrace');
       _setError(_getErrorMessage(e));
       return false;
     } finally {
-      debugPrint('🏁 Resetting loading state');
       _setUpdateProfileLoading(false);
     }
   }
@@ -339,5 +323,9 @@ class AuthProvider extends ChangeNotifier {
       }
     }
     return 'An expected error has occurred. Please try again.';
+  }
+
+  Future<void> reloadUserData() async {
+    await _loadUserModel();
   }
 }

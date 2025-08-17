@@ -234,10 +234,3 @@ class ServiceRepository {
     return degree * (math.pi / 180);
   }
 }
-
-extension on double {
-  double sin() => math.sin(this);
-  double cos() => math.cos(this);
-  double sqrt() => math.sqrt(this);
-  double asin() => math.asin(this);
-}
