@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/presentation/providers/service_provider.dart';
+import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -10,27 +14,40 @@ class ProviderDashboardScreen extends StatefulWidget {
   const ProviderDashboardScreen({super.key});
 
   @override
-  State<ProviderDashboardScreen> createState() => _ProviderDashboardScreenState();
+  State<ProviderDashboardScreen> createState() =>
+      _ProviderDashboardScreenState();
 }
 
-class _ProviderDashboardScreenState extends State<ProviderDashboardScreen> 
+class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 4, vsync: this);
-    _loadProviderBookings();
+    _tabController = TabController(length: 5, vsync: this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _loadData();
+    });
   }
 
-  void _loadProviderBookings() {
+  Future<void> _loadData() async {
     final authProvider = context.read<AuthProvider>();
     final bookingProvider = context.read<BookingProvider>();
-    
+    final serviceProvider = context.read<ServiceProvider>();
+
     if (authProvider.user != null) {
-      bookingProvider.loadProviderBookings(authProvider.user!.uid);
+      // Load data without triggering immediate UI updates
+      await Future.wait([
+        bookingProvider.loadProviderBookings(authProvider.user!.uid),
+        serviceProvider.loadServices(),
+      ]);
     }
+  }
+
+  void _loadProviderServices() {
+    final serviceProvider = context.read<ServiceProvider>();
+    serviceProvider.loadServices();
   }
 
   @override
@@ -39,17 +56,70 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     super.dispose();
   }
 
+  void safeSetState(VoidCallback fn) {
+    if (!mounted) return;
+
+    if (SchedulerBinding.instance.schedulerPhase == SchedulerPhase.idle) {
+      setState(fn);
+    } else {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) setState(fn);
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Provider Dashboard'),
         backgroundColor: AppColors.primary,
+        actions: [
+          IconButton(
+            onPressed: () => context.go('/provider-profile'),
+            icon: const Icon(Icons.person),
+          ),
+          PopupMenuButton<String>(
+            onSelected: (value) async {
+              if (value == 'logout') {
+                // ✅ Show loading indicator
+                showDialog(
+                  context: context,
+                  barrierDismissible: false,
+                  builder: (context) =>
+                      const Center(child: CircularProgressIndicator()),
+                );
+
+                // ✅ Properly sign out and clear all data
+                final authProvider = context.read<AuthProvider>();
+                await authProvider.signOut();
+
+                // ✅ Close loading dialog
+                if (mounted) Navigator.of(context).pop();
+
+                // ✅ Navigate to user type selection (not customer home)
+                if (mounted) {
+                  context.go('/user-type-selection');
+                }
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'logout',
+                child: ListTile(
+                  leading: Icon(Icons.logout, color: Colors.red),
+                  title: Text('Logout', style: TextStyle(color: Colors.red)),
+                ),
+              ),
+            ],
+          ),
+        ],
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
           tabs: const [
             Tab(text: 'Overview'),
+            Tab(text: 'Services'),
             Tab(text: 'Pending'),
             Tab(text: 'Active'),
             Tab(text: 'History'),
@@ -60,140 +130,183 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         controller: _tabController,
         children: [
           _buildOverviewTab(),
+          _buildServicesTab(),
           _buildBookingsTab(BookingStatus.pending),
           _buildBookingsTab(BookingStatus.inProgresss),
           _buildHistoryTab(),
         ],
       ),
+      // ✅ Add this after the body
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => context.go('/create-service'),
+        backgroundColor: AppColors.primary,
+        child: const Icon(Icons.add, color: Colors.white),
+      ),
     );
   }
 
+  Future<void> _loadDataFuture() async {
+    final authProvider = context.read<AuthProvider>();
+    final bookingProvider = context.read<BookingProvider>();
+    final serviceProvider = context.read<ServiceProvider>();
+
+    if (authProvider.user != null) {
+      await Future.wait([
+        bookingProvider.loadProviderBookings(authProvider.user!.uid),
+        serviceProvider.loadServices(),
+      ]);
+    }
+  }
+
   Widget _buildOverviewTab() {
-    return Consumer<BookingProvider>(
-      builder: (context, bookingProvider, child) {
-        final bookings = bookingProvider.providerbookings;
-        final pendingBookings = bookings.where((b) => 
-            b.status == BookingStatus.pending).length;
-        final activeBookings = bookings.where((b) => 
-            b.status == BookingStatus.inProgresss).length;
-        final completedBookings = bookings.where((b) => 
-            b.status == BookingStatus.completed).length;
-        final totalEarnings = bookings.where((b) => 
-            b.status == BookingStatus.completed)
-            .fold(0.0, (sum, booking) => sum + booking.totalAmount);
+    return FutureBuilder(
+      future: _loadDataFuture(), // Create this future once
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        return Consumer2<BookingProvider, ServiceProvider>(
+          // ✅ Changed from Consumer to Consumer2
+          builder: (context, bookingProvider, serviceProvider, child) {
+            // ✅ Added serviceProvider parameter
+            final bookings = bookingProvider.providerbookings;
+            final services = serviceProvider.services; // ✅ Added this line
 
-        return SingleChildScrollView(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Welcome Card
-              Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(20),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            const Text(
-                              'Welcome back!',
-                              style: TextStyle(
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'You have $pendingBookings pending bookings',
-                              style: const TextStyle(
-                                fontSize: 16,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Icon(
-                        Icons.business_center,
-                        size: 48,
-                        color: AppColors.primary,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
+            final pendingBookings = bookings
+                .where((b) => b.status == BookingStatus.pending)
+                .length;
+            final activeBookings = bookings
+                .where((b) => b.status == BookingStatus.inProgresss)
+                .length;
+            final completedBookings = bookings
+                .where((b) => b.status == BookingStatus.completed)
+                .length;
+            final totalEarnings = bookings
+                .where((b) => b.status == BookingStatus.completed)
+                .fold(0.0, (sum, booking) => sum + booking.totalAmount);
 
-              // Statistics Grid
-              GridView.count(
-                crossAxisCount: 2,
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildStatCard(
-                    'Pending',
-                    pendingBookings.toString(),
-                    Icons.schedule,
-                    Colors.orange,
-                  ),
-                  _buildStatCard(
-                    'Active',
-                    activeBookings.toString(),
-                    Icons.construction,
-                    Colors.blue,
-                  ),
-                  _buildStatCard(
-                    'Completed',
-                    completedBookings.toString(),
-                    Icons.check_circle,
-                    Colors.green,
-                  ),
-                  _buildStatCard(
-                    'Earnings',
-                    Helpers.formatCurrency(totalEarnings),
-                    Icons.account_balance_wallet,
-                    AppColors.primary,
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-
-              // Recent Bookings
-              const Text(
-                'Recent Bookings',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 12),
-              
-              ...bookings.take(3).map((booking) => 
-                  _buildBookingCard(booking)),
-              
-              if (bookings.isEmpty)
-                const Card(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Center(
-                      child: Text(
-                        'No bookings yet',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textSecondary,
-                        ),
+                  // Welcome Card
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const Text(
+                                  'Welcome back!',
+                                  style: TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'You have ${services.length} services and $pendingBookings pending bookings', // ✅ Updated this line
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.business_center,
+                            size: 48,
+                            color: AppColors.primary,
+                          ),
+                        ],
                       ),
                     ),
                   ),
-                ),
-            ],
-          ),
+                  const SizedBox(height: 20),
+
+                  // ✅ Updated Statistics Grid
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    crossAxisSpacing: 16,
+                    mainAxisSpacing: 16,
+                    children: [
+                      _buildStatCard(
+                        // ✅ Added services stat card
+                        'Services',
+                        services.length.toString(),
+                        Icons.build,
+                        AppColors.primary,
+                      ),
+                      _buildStatCard(
+                        'Active',
+                        activeBookings.toString(),
+                        Icons.construction,
+                        Colors.blue,
+                      ),
+                      _buildStatCard(
+                        'Pending',
+                        pendingBookings.toString(),
+                        Icons.schedule,
+                        Colors.orange,
+                      ),
+                      _buildStatCard(
+                        'Completed',
+                        completedBookings.toString(),
+                        Icons.check_circle,
+                        Colors.green,
+                      ),
+                      _buildStatCard(
+                        'Earnings',
+                        Helpers.formatCurrency(totalEarnings),
+                        Icons.account_balance_wallet,
+                        AppColors.primary,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+
+                  // Recent Bookings (keep your existing code here)
+                  const Text(
+                    'Recent Bookings',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
+                  ...bookings
+                      .take(3)
+                      .map((booking) => _buildBookingCard(booking)),
+
+                  if (bookings.isEmpty)
+                    const Card(
+                      child: Padding(
+                        padding: EdgeInsets.all(40),
+                        child: Center(
+                          child: Text(
+                            'No bookings yet',
+                            style: TextStyle(
+                              fontSize: 16,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            );
+          },
         );
       },
     );
@@ -231,7 +344,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
         return RefreshIndicator(
           onRefresh: () async {
-            _loadProviderBookings();
+            _loadData();
           },
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -249,8 +362,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
         final bookings = bookingProvider.providerbookings
-            .where((b) => b.status == BookingStatus.completed || 
-                         b.status == BookingStatus.cancelled)
+            .where(
+              (b) =>
+                  b.status == BookingStatus.completed ||
+                  b.status == BookingStatus.cancelled,
+            )
             .toList();
 
         if (bookings.isEmpty) {
@@ -258,11 +374,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.history,
-                  size: 64,
-                  color: AppColors.textSecondary,
-                ),
+                Icon(Icons.history, size: 64, color: AppColors.textSecondary),
                 SizedBox(height: 16),
                 Text(
                   'No booking history',
@@ -278,7 +390,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
         return RefreshIndicator(
           onRefresh: () async {
-            _loadProviderBookings();
+            _loadData();
           },
           child: ListView.builder(
             padding: const EdgeInsets.all(16),
@@ -292,7 +404,12 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     );
   }
 
-  Widget _buildStatCard(String title, String value, IconData icon, Color color) {
+  Widget _buildStatCard(
+    String title,
+    String value,
+    IconData icon,
+    Color color,
+  ) {
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -325,7 +442,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   Widget _buildBookingCard(BookingModel booking) {
     final statusColor = Helpers.getStatusColor(booking.status.toString());
-    
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       child: Padding(
@@ -346,7 +463,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   ),
                 ),
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
                   decoration: BoxDecoration(
                     // ignore: deprecated_member_use
                     color: statusColor.withOpacity(0.1),
@@ -364,7 +484,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ],
             ),
             const SizedBox(height: 8),
-            
+
             Text(
               'Customer: ${booking.customerId.substring(0, 8)}',
               style: const TextStyle(
@@ -373,7 +493,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
             const SizedBox(height: 4),
-            
+
             Text(
               'Date: ${Helpers.formatDateTime(booking.scheduledDateTime)}',
               style: const TextStyle(
@@ -382,7 +502,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
             const SizedBox(height: 4),
-            
+
             Text(
               'Amount: ${Helpers.formatCurrency(booking.totalAmount)}',
               style: const TextStyle(
@@ -392,7 +512,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
             const SizedBox(height: 12),
-            
+
             // Action buttons
             if (booking.status == BookingStatus.pending) ...[
               Row(
@@ -400,7 +520,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   Expanded(
                     child: OutlinedButton(
                       onPressed: () => _updateBookingStatus(
-                          booking.id, BookingStatus.cancelled),
+                        booking.id,
+                        BookingStatus.cancelled,
+                      ),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: AppColors.error,
                         side: const BorderSide(color: AppColors.error),
@@ -412,7 +534,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () => _updateBookingStatus(
-                          booking.id, BookingStatus.confirmed),
+                        booking.id,
+                        BookingStatus.confirmed,
+                      ),
                       child: const Text('Accept'),
                     ),
                   ),
@@ -423,7 +547,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: () => _updateBookingStatus(
-                      booking.id, BookingStatus.inProgresss),
+                    booking.id,
+                    BookingStatus.inProgresss,
+                  ),
                   child: const Text('Start Service'),
                 ),
               ),
@@ -431,8 +557,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton(
-                  onPressed: () => _updateBookingStatus(
-                      booking.id, BookingStatus.completed),
+                  onPressed: () =>
+                      _updateBookingStatus(booking.id, BookingStatus.completed),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.success,
                   ),
@@ -446,14 +572,20 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     );
   }
 
-  Future<void> _updateBookingStatus(String bookingId, BookingStatus status) async {
+  Future<void> _updateBookingStatus(
+    String bookingId,
+    BookingStatus status,
+  ) async {
     final bookingProvider = context.read<BookingProvider>();
-    
-    final success = await bookingProvider.updateBookingStatus(bookingId, status);
-    
+
+    final success = await bookingProvider.updateBookingStatus(
+      bookingId,
+      status,
+    );
+
     if (success && mounted) {
       Helpers.showSnackBar(
-        context, 
+        context,
         'Booking ${status.toString().split('.').last} successfully',
         backgroundColor: AppColors.success,
       );
@@ -475,5 +607,115 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       default:
         return Icons.info;
     }
+  }
+
+  // ✅ Add this new method
+  Widget _buildServicesTab() {
+    return Consumer<ServiceProvider>(
+      builder: (context, serviceProvider, child) {
+        final services = serviceProvider.services;
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            _loadProviderServices();
+          },
+          child: Column(
+            children: [
+              // Services Header with Add Button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    const Text(
+                      'My Services',
+                      style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const Spacer(),
+                    ElevatedButton.icon(
+                      onPressed: () => context.go('/create-service'),
+                      icon: const Icon(Icons.add),
+                      label: const Text('Add Service'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // Services List
+              Expanded(
+                child: services.isEmpty
+                    ? _buildEmptyServicesState()
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: services.length,
+                        itemBuilder: (context, index) {
+                          final service = services[index];
+                          return ServiceCard(
+                            service: service,
+                            onTap: () =>
+                                context.go('/edit-service/${service.id}'),
+                          );
+                        },
+                      ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ✅ Add this helper method
+  Widget _buildEmptyServicesState() {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.build_circle_outlined,
+              size: 80,
+              color: Colors.grey[400],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'No Services Yet',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'Create your first service to start receiving bookings from customers',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => context.go('/create-service'),
+              icon: const Icon(Icons.add),
+              label: const Text('Create Your First Service'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 24,
+                  vertical: 12,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

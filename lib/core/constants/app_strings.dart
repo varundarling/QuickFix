@@ -46,5 +46,7 @@ class AppStrings {
   static const String somethingWentWrong = 'Something went wrong';
   static const String noInternetConnection = 'No internet connection';
   static const String locationPermissionDenied = 'Location permission denied';
+
+  
   
 }

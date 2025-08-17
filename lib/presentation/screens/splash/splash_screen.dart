@@ -31,20 +31,43 @@ class _SplashScreenState extends State<SplashScreen>
     );
 
     _fadeController.forward();
-    _checkAuthAndNavigate();
+    _initializeApp();
   }
 
-  Future<void> _checkAuthAndNavigate() async {
-    //waits for animation to complete
-    await Future.delayed(const Duration(seconds: 3));
+  Future<void> _initializeApp() async {
+    await Future.delayed(const Duration(seconds: 2));
 
     if (!mounted) return;
 
+    debugPrint('🔍 Initializing app and checking auth state...');
+
     final authProvider = context.read<AuthProvider>();
 
-    if (authProvider.isAuthenticated) {
-      context.go('home');
+    // ✅ Wait for Firebase auth to settle
+    await Future.delayed(const Duration(milliseconds: 500));
+
+    final isLoggedIn =
+        authProvider.isAuthenticated && authProvider.user != null;
+
+    if (isLoggedIn) {
+      debugPrint('✅ User is logged in: ${authProvider.user!.email}');
+
+      // ✅ Always get fresh user type from database
+      final userType = await authProvider.getUserType();
+      debugPrint(
+        '👤 User type determined for ${authProvider.user!.uid}: $userType',
+      );
+
+      // Navigate based on user type
+      if (userType == 'provider') {
+        debugPrint('🏢 Navigating to provider dashboard');
+        context.go('/provider-dashboard');
+      } else {
+        debugPrint('🏠 Navigating to customer home');
+        context.go('/home');
+      }
     } else {
+      debugPrint('❌ User not logged in, navigating to user type selection');
       context.go('/user-type-selection');
     }
   }
@@ -108,6 +131,11 @@ class _SplashScreenState extends State<SplashScreen>
                 //loading indicator
                 const CircularProgressIndicator(
                   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                ),
+                const SizedBox(height: 20),
+                const Text(
+                  'Loading user data...',
+                  style: TextStyle(color: Colors.white70, fontSize: 16),
                 ),
               ],
             ),

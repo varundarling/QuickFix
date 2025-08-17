@@ -107,6 +107,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       appBar: AppBar(
         title: const Text('Profile'),
         backgroundColor: AppColors.primary,
+        leading: IconButton(
+          onPressed: () {
+            context.go('/home');
+          },
+          icon: Icon(Icons.arrow_back_rounded, color: Colors.white),
+        ),
         actions: [
           if (!_isEditing)
             IconButton(

@@ -1,3 +1,7 @@
+import 'dart:math' as math;
+
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 import '../models/service_model.dart';
 import '../models/provider_model.dart';
 import '../../core/services/firebase_service.dart';
@@ -11,8 +15,9 @@ class ServiceRepository {
         'services',
         queryBuilder: (query) => query.where('isActive', isEqualTo: true),
       );
-      
+
       return querySnapshot.docs
+          .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
     } catch (e) {
@@ -24,7 +29,8 @@ class ServiceRepository {
     try {
       final doc = await _firebaseService.getDocument('services', serviceId);
       if (doc.exists) {
-        return ServiceModel.fromFireStore(doc);
+        final castedDoc = doc as DocumentSnapshot<Map<String, dynamic>>;
+        return ServiceModel.fromFireStore(castedDoc);
       }
       return null;
     } catch (e) {
@@ -40,8 +46,9 @@ class ServiceRepository {
             .where('category', isEqualTo: category)
             .where('isActive', isEqualTo: true),
       );
-      
+
       return querySnapshot.docs
+          .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
     } catch (e) {
@@ -57,8 +64,9 @@ class ServiceRepository {
             .where('isActive', isEqualTo: true)
             .where('isVerified', isEqualTo: true),
       );
-      
+
       return querySnapshot.docs
+          .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()
           .map((doc) => ProviderModel.fromFireStore(doc))
           .toList();
     } catch (e) {
@@ -70,7 +78,8 @@ class ServiceRepository {
     try {
       final doc = await _firebaseService.getDocument('providers', providerId);
       if (doc.exists) {
-        return ProviderModel.fromFireStore(doc);
+        final castedDoc = doc as DocumentSnapshot<Map<String, dynamic>>;
+        return ProviderModel.fromFireStore(castedDoc);
       }
       return null;
     } catch (e) {
@@ -87,8 +96,9 @@ class ServiceRepository {
             .where('isActive', isEqualTo: true)
             .where('isVerified', isEqualTo: true),
       );
-      
+
       return querySnapshot.docs
+          .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()
           .map((doc) => ProviderModel.fromFireStore(doc))
           .toList();
     } catch (e) {
@@ -109,13 +119,16 @@ class ServiceRepository {
             .where('isActive', isEqualTo: true)
             .where('isVerified', isEqualTo: true),
       );
-      
+
       return querySnapshot.docs
+          .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()
           .map((doc) => ProviderModel.fromFireStore(doc))
           .where((provider) {
             final distance = _calculateDistance(
-              latitude, longitude,
-              provider.latitude, provider.longitude,
+              latitude,
+              longitude,
+              provider.latitude,
+              provider.longitude,
             );
             return distance <= radiusKm;
           })
@@ -179,43 +192,52 @@ class ServiceRepository {
         'services',
         queryBuilder: (query) => query.where('isActive', isEqualTo: true),
       );
-      
+
       final categories = <String>{};
-      for (final doc in querySnapshot.docs) {
+      for (final doc
+          in querySnapshot.docs
+              .cast<QueryDocumentSnapshot<Map<String, dynamic>>>()) {
         final service = ServiceModel.fromFireStore(doc);
         categories.add(service.category);
       }
-      
       return categories.toList()..sort();
     } catch (e) {
       rethrow;
     }
   }
 
-  double _calculateDistance(double lat1, double lon1, double lat2, double lon2) {
+  double _calculateDistance(
+    double lat1,
+    double lon1,
+    double lat2,
+    double lon2,
+  ) {
     // Simple distance calculation - in production, use more accurate formula
     const double earthRadius = 6371; // Earth's radius in km
-    
+
     final double dLat = _toRadians(lat2 - lat1);
     final double dLon = _toRadians(lon2 - lon1);
-    
-    final double a = (dLat / 2).sin() * (dLat / 2).sin() +
-        lat1.cos() * lat2.cos() *
-        (dLon / 2).sin() * (dLon / 2).sin();
-    
-    final double c = 2 * a.sqrt().asin();
-    
+
+    final double a =
+        math.sin(dLat / 2) * math.sin(dLat / 2) +
+        math.cos(_toRadians(lat1)) *
+            math.cos(_toRadians(lat2)) *
+            math.sin(dLon / 2) *
+            math.sin(dLon / 2);
+
+    final double c = 2 * math.asin(math.sqrt(a));
+
     return earthRadius * c;
   }
 
   double _toRadians(double degree) {
-    return degree * (3.141592653589793 / 180);
+    return degree * (math.pi / 180);
   }
 }
 
 extension on double {
-  double sin() => sin();
-  double cos() => cos();
-  double sqrt() => sqrt();
-  double asin() => asin();
+  double sin() => math.sin(this);
+  double cos() => math.cos(this);
+  double sqrt() => math.sqrt(this);
+  double asin() => math.asin(this);
 }

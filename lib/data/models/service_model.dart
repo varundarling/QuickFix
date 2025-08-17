@@ -9,6 +9,7 @@ class ServiceModel {
   final String imageUrl;
   final List<String> subServices;
   final bool isActive;
+  final String providerId;
   final DateTime createdAt;
   final Map<String, dynamic>? metadata;
 
@@ -21,12 +22,19 @@ class ServiceModel {
     required this.imageUrl,
     required this.subServices,
     this.isActive = true,
+    required this.providerId,
     required this.createdAt,
     this.metadata,
   });
 
-  factory ServiceModel.fromFireStore(DocumentSnapshot doc) {
-    final data = doc.data() as Map<String, dynamic>;
+  factory ServiceModel.fromFireStore(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+
+    if (data == null) {
+      throw Exception('Document data is null');
+    }
     return ServiceModel(
       id: doc.id,
       name: data['name'] ?? '',
@@ -36,22 +44,24 @@ class ServiceModel {
       imageUrl: data['imageUrl'] ?? '',
       subServices: data['subServices'] ?? '',
       isActive: data['isActive'] ?? true,
+      providerId: data['providerId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       metadata: data['metadata'],
     );
   }
 
-  Map<String, dynamic> toFireStore(){
+  Map<String, dynamic> toFireStore() {
     return {
-      "name":name,
-      "description" : description,
-      'category' : category,
-      'basePrice' : basePrice,
-      'imageUrl' : imageUrl,
-      'subServices' : subServices,
-      'isActive' : isActive,
-      'createdAt' : Timestamp.fromDate(createdAt),
-      'metadata' : metadata,
+      "name": name,
+      "description": description,
+      'category': category,
+      'basePrice': basePrice,
+      'imageUrl': imageUrl,
+      'subServices': subServices,
+      'isActive': isActive,
+      'providerId': providerId,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'metadata': metadata,
     };
   }
 }

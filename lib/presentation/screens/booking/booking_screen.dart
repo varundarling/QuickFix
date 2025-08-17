@@ -17,7 +17,7 @@ import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 class BookingScreen extends StatefulWidget {
   final String serviceId;
 
-  const BookingScreen({Key? key, required this.serviceId}) : super(key: key);
+  const BookingScreen({super.key, required this.serviceId});
 
   @override
   State<BookingScreen> createState() => _BookingScreenState();

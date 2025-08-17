@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/data/models/user_model.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
@@ -38,12 +39,49 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ✅ Add these methods after your getters
+  Future<void> _saveUserType(String userType) async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'user_type_${_user!.uid}'; // ✅ User-specific key
+    await prefs.setString(key, userType);
+    debugPrint('✅ Saved user type: $userType');
+  }
+
+  Future<String?> _getSavedUserType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'user_type_${_user!.uid}'; // ✅ User-specific key
+    final userType = prefs.getString(key);
+    debugPrint('📱 Loaded saved user type: $userType');
+    return userType;
+  }
+
+  Future<void> _clearUserType() async {
+    final prefs = await SharedPreferences.getInstance();
+    final key = 'user_type_${_user!.uid}'; // ✅ User-specific key
+    await prefs.remove(key);
+    debugPrint('🗑️ Cleared saved user type');
+  }
+
+  Future<void> _clearAllUserTypes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keys = prefs.getKeys();
+
+    // Remove all user_type_* keys
+    for (final key in keys) {
+      if (key.startsWith('user_type_')) {
+        await prefs.remove(key);
+        debugPrint('🗑️ Cleared user type: $key');
+      }
+    }
+  }
+
   AuthProvider() {
     //Auth state changes
-    _firebaseService.auth.authStateChanges().listen((User? user) {
+    _firebaseService.auth.authStateChanges().listen((User? user) async {
       _user = user;
       if (user != null) {
-        _loadUserModel();
+        await _loadUserModel();
+        await _validateUserData();
       } else {
         _userModel = null;
       }
@@ -75,6 +113,13 @@ class AuthProvider extends ChangeNotifier {
       _clearError();
 
       await _firebaseService.signInWithEmailPassword(email, password);
+      await _loadUserModel();
+      if (_userModel?.userType != null) {
+        await _saveUserType(_userModel!.userType);
+        debugPrint(
+          '✅ Sign-in successful for user type: ${_userModel!.userType}',
+        );
+      }
       return true;
     } catch (e) {
       _setError(_getErrorMessage(e));
@@ -117,6 +162,9 @@ class AuthProvider extends ChangeNotifier {
           userModel.toRealtimeDatabase(),
         );
 
+        await _saveUserType(userType);
+        debugPrint('✅ Sign-up successful for user type: $userType');
+
         return true;
       }
       return false;
@@ -130,14 +178,90 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> signOut() async {
     try {
+      // ✅ Clear user type for current user before signing out
+      await _clearUserType();
+
       await _firebaseService.signOut();
       _user = null;
       _userModel = null;
       _clearError();
+
+      debugPrint('👋 User signed out and user type cleared');
       notifyListeners();
     } catch (e) {
       _setError(_getErrorMessage(e));
     }
+  }
+
+  // ✅ Add this method to validate user data
+  Future<bool> _validateUserData() async {
+    if (_user == null || _userModel == null) return false;
+
+    try {
+      // Get fresh data from Firebase
+      final doc = await _firebaseService.getUserData(_user!.uid);
+      if (doc.exists) {
+        final freshUserModel = UserModel.fromRealtimeDatabase(
+          doc.value as Map<dynamic, dynamic>,
+        );
+
+        // Check if cached data matches Firebase data
+        final isSameUserType = _userModel!.userType == freshUserModel.userType;
+        if (!isSameUserType) {
+          debugPrint(
+            '⚠️ User type mismatch detected! Cached: ${_userModel!.userType}, Firebase: ${freshUserModel.userType}',
+          );
+          // Update with fresh data
+          _userModel = freshUserModel;
+          await _saveUserType(freshUserModel.userType);
+          notifyListeners();
+        }
+
+        return true;
+      }
+    } catch (e) {
+      debugPrint('❌ Error validating user data: $e');
+    }
+
+    return false;
+  }
+
+  Future<String> getUserType() async {
+    debugPrint('🔍 Getting user type for user: ${_user?.uid}');
+
+    // ✅ Always prioritize database data over cached data
+    if (_user != null) {
+      // First, try to get fresh data from Firebase
+      try {
+        await _loadUserModel();
+        if (_userModel?.userType != null) {
+          debugPrint(
+            '🔥 Got fresh user type from Firebase: ${_userModel!.userType}',
+          );
+          // Save the fresh data to cache
+          await _saveUserType(_userModel!.userType);
+          return _userModel!.userType;
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to load from Firebase: $e');
+      }
+    }
+
+    // Fallback to cached data if Firebase fails
+    if (_userModel?.userType != null) {
+      debugPrint('👤 Using user type from memory: ${_userModel!.userType}');
+      return _userModel!.userType;
+    }
+
+    // Then check saved preferences for this specific user
+    final savedUserType = await _getSavedUserType();
+    if (savedUserType != null) {
+      debugPrint('💾 Using saved user type: $savedUserType');
+      return savedUserType;
+    }
+
+    debugPrint('⚠️ No user type found anywhere, defaulting to customer');
+    return 'customer'; // Default fallback
   }
 
   Future<bool> updateProfile({

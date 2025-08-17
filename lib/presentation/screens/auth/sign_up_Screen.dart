@@ -9,10 +9,9 @@ import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/buttons/primary_button.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key, this.preselectedUserType = 'Customer'});
+  const SignUpScreen({super.key, this.preselectedUserType = 'customer'});
 
   final String preselectedUserType;
-  
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -71,7 +70,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
     );
 
     if (success && mounted) {
-      if (_selectedUserType == 'provider') {
+      // ✅ Get actual user type from AuthProvider
+      final userType = await authProvider.getUserType();
+      if (userType == 'provider') {
         context.go('/provider-dashboard');
       } else {
         context.go('/home');
@@ -164,25 +165,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 30),
-
-                // Header
-                const Text(
-                  'Create Account',
-                  style: TextStyle(
-                    fontSize: 32,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Sign up to Get Started',
-                  style: TextStyle(
-                    fontSize: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-                const SizedBox(height: 50),
 
                 // Name Field
                 CustomTextField(

@@ -9,7 +9,7 @@ import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, this.preselectedUserType = 'Customer'});
+  const LoginScreen({super.key, this.preselectedUserType = 'customer'});
 
   final String preselectedUserType;
 
@@ -48,7 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      if (_selectedUserType == 'provider') {
+      final userType = await authProvider.getUserType();
+      debugPrint(
+        '🎯 Login successful, navigating based on user type: $userType',
+      );
+      if (userType == 'provider') {
         context.go('/provider-dashboard');
       } else {
         context.go('/home');
@@ -153,7 +157,6 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 30),
 
-                
                 //Email
                 CustomTextField(
                   controller: _emailController,

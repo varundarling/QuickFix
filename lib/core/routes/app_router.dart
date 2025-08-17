@@ -4,6 +4,8 @@ import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
+import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
+import 'package:quickfix/presentation/screens/provider/create_service_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/auth/sign_Up_Screen.dart';
 import '../../presentation/screens/booking/booking_details_screen.dart';
@@ -100,6 +102,18 @@ class AppRouter {
         path: '/provider-dashboard',
         name: 'provider-dashboard',
         builder: (context, state) => const ProviderDashboardScreen(),
+      ),
+
+      GoRoute(
+        path: '/create-service',
+        name: 'create-service',
+        builder: (context, state) => const CreateServiceScreen(),
+      ),
+
+      GoRoute(
+        path: '/provider-profile',
+        name: 'provider-profile',
+        builder: (context, state) => const ProviderProfileScreen(),
       ),
     ],
   );
