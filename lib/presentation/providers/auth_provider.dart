@@ -283,6 +283,7 @@ class AuthProvider extends ChangeNotifier {
       await _loadUserModel();
       debugPrint('✅ User model reloaded');
       debugPrint('📍 New user address: ${_userModel?.address}');
+      notifyListeners();
 
       return true;
     } catch (e, stackTrace) {

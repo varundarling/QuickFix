@@ -1,14 +1,15 @@
 import 'dart:async';
 import 'dart:math' as math;
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:geocoding/geocoding.dart' as geoCoding;
 import 'package:geolocator/geolocator.dart';
+import 'package:go_router/go_router.dart';
 import 'package:location/location.dart' hide LocationAccuracy;
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
+import 'package:quickfix/presentation/screens/home/home_screen.dart';
 
 class LocationService {
   static LocationService? _instance;
@@ -482,6 +483,7 @@ class LocationService {
                     textCapitalization: TextCapitalization.words,
                     onChanged: (value) {
                       location = value;
+                      debugPrint('🔤 Location input changed: $location');
                     },
                   ),
                   const SizedBox(height: 16),
@@ -498,8 +500,27 @@ class LocationService {
                 ),
                 ElevatedButton(
                   onPressed: () {
-                    if (location != null && location!.trim().isNotEmpty) {
+                    // ✅ Use controller.text instead of location variable
+                    final enteredLocation = controller.text.trim();
+                    debugPrint(
+                      '🚀 Confirm pressed with location: $enteredLocation',
+                    );
+
+                    if (enteredLocation.isNotEmpty) {
                       Navigator.of(context).pop();
+
+                      // ✅ Navigate with the captured location
+                      context.go(
+                        '/home?location=${Uri.encodeComponent(enteredLocation)}',
+                      );
+                    } else {
+                      // ✅ Show error if empty
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Please enter a location'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
                     }
                   },
                   style: ElevatedButton.styleFrom(
@@ -636,6 +657,9 @@ class LocationService {
         if (success && context.mounted) {
           await Future.delayed(const Duration(milliseconds: 200));
           await authProvider.reloadUserData();
+          debugPrint(
+            '✅ Updated address in provider: ${authProvider.userModel?.address}',
+          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Location updated successfully!'),

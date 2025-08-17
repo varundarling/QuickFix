@@ -14,7 +14,9 @@ import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 import '../../widgets/cards/service_card.dart';
 
 class HomeScreen extends StatefulWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.passedLocation});
+
+  final String? passedLocation;
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -29,11 +31,33 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // ✅ Defer loading until after the build completes
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeScreen();
       _loadAds();
     });
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _checkQueryParameters();
+  }
+
+  void _checkQueryParameters() {
+    // ✅ Get query parameters from go_router
+    final router = GoRouter.of(context);
+    final location = router.routeInformationProvider.value.location;
+    final uri = Uri.parse(location);
+    final locationParam = uri.queryParameters['location'];
+
+    debugPrint('🔍 Query parameter location: $locationParam');
+
+    if (locationParam != null && locationParam != _currentAddress) {
+      setState(() {
+        _currentAddress = Uri.decodeComponent(locationParam);
+      });
+      debugPrint('✅ Location updated: $_currentAddress');
+    }
   }
 
   Future<void> _initializeScreen() async {
@@ -219,80 +243,81 @@ class _HomeScreenState extends State<HomeScreen> {
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black45,
+            color: Colors.black.withOpacity(0.1),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
         ],
       ),
-      child: // ✅ Use Selector for better performance and debugging
-      Selector<AuthProvider, String?>(
-        selector: (context, authProvider) => authProvider.userModel?.address,
-        builder: (context, address, child) {
-          debugPrint('🏗️ Location widget rebuilding with: $address');
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          debugPrint(
+            '🏗️ Consumer called with address: ${authProvider.userModel?.address}',
+          );
 
-          return Container(
-            padding: const EdgeInsets.all(16),
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: Colors.grey[50],
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey),
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.location_on,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Text(
-                        'Your Location',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey,
-                          fontWeight: FontWeight.w500,
-                        ),
+          // ✅ Get route arguments for passed location
+          final args =
+              ModalRoute.of(context)?.settings.arguments
+                  as Map<String, dynamic>?;
+          final passedLocation = args?['location'] as String?;
+
+          // ✅ Priority order: passed location > provider address > current address > default
+          final displayAddress =
+              passedLocation ??
+              authProvider.userModel?.address ??
+              _currentAddress ??
+              'Set your location';
+
+          debugPrint('🏗️ Final display address: $displayAddress');
+
+          return Row(
+            children: [
+              const Icon(Icons.location_on, color: AppColors.primary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Your Location',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        address ??
-                            'Set your location', // ✅ This will update automatically
-                        style: const TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      displayAddress,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
                 ),
-                TextButton(
-                  onPressed: () =>
-                      LocationService.showLocationChangeOptions(context),
-                  child: const Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.edit_location, size: 16),
-                      SizedBox(width: 4),
-                      Text(
-                        'Change',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                        ),
+              ),
+              TextButton(
+                onPressed: () =>
+                    LocationService.showLocationChangeOptions(context),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_location, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           );
         },
       ),
