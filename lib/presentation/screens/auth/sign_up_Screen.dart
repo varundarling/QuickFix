@@ -9,7 +9,10 @@ import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/buttons/primary_button.dart';
 
 class SignUpScreen extends StatefulWidget {
-  const SignUpScreen({super.key});
+  const SignUpScreen({super.key, this.preselectedUserType = 'Customer'});
+
+  final String preselectedUserType;
+  
 
   @override
   State<SignUpScreen> createState() => _SignUpScreenState();
@@ -26,6 +29,14 @@ class _SignUpScreenState extends State<SignUpScreen> {
   bool _obscureConfirmPassword = true;
   bool _agreeToTerms = false;
 
+  late String _selectedUserType;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedUserType = widget.preselectedUserType;
+  }
+
   @override
   void dispose() {
     _nameController.dispose();
@@ -38,7 +49,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   Future<void> _handleSignUp() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     if (!_agreeToTerms) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -50,16 +61,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
     }
 
     final authProvider = context.read<AuthProvider>();
-    
+
     final success = await authProvider.signUp(
       email: _emailController.text.trim(),
       password: _passwordController.text,
       name: _nameController.text.trim(),
       phone: _phoneController.text.trim(),
+      userType: _selectedUserType,
     );
 
     if (success && mounted) {
-      context.go('/home');
+      if (_selectedUserType == 'provider') {
+        context.go('/provider-dashboard');
+      } else {
+        context.go('/home');
+      }
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -92,7 +108,63 @@ class _SignUpScreenState extends State<SignUpScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const SizedBox(height: 50),
-                
+
+                // Header
+                Text(
+                  _selectedUserType == 'provider'
+                      ? 'Join as Service Provider'
+                      : 'Create Account',
+                  style: const TextStyle(
+                    fontSize: 32,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _selectedUserType == 'provider'
+                      ? 'Start earning by providing services'
+                      : 'Sign up to book trusted services',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 50),
+
+                // ✅ Show selected user type
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedUserType == 'provider'
+                            ? Icons.business_center
+                            : Icons.person,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Signing up as ${_selectedUserType == 'provider' ? 'Service Provider' : 'Customer'}',
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const Spacer(),
+                      TextButton(
+                        onPressed: () => context.go('/user-type-selection'),
+                        child: const Text('Change'),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+
                 // Header
                 const Text(
                   'Create Account',
@@ -111,7 +183,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ),
                 ),
                 const SizedBox(height: 50),
-                
+
                 // Name Field
                 CustomTextField(
                   controller: _nameController,
@@ -121,7 +193,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: Validators.name,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Email Field
                 CustomTextField(
                   controller: _emailController,
@@ -132,7 +204,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: Validators.email,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Phone Field
                 CustomTextField(
                   controller: _phoneController,
@@ -143,7 +215,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: Validators.phone,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Password Field
                 CustomTextField(
                   controller: _passwordController,
@@ -152,9 +224,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   obscureText: _obscurePassword,
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscurePassword 
-                        ? Icons.visibility_off 
-                        : Icons.visibility),
+                    icon: Icon(
+                      _obscurePassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
                     onPressed: () {
                       setState(() {
                         _obscurePassword = !_obscurePassword;
@@ -164,7 +238,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: Validators.password,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Confirm Password Field
                 CustomTextField(
                   controller: _confirmPasswordController,
@@ -173,9 +247,11 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   obscureText: _obscureConfirmPassword,
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
-                    icon: Icon(_obscureConfirmPassword 
-                        ? Icons.visibility_off 
-                        : Icons.visibility),
+                    icon: Icon(
+                      _obscureConfirmPassword
+                          ? Icons.visibility_off
+                          : Icons.visibility,
+                    ),
                     onPressed: () {
                       setState(() {
                         _obscureConfirmPassword = !_obscureConfirmPassword;
@@ -185,7 +261,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   validator: _validateConfirmPassword,
                 ),
                 const SizedBox(height: 20),
-                
+
                 // Terms & Conditions Checkbox
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -221,19 +297,21 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   ],
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Sign Up Button
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
                     return PrimaryButton(
-                      onPressed: authProvider.isSigningUp ? null : _handleSignUp,
+                      onPressed: authProvider.isSigningUp
+                          ? null
+                          : _handleSignUp,
                       text: AppStrings.signUp,
                       isLoading: authProvider.isSigningUp,
                     );
                   },
                 ),
                 const SizedBox(height: 30),
-                
+
                 // Login Link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,

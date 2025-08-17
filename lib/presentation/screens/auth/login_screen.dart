@@ -9,7 +9,9 @@ import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.preselectedUserType = 'Customer'});
+
+  final String preselectedUserType;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -20,6 +22,14 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+
+  late String _selectedUserType;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedUserType = widget.preselectedUserType;
+  }
 
   @override
   void dispose() {
@@ -38,7 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      context.go('/home');
+      if (_selectedUserType == 'provider') {
+        context.go('/provider-dashboard');
+      } else {
+        context.go('/home');
+      }
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -62,17 +76,84 @@ class _LoginScreenState extends State<LoginScreen> {
               children: [
                 const SizedBox(height: 50),
 
-                //Header
-                const Text(
-                  'Welcome Back!',
-                  style: TextStyle(
+                // Header
+                Text(
+                  _selectedUserType == 'provider'
+                      ? 'Provider Login'
+                      : 'Welcome Back!',
+                  style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
                     color: AppColors.textPrimary,
                   ),
                 ),
-                const SizedBox(height: 50),
+                const SizedBox(height: 8),
 
+                Text(
+                  _selectedUserType == 'provider'
+                      ? 'Login to manage your services'
+                      : 'Login to book trusted services',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 30),
+
+                // ✅ User Type Display - Add this section
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        _selectedUserType == 'provider'
+                            ? Icons.business_center
+                            : Icons.person,
+                        color: AppColors.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Logging in as ${_selectedUserType == 'provider' ? 'Service Provider' : 'Customer'}',
+                          style: const TextStyle(
+                            color: AppColors.primary,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () {
+                          // Navigate back to user type selection
+                          context.go('/user-type-selection');
+                        },
+                        style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
+                          minimumSize: const Size(60, 32),
+                        ),
+                        child: const Text(
+                          'Change',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 30),
+
+                
                 //Email
                 CustomTextField(
                   controller: _emailController,
@@ -111,7 +192,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
                     return PrimaryButton(
-                      onPressed: authProvider.isSigningIn ?null : _handlingLogin ,
+                      onPressed: authProvider.isSigningIn
+                          ? null
+                          : _handlingLogin,
                       text: AppStrings.login,
                       isLoading: authProvider.isSigningIn,
                     );

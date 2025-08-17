@@ -45,7 +45,7 @@ class _SplashScreenState extends State<SplashScreen>
     if (authProvider.isAuthenticated) {
       context.go('home');
     } else {
-      context.go('/login');
+      context.go('/user-type-selection');
     }
   }
 
