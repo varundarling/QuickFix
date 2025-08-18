@@ -9,12 +9,12 @@ plugins {
 
 android {
     namespace = "com.example.quickfix"
-    compileSdk = 35
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_17  // ✅ Removed underscore
+        targetCompatibility = JavaVersion.VERSION_17  // ✅ Removed underscore
     }
 
     kotlinOptions {
@@ -26,10 +26,10 @@ android {
         applicationId = "com.example.quickfix"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = 23
-        targetSdk = 35
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
+        minSdkVersion(24)                    // ✅ Direct assignment
+        targetSdkVersion(36)                 // ✅ Corrected property name
+        versionCode = 1                       // ✅ Use explicit value
+        versionName = "1.0"                   // ✅ Use explicit value
     }
 
     buildTypes {
@@ -45,16 +45,21 @@ flutter {
     source = "../.."
 }
 
+// ✅ Add compiler args for Java tasks
+tasks.withType<JavaCompile> {
+    options.compilerArgs.addAll(listOf("-Xlint:-options", "-Xlint:-deprecation"))
+    sourceCompatibility = JavaVersion.VERSION_17.toString()
+        targetCompatibility = JavaVersion.VERSION_17.toString()
+}
+
 dependencies {
-  // Import the Firebase BoM
-  implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
+    // Import the Firebase BoM
+    implementation(platform("com.google.firebase:firebase-bom:34.1.0"))
 
+    // TODO: Add the dependencies for Firebase products you want to use
+    // When using the BoM, don't specify versions in Firebase dependencies
+    implementation("com.google.firebase:firebase-analytics")
 
-  // TODO: Add the dependencies for Firebase products you want to use
-  // When using the BoM, don't specify versions in Firebase dependencies
-  implementation("com.google.firebase:firebase-analytics")
-
-
-  // Add the dependencies for any other desired Firebase products
-  // https://firebase.google.com/docs/android/setup#available-libraries
+    // Add the dependencies for any other desired Firebase products
+    // https://firebase.google.com/docs/android/setup#available-libraries
 }

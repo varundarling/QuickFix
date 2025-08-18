@@ -73,7 +73,13 @@ class _HomeScreenState extends State<HomeScreen> {
 
     //Load Service and providers
     final serviceProvider = context.read<ServiceProvider>();
-    await serviceProvider.loadProviders();
+    // Load all services with location filtering for customers
+    await serviceProvider.loadAllServices(
+      userLat: _curentLocation?.latitude,
+      userLng: _curentLocation?.longitude,
+    );
+
+    // Load providers
     await serviceProvider.loadProviders(
       userLat: _curentLocation?.latitude,
       userLng: _curentLocation?.longitude,

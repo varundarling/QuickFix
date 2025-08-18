@@ -75,24 +75,6 @@ class AppRouter {
       ),
 
       GoRoute(
-        path: '/booking/:serviceId',
-        name: 'booking',
-        builder: (context, state) {
-          final serviceId = state.pathParameters['serviceId']!;
-          return BookingScreen(serviceId: serviceId);
-        },
-      ),
-
-      GoRoute(
-        path: '/booking-details/:bookingId',
-        name: 'booking-details',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          return BookingDetailsScreen(bookingId: bookingId);
-        },
-      ),
-
-      GoRoute(
         path: '/profile',
         name: 'profile',
         builder: (context, state) => const ProfileScreen(),
@@ -114,6 +96,24 @@ class AppRouter {
         path: '/provider-profile',
         name: 'provider-profile',
         builder: (context, state) => const ProviderProfileScreen(),
+      ),
+
+      GoRoute(
+        path: '/booking/:serviceId',
+        name: 'booking',
+        builder: (context, state) {
+          final serviceId = state.pathParameters['serviceId']!;
+          return BookingScreen(serviceId: serviceId);
+        },
+      ),
+
+      GoRoute(
+        path: '/booking-details/:bookingId',
+        name: 'booking-details',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          return BookingDetailsScreen(bookingId: bookingId);
+        },
       ),
     ],
   );

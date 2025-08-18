@@ -29,6 +29,27 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  String? getCurrentUserId() {
+    return _user?.uid;
+  }
+
+  Future<bool> ensureUserAuthenticated() async {
+    if (_user == null) {
+      // Wait a bit for auth state to restore
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Force reload current user
+      await FirebaseAuth.instance.currentUser?.reload();
+      _user = FirebaseAuth.instance.currentUser;
+
+      if (_user != null && _userModel == null) {
+        await _loadUserModel();
+      }
+    }
+
+    return _user != null;
+  }
+
   void _setSignUpLoading(bool loading) {
     _isSigningUp = loading;
     notifyListeners();
@@ -65,8 +86,10 @@ class AuthProvider extends ChangeNotifier {
   AuthProvider() {
     //Auth state changes
     _firebaseService.auth.authStateChanges().listen((User? user) async {
+      debugPrint('🔄 Auth state changed: ${user?.uid}');
       _user = user;
       if (user != null) {
+        debugPrint('✅ User authenticated: ${user.email}');
         await _loadUserModel();
         await _validateUserData();
       } else {
@@ -165,7 +188,9 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     try {
       // ✅ Clear user type for current user before signing out
-      await _clearUserType();
+      if (user != null) {
+        await _clearUserType();
+      }
 
       await _firebaseService.signOut();
       _user = null;
@@ -215,39 +240,29 @@ class AuthProvider extends ChangeNotifier {
   Future<String> getUserType() async {
     debugPrint('🔍 Getting user type for user: ${_user?.uid}');
 
-    // ✅ Always prioritize database data over cached data
+    // ✅ Always prioritize fresh database data
     if (_user != null) {
-      // First, try to get fresh data from Firebase
       try {
         await _loadUserModel();
         if (_userModel?.userType != null) {
-          debugPrint(
-            '🔥 Got fresh user type from Firebase: ${_userModel!.userType}',
-          );
-          // Save the fresh data to cache
+          debugPrint('🔥 Got fresh user type: ${_userModel!.userType}');
           await _saveUserType(_userModel!.userType);
           return _userModel!.userType;
         }
       } catch (e) {
-        debugPrint('❌ Failed to load from Firebase: $e');
+        debugPrint('❌ Failed to load from database: $e');
       }
     }
 
-    // Fallback to cached data if Firebase fails
-    if (_userModel?.userType != null) {
-      debugPrint('👤 Using user type from memory: ${_userModel!.userType}');
-      return _userModel!.userType;
-    }
-
-    // Then check saved preferences for this specific user
+    // Fallback to cached data
     final savedUserType = await _getSavedUserType();
     if (savedUserType != null) {
-      debugPrint('💾 Using saved user type: $savedUserType');
+      debugPrint('💾 Using cached user type: $savedUserType');
       return savedUserType;
     }
 
-    debugPrint('⚠️ No user type found anywhere, defaulting to customer');
-    return 'customer'; // Default fallback
+    debugPrint('⚠️ Defaulting to customer');
+    return 'customer';
   }
 
   Future<bool> updateProfile({
@@ -326,7 +341,43 @@ class AuthProvider extends ChangeNotifier {
     return 'An expected error has occurred. Please try again.';
   }
 
+  // Add this method that was missing
+  Future<UserModel?> _loadUserFromDatabase(String uid) async {
+    try {
+      final doc = await _firebaseService.getUserData(uid);
+      if (doc.exists) {
+        return UserModel.fromRealtimeDatabase(
+          doc.value as Map<dynamic, dynamic>,
+        );
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error loading user from database: $e');
+      return null;
+    }
+  }
+
   Future<void> reloadUserData() async {
-    await _loadUserModel();
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        _userModel = null;
+        notifyListeners();
+        return;
+      }
+
+      // ✅ Load user data from database
+      final userData = await _loadUserFromDatabase(currentUser.uid);
+
+      if (userData != null) {
+        _userModel = userData;
+        // ✅ Update cached user type
+        await _saveUserType(userData.userType);
+        notifyListeners();
+        debugPrint('✅ User data reloaded: ${userData.userType}');
+      }
+    } catch (e) {
+      debugPrint('Error reloading user data: $e');
+    }
   }
 }

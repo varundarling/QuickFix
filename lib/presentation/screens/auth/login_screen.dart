@@ -8,6 +8,8 @@ import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
 
+import '../../../core/utils/navigation_helper.dart';
+
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key, this.preselectedUserType = 'customer'});
 
@@ -48,15 +50,8 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-      final userType = await authProvider.getUserType();
-      debugPrint(
-        '🎯 Login successful, navigating based on user type: $userType',
-      );
-      if (userType == 'provider') {
-        context.go('/provider-dashboard');
-      } else {
-        context.go('/home');
-      }
+      // ✅ Use NavigationHelper for consistent navigation
+      await NavigationHelper.navigateBasedOnRole(context);
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

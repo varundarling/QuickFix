@@ -230,7 +230,10 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
           backgroundColor: AppColors.success,
         ),
       );
-      context.go('/provider-dashboard');
+      await Future.delayed(const Duration(milliseconds: 500));
+      if (mounted) {
+        context.go('/provider-dashboard');
+      }
     } else if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(

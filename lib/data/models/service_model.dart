@@ -42,7 +42,7 @@ class ServiceModel {
       category: data['category'] ?? '',
       basePrice: (data['basePrice'] ?? 0.0).toDouble(),
       imageUrl: data['imageUrl'] ?? '',
-      subServices: data['subServices'] ?? '',
+      subServices: List<String>.from(data['subServices'] ?? []),
       isActive: data['isActive'] ?? true,
       providerId: data['providerId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),

@@ -1,4 +1,3 @@
-
 class UserModel {
   final String id;
   final String name;
@@ -26,6 +25,10 @@ class UserModel {
     this.address,
   });
 
+  // ✅ Add convenience getter methods
+  bool get isProvider => userType.toLowerCase() == 'provider';
+  bool get isCustomer => userType.toLowerCase() == 'customer';
+
   factory UserModel.fromRealtimeDatabase(Map<dynamic, dynamic> data) {
     return UserModel(
       id: data['id']?.toString() ?? '',
@@ -34,7 +37,7 @@ class UserModel {
       phone: data['phone']?.toString() ?? '',
       photoUrl: data['photoUrl']?.toString(),
       userType: data['userType']?.toString() ?? 'customer',
-      createdAt: data['createdAt'] != null 
+      createdAt: data['createdAt'] != null
           ? DateTime.fromMillisecondsSinceEpoch(data['createdAt'])
           : DateTime.now(),
       isActive: data['isActive'] ?? true,
@@ -52,7 +55,7 @@ class UserModel {
       'phone': phone,
       'photoUrl': photoUrl,
       'userType': userType,
-      'createdAt': createdAt.minute,
+      'createdAt': createdAt.millisecondsSinceEpoch,
       'isActive': isActive,
       'latitude': latitude,
       'longitude': longitude,

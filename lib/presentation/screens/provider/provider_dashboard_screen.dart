@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
+import '../../../core/utils/navigation_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -26,28 +27,98 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    // ✅ Wait longer for authentication to be ready
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadData();
+      if (mounted) {
+        // Add a small delay to ensure Firebase Auth is fully initialized
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            _loadData();
+          }
+        });
+      }
     });
   }
 
   Future<void> _loadData() async {
-    final authProvider = context.read<AuthProvider>();
-    final bookingProvider = context.read<BookingProvider>();
-    final serviceProvider = context.read<ServiceProvider>();
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final bookingProvider = context.read<BookingProvider>();
+      final serviceProvider = context.read<ServiceProvider>();
 
-    if (authProvider.user != null) {
-      // Load data without triggering immediate UI updates
+      debugPrint('🏗️ Loading provider dashboard data...');
+
+      // ✅ Ensure user is authenticated before loading data
+      final isAuthenticated = await authProvider.ensureUserAuthenticated();
+
+      if (!isAuthenticated) {
+        debugPrint('❌ User not authenticated, cannot load services');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Authentication required. Please log in again.'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+        return;
+      }
+
+      // ✅ Wait for user model to be loaded
+      if (authProvider.userModel == null) {
+        debugPrint('🔄 User model not loaded, reloading...');
+        await authProvider.reloadUserData();
+      }
+
+      final userId = authProvider.getCurrentUserId();
+
+      if (userId == null) {
+        debugPrint('❌ No user ID available');
+        return;
+      }
+
+      debugPrint('✅ Loading data for user: $userId');
+
+      // Load data with proper error handling
       await Future.wait([
-        bookingProvider.loadProviderBookings(authProvider.user!.uid),
-        serviceProvider.loadServices(),
+        bookingProvider.loadProviderBookings(userId),
+        serviceProvider.loadMyServices(),
       ]);
+
+      debugPrint('✅ Data loading completed');
+    } catch (error, stackTrace) {
+      debugPrint('❌ Error loading provider data: $error');
+      debugPrint('Stack trace: $stackTrace');
+
+      // Show user-friendly error message
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to load services. Please try again.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
     }
   }
 
-  void _loadProviderServices() {
-    final serviceProvider = context.read<ServiceProvider>();
-    serviceProvider.loadServices();
+  Future<void> _loadProviderServices() async {
+    try {
+      final serviceProvider = context.read<ServiceProvider>();
+      await serviceProvider.loadMyServices();
+    } catch (error) {
+      debugPrint('❌ Error loading services: $error');
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Failed to refresh services'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -70,6 +141,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
+    debugPrint('🏗️ Building ProviderDashboardScreen');
     return Scaffold(
       appBar: AppBar(
         title: const Text('Provider Dashboard'),
@@ -82,25 +154,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           PopupMenuButton<String>(
             onSelected: (value) async {
               if (value == 'logout') {
-                // ✅ Show loading indicator
-                showDialog(
-                  context: context,
-                  barrierDismissible: false,
-                  builder: (context) =>
-                      const Center(child: CircularProgressIndicator()),
-                );
-
-                // ✅ Properly sign out and clear all data
-                final authProvider = context.read<AuthProvider>();
-                await authProvider.signOut();
-
-                // ✅ Close loading dialog
-                if (mounted) Navigator.of(context).pop();
-
-                // ✅ Navigate to user type selection (not customer home)
-                if (mounted) {
-                  context.go('/user-type-selection');
-                }
+                // ✅ Use NavigationHelper for logout
+                NavigationHelper.handleLogout(context);
               }
             },
             itemBuilder: (context) => [
@@ -153,7 +208,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     if (authProvider.user != null) {
       await Future.wait([
         bookingProvider.loadProviderBookings(authProvider.user!.uid),
-        serviceProvider.loadServices(),
+        serviceProvider.loadMyServices(),
       ]);
     }
   }
@@ -196,7 +251,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       padding: const EdgeInsets.all(20),
                       child: Row(
                         children: [
-                          Expanded(
+                          Flexible(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
@@ -469,7 +524,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   ),
                   decoration: BoxDecoration(
                     // ignore: deprecated_member_use
-                    color: statusColor.withOpacity(0.1),
+                    color: statusColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Text(
@@ -613,17 +668,45 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   Widget _buildServicesTab() {
     return Consumer<ServiceProvider>(
       builder: (context, serviceProvider, child) {
+        if (serviceProvider.isLoading) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (serviceProvider.errorMessage != null) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red),
+                const SizedBox(height: 16),
+                Text(
+                  'Error: ${serviceProvider.errorMessage}',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(color: Colors.red),
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => _loadProviderServices(),
+                  child: const Text('Retry'),
+                ),
+              ],
+            ),
+          );
+        }
+
         final services = serviceProvider.services;
 
-        return RefreshIndicator(
-          onRefresh: () async {
-            _loadProviderServices();
-          },
-          child: Column(
-            children: [
-              // Services Header with Add Button
-              Padding(
-                padding: const EdgeInsets.all(16),
+        if (services.isEmpty) {
+          return _buildEmptyServicesState();
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(16),
+          itemCount: services.length + 1,
+          itemBuilder: (context, index) {
+            if (index == 0) {
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 16),
                 child: Row(
                   children: [
                     const Text(
@@ -634,38 +717,22 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       ),
                     ),
                     const Spacer(),
-                    ElevatedButton.icon(
-                      onPressed: () => context.go('/create-service'),
-                      icon: const Icon(Icons.add),
-                      label: const Text('Add Service'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                      ),
-                    ),
                   ],
                 ),
-              ),
+              );
+            }
 
-              // Services List
-              Expanded(
-                child: services.isEmpty
-                    ? _buildEmptyServicesState()
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: services.length,
-                        itemBuilder: (context, index) {
-                          final service = services[index];
-                          return ServiceCard(
-                            service: service,
-                            onTap: () =>
-                                context.go('/edit-service/${service.id}'),
-                          );
-                        },
-                      ),
+            final service = services[index - 1];
+            return Card(
+              margin: const EdgeInsets.only(bottom: 8),
+              child: ListTile(
+                title: Text(service.name),
+                subtitle: Text('₹${service.basePrice} • ${service.category}'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => context.go('/edit-service/${service.id}'),
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

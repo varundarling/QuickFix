@@ -1,6 +1,8 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:geocoding/geocoding.dart';
+import 'package:geolocator/geolocator.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/data/models/provider_model.dart';
@@ -61,6 +63,18 @@ class ServiceProvider extends ChangeNotifier {
         throw Exception('User not logged in');
       }
 
+      final position = await _getCurrentLocation();
+      String address = 'Location not available';
+
+      if (position != null) {
+        address =
+            await _getAddressFromCoordinates(
+              position.latitude,
+              position.longitude,
+            ) ??
+            'Address not available';
+      }
+
       // Generate unique ID
       final serviceId = const Uuid().v4();
 
@@ -75,6 +89,13 @@ class ServiceProvider extends ChangeNotifier {
         subServices: subServices,
         providerId: currentUser.uid, // Add provider ID
         createdAt: DateTime.now(),
+        metadata: position != null
+            ? {
+                'latitude': position.latitude,
+                'longitude': position.longitude,
+                'address': address,
+              }
+            : null,
       );
 
       // Save to Firestore
@@ -97,34 +118,111 @@ class ServiceProvider extends ChangeNotifier {
     }
   }
 
-  Future<void> loadServices() async {
+  // Helper methods for location
+  Future<Position?> _getCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          return null;
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        return null;
+      }
+
+      return await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
+    } catch (e) {
+      print('Error getting location: $e');
+      return null;
+    }
+  }
+
+  Future<String?> _getAddressFromCoordinates(
+    double latitude,
+    double longitude,
+  ) async {
+    try {
+      final placemarks = await placemarkFromCoordinates(latitude, longitude);
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        return '${placemark.street}, ${placemark.locality}, ${placemark.administrativeArea}';
+      }
+      return null;
+    } catch (e) {
+      print('Error getting address: $e');
+      return null;
+    }
+  }
+
+  Future<void> loadMyServices() async {
     _isLoading = true;
     _errorMessage = null;
     _safeNotifyListeners();
 
     try {
+      // ✅ Wait for authentication to be ready
+      await Future.delayed(const Duration(milliseconds: 100));
+
       final currentUser = FirebaseAuth.instance.currentUser;
+
+      // ✅ Add extensive debugging
+      debugPrint('🔍 Loading services for user: ${currentUser?.uid}');
+      debugPrint('🔍 User email: ${currentUser?.email}');
+
       if (currentUser == null) {
+        debugPrint('❌ No current user found, clearing services');
         _services = [];
         _isLoading = false;
         _safeNotifyListeners();
         return;
       }
 
+      // ✅ Force token refresh to ensure authentication is valid
+      await currentUser.getIdToken(true);
+
+      debugPrint('🔍 Querying services with providerId: ${currentUser.uid}');
+
       // Load services for current provider
       final snapshot = await FirebaseFirestore.instance
           .collection('services')
           .where('providerId', isEqualTo: currentUser.uid)
           .orderBy('createdAt', descending: true)
-          .get();
+          .get()
+          .timeout(
+            const Duration(seconds: 10),
+            onTimeout: () {
+              throw Exception(
+                'Request timed out. Please check your connection.',
+              );
+            },
+          );
+
+      debugPrint('🔍 Found ${snapshot.docs.length} services in Firestore');
+
+      // ✅ Debug each service found
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        debugPrint(
+          '📄 Service: ${data['name']} (ID: ${doc.id}) - Provider: ${data['providerId']}',
+        );
+      }
 
       _services = snapshot.docs
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
+      debugPrint('✅ Successfully loaded ${_services.length} services');
+
       _isLoading = false;
       _safeNotifyListeners();
     } catch (e) {
+      debugPrint('❌ Error loading services: $e');
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
@@ -291,5 +389,70 @@ class ServiceProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  // Method to load all services (for customers)
+  Future<void> loadAllServices({double? userLat, double? userLng}) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _safeNotifyListeners();
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('services')
+          .where('isActive', isEqualTo: true)
+          .get();
+
+      List<ServiceModel> allServices = snapshot.docs
+          .map((doc) => ServiceModel.fromFireStore(doc))
+          .toList();
+
+      // Filter by location if provided (within 20km radius)
+      if (userLat != null && userLng != null) {
+        allServices = allServices.where((service) {
+          if (service.metadata != null &&
+              service.metadata!['latitude'] != null &&
+              service.metadata!['longitude'] != null) {
+            final distance = _locationService.calculateDistance(
+              userLat,
+              userLng,
+              service.metadata!['latitude'],
+              service.metadata!['longitude'],
+            );
+            return distance <= 20.0; // Within 20km
+          }
+          return true; // Include services without location data
+        }).toList();
+
+        // Sort by distance
+        allServices.sort((a, b) {
+          if (a.metadata?['latitude'] == null ||
+              b.metadata?['latitude'] == null) {
+            return 0;
+          }
+          final distanceA = _locationService.calculateDistance(
+            userLat,
+            userLng,
+            a.metadata!['latitude'],
+            a.metadata!['longitude'],
+          );
+          final distanceB = _locationService.calculateDistance(
+            userLat,
+            userLng,
+            b.metadata!['latitude'],
+            b.metadata!['longitude'],
+          );
+          return distanceA.compareTo(distanceB);
+        });
+      }
+
+      _services = allServices;
+      _isLoading = false;
+      _safeNotifyListeners();
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      _safeNotifyListeners();
+    }
   }
 }
