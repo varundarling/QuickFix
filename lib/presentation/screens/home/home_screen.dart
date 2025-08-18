@@ -8,6 +8,7 @@ import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
+import 'package:quickfix/presentation/screens/home/search_screen.dart';
 import 'package:quickfix/presentation/widgets/common/ad_banner_widget.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 
@@ -114,7 +115,7 @@ class _HomeScreenState extends State<HomeScreen> {
               SliverToBoxAdapter(child: _buildLocationBanner()),
 
               //search Bar
-              SliverToBoxAdapter(child: _buildSearchBar()),
+              SliverToBoxAdapter(child: _buildSearchBar(context)),
 
               //Category tabs
               SliverToBoxAdapter(child: _buildCategoryTabs()),
@@ -305,24 +306,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              TextButton(
-                onPressed: () =>
-                    LocationService.showLocationChangeOptions(context),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.edit_location, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Change',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+              // TextButton(
+              //   onPressed: () =>
+              //       LocationService.showLocationChangeOptions(context),
+              //   child: const Row(
+              //     mainAxisSize: MainAxisSize.min,
+              //     children: [
+              //       Icon(Icons.edit_location, size: 16),
+              //       SizedBox(width: 4),
+              //       Text(
+              //         'Change',
+              //         style: TextStyle(
+              //           fontSize: 12,
+              //           fontWeight: FontWeight.w600,
+              //         ),
+              //       ),
+              //     ],
+              //   ),
+              // ),
             ],
           );
         },
@@ -330,12 +331,12 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildSearchBar() {
+  Widget _buildSearchBar(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       child: TextField(
         decoration: InputDecoration(
-          hintText: 'Searching for services...',
+          hintText: 'Search for services...',
           prefixIcon: const Icon(Icons.search),
           filled: true,
           fillColor: Colors.white,
@@ -346,7 +347,15 @@ class _HomeScreenState extends State<HomeScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         onTap: () {
-          //TOdo Navigate to search screen
+          // Navigate to search screen with available services
+          final serviceProvider = context.read<ServiceProvider>();
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  SearchScreen(services: serviceProvider.services),
+            ),
+          );
         },
         readOnly: true,
       ),
@@ -377,7 +386,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: Colors.white,
                   selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
-                    color: isSelected ? Colors.white : AppColors.textPrimary,
+                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),

@@ -34,7 +34,7 @@ class ServiceProvider extends ChangeNotifier {
     'Cleaning',
     'Appliance Repair',
     'Painting',
-    'Carepentry',
+    'Carpentry',
   ];
 
   void _safeNotifyListeners() {

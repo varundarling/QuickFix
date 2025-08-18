@@ -536,9 +536,9 @@ class LocationService {
       },
     );
 
-    if (location != null && location!.isNotEmpty && context.mounted) {
-      await _updateManualLocation(context, location!);
-    }
+    // if (location != null && location!.isNotEmpty && context.mounted) {
+    //   await _updateManualLocation(context, location!);
+    // }
   }
 
   static Future<void> showLocationChangeOptions(BuildContext context) async {
@@ -616,75 +616,75 @@ class LocationService {
     );
   }
 
-  Future<void> _updateManualLocation(
-    BuildContext context,
-    String location,
-  ) async {
-    // Show loading
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('Updating location...'),
-          ],
-        ),
-      ),
-    );
+  // Future<void> _updateManualLocation(
+  //   BuildContext context,
+  //   String location,
+  // ) async {
+  //   // Show loading
+  //   showDialog(
+  //     context: context,
+  //     barrierDismissible: false,
+  //     builder: (context) => const AlertDialog(
+  //       content: Row(
+  //         children: [
+  //           CircularProgressIndicator(),
+  //           SizedBox(width: 20),
+  //           Text('Updating location...'),
+  //         ],
+  //       ),
+  //     ),
+  //   );
 
-    try {
-      // ✅ Fix: Use geoCoding.Location instead of Location
-      List<geoCoding.Location> locations = await geoCoding.locationFromAddress(
-        location,
-      );
+  //   try {
+  //     // ✅ Fix: Use geoCoding.Location instead of Location
+  //     List<geoCoding.Location> locations = await geoCoding.locationFromAddress(
+  //       location,
+  //     );
 
-      if (locations.isNotEmpty) {
-        final loc = locations.first;
-        final authProvider = context.read<AuthProvider>();
+  //     if (locations.isNotEmpty) {
+  //       final loc = locations.first;
+  //       final authProvider = context.read<AuthProvider>();
 
-        final success = await authProvider.updateProfile(
-          latitude: loc.latitude,
-          longitude: loc.longitude,
-          address: location,
-        );
+  //       final success = await authProvider.updateProfile(
+  //         latitude: loc.latitude,
+  //         longitude: loc.longitude,
+  //         address: location,
+  //       );
 
-        // Close loading dialog
-        if (context.mounted) Navigator.of(context).pop();
+  //       // Close loading dialog
+  //       if (context.mounted) Navigator.of(context).pop();
 
-        if (success && context.mounted) {
-          await Future.delayed(const Duration(milliseconds: 200));
-          await authProvider.reloadUserData();
-          debugPrint(
-            '✅ Updated address in provider: ${authProvider.userModel?.address}',
-          );
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Location updated successfully!'),
-              backgroundColor: AppColors.success,
-            ),
-          );
-        }
-      } else {
-        throw Exception('Location not found');
-      }
-    } catch (e) {
-      // Close loading dialog
-      if (context.mounted) Navigator.of(context).pop();
+  //       if (success && context.mounted) {
+  //         await Future.delayed(const Duration(milliseconds: 200));
+  //         await authProvider.reloadUserData();
+  //         debugPrint(
+  //           '✅ Updated address in provider: ${authProvider.userModel?.address}',
+  //         );
+  //         ScaffoldMessenger.of(context).showSnackBar(
+  //           const SnackBar(
+  //             content: Text('Location updated successfully!'),
+  //             backgroundColor: AppColors.success,
+  //           ),
+  //         );
+  //       }
+  //     } else {
+  //       throw Exception('Location not found');
+  //     }
+  //   } catch (e) {
+  //     // Close loading dialog
+  //     if (context.mounted) Navigator.of(context).pop();
 
-      // Show error
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: Location not found'),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      }
-    }
-  }
+  //     // Show error
+  //     if (context.mounted) {
+  //       ScaffoldMessenger.of(context).showSnackBar(
+  //         SnackBar(
+  //           content: Text('Error: Location not found'),
+  //           backgroundColor: AppColors.error,
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
 }
 
 extension on double {
