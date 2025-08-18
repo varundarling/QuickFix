@@ -301,7 +301,7 @@ class AuthProvider extends ChangeNotifier {
       notifyListeners();
 
       return true;
-    } catch (e, stackTrace) {
+    } catch (e) {
       debugPrint('❌ Profile update failed: $e');
       _setError(_getErrorMessage(e));
       return false;

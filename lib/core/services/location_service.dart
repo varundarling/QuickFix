@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use, library_prefixes
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -9,7 +11,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
-import 'package:quickfix/presentation/screens/home/home_screen.dart';
 
 class LocationService {
   static LocationService? _instance;

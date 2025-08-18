@@ -3,7 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
-import 'package:quickfix/presentation/widgets/cards/service_card.dart';
+import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 import '../../../core/utils/navigation_helper.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
@@ -144,7 +144,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     debugPrint('🏗️ Building ProviderDashboardScreen');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Provider Dashboard'),
+        title: const Text('Dashboard'),
         backgroundColor: AppColors.primary,
         actions: [
           IconButton(
@@ -664,32 +664,88 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
   }
 
-  // ✅ Add this new method
   Widget _buildServicesTab() {
     return Consumer<ServiceProvider>(
       builder: (context, serviceProvider, child) {
         if (serviceProvider.isLoading) {
-          return const Center(child: CircularProgressIndicator());
+          return const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                CircularProgressIndicator(
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    AppColors.primary,
+                  ),
+                ),
+                SizedBox(height: 16),
+                Text(
+                  'Loading your services...',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+          );
         }
 
         if (serviceProvider.errorMessage != null) {
           return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.error_outline, size: 64, color: Colors.red),
-                const SizedBox(height: 16),
-                Text(
-                  'Error: ${serviceProvider.errorMessage}',
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.red),
-                ),
-                const SizedBox(height: 16),
-                ElevatedButton(
-                  onPressed: () => _loadProviderServices(),
-                  child: const Text('Retry'),
-                ),
-              ],
+            child: Padding(
+              padding: const EdgeInsets.all(32),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(50),
+                    ),
+                    child: const Icon(
+                      Icons.error_outline,
+                      size: 48,
+                      color: Colors.red,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  const Text(
+                    'Oops! Something went wrong',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    serviceProvider.errorMessage!,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                  ElevatedButton.icon(
+                    onPressed: () => _loadProviderServices(),
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('Try Again'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(25),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           );
         }
@@ -700,89 +756,240 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           return _buildEmptyServicesState();
         }
 
-        return ListView.builder(
-          padding: const EdgeInsets.all(16),
-          itemCount: services.length + 1,
-          itemBuilder: (context, index) {
-            if (index == 0) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16),
-                child: Row(
-                  children: [
-                    const Text(
-                      'My Services',
-                      style: TextStyle(
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const Spacer(),
-                  ],
-                ),
-              );
-            }
-
-            final service = services[index - 1];
-            return Card(
-              margin: const EdgeInsets.only(bottom: 8),
-              child: ListTile(
-                title: Text(service.name),
-                subtitle: Text('₹${service.basePrice} • ${service.category}'),
-                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => context.go('/edit-service/${service.id}'),
+        return Column(
+          children: [
+            // Header Section
+            _buildServicesHeader(services.length),
+        
+            // Services List
+            Expanded(
+              child: ListView.builder(
+                padding: const EdgeInsets.only(top: 8, bottom: 20),
+                itemCount: services.length,
+                itemBuilder: (context, index) {
+                  final service = services[index];
+                  return ProviderCard(
+                    service: service,
+                    onTap: () => context.go('/edit-service/${service.id}'),
+                    customButtonText: 'Manage Service',
+                    onServiceDeleted: () => _refreshServicesAfterDeletion(),
+                  );
+                },
               ),
-            );
-          },
+            ),
+          ],
         );
       },
     );
   }
 
-  // ✅ Add this helper method
-  Widget _buildEmptyServicesState() {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(32),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.build_circle_outlined,
-              size: 80,
-              color: Colors.grey[400],
-            ),
-            const SizedBox(height: 24),
-            Text(
-              'No Services Yet',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Text(
-              'Create your first service to start receiving bookings from customers',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 16, color: Colors.grey[500]),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton.icon(
-              onPressed: () => context.go('/create-service'),
-              icon: const Icon(Icons.add),
-              label: const Text('Create Your First Service'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 24,
-                  vertical: 12,
+  // ✅ Add this method to refresh services after deletion
+  Future<void> _refreshServicesAfterDeletion() async {
+    try {
+      final serviceProvider = context.read<ServiceProvider>();
+      await serviceProvider.loadMyServices();
+    } catch (error) {
+      debugPrint('❌ Error refreshing services after deletion: $error');
+    }
+  }
+
+  Widget _buildServicesHeader(int serviceCount) {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppColors.primary, AppColors.primary],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          // Container(
+          //   padding: const EdgeInsets.all(12),
+          //   decoration: BoxDecoration(
+          //     color: Colors.white.withOpacity(0.2),
+          //     borderRadius: BorderRadius.circular(12),
+          //   ),
+          //   child: const Icon(
+          //     Icons.business_center,
+          //     color: Colors.white,
+          //     size: 24,
+          //   ),
+          // ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  'My Services',
+                  style: TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
-              ),
+                const SizedBox(height: 4),
+                Text(
+                  '$serviceCount ${serviceCount == 1 ? 'service' : 'services'} available',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.white.withValues(alpha: 0.9),
+                  ),
+                ),
+              ],
             ),
-          ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyServicesState() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.primary.withValues(alpha: 0.02), Colors.white],
         ),
       ),
+      child: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(40),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary.withValues(alpha: 0.1),
+                      AppColors.primary.withValues(alpha: 0.05),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(80),
+                ),
+                child: Icon(
+                  Icons.build_circle_outlined,
+                  size: 80,
+                  color: AppColors.primary.withValues(alpha: 0.6),
+                ),
+              ),
+              const SizedBox(height: 32),
+              const Text(
+                'No Services Yet',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Create your first service to start\nreceiving bookings from customers',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  color: AppColors.textSecondary,
+                  height: 1.5,
+                ),
+              ),
+              const SizedBox(height: 32),
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withValues(alpha: 0.8),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 5),
+                    ),
+                  ],
+                ),
+                child: ElevatedButton.icon(
+                  onPressed: () => context.go('/create-service'),
+                  icon: const Icon(Icons.add_business, size: 24),
+                  label: const Text('Create Your First Service'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.transparent,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shadowColor: Colors.transparent,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(25),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // Quick benefits
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
+                ),
+                child: Column(
+                  children: [
+                    _buildBenefitRow(
+                      Icons.visibility,
+                      'Get discovered by customers',
+                    ),
+                    const SizedBox(height: 12),
+                    _buildBenefitRow(Icons.trending_up, 'Grow your business'),
+                    const SizedBox(height: 12),
+                    _buildBenefitRow(Icons.payments, 'Earn more revenue'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBenefitRow(IconData icon, String text) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(icon, size: 16, color: AppColors.primary),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: const TextStyle(fontSize: 14, color: AppColors.textSecondary),
+        ),
+      ],
     );
   }
 }

@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use, use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart';
@@ -11,7 +13,6 @@ import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
 import 'package:quickfix/presentation/widgets/common/ad_banner_widget.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
-
 import '../../widgets/cards/service_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -127,7 +128,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     return const SliverToBoxAdapter(
                       child: Center(
                         child: Padding(
-                          padding: EdgeInsetsGeometry.all(20),
+                          padding: EdgeInsets.all(20),
                           child: CircularProgressIndicator(),
                         ),
                       ),
@@ -135,37 +136,78 @@ class _HomeScreenState extends State<HomeScreen> {
                   }
 
                   final services = serviceProvider.getServicesByCategory();
-                  return SliverPadding(
-                    padding: const EdgeInsets.all(16),
-                    sliver: SliverGrid(
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 16,
-                            crossAxisSpacing: 16,
-                            childAspectRatio: 0.8,
+
+                  // Show message if no services
+                  if (services.isEmpty) {
+                    return SliverToBoxAdapter(
+                      child: Container(
+                        margin: const EdgeInsets.all(32),
+                        padding: const EdgeInsets.all(32),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                        child: Column(
+                          children: [
+                            Icon(
+                              Icons.search_off,
+                              size: 64,
+                              color: Colors.grey[400],
+                            ),
+                            const SizedBox(height: 16),
+                            Text(
+                              'No services available',
+                              style: TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              'Try selecting a different category or check back later',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }
+
+                  // Use SliverList for full-width cards instead of SliverGrid
+                  return SliverList(
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      // Show ad every 3 services
+                      if ((index + 1) % 4 == 0 && index < services.length - 1) {
+                        return Container(
+                          margin: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 8,
                           ),
-                      delegate: SliverChildBuilderDelegate((context, index) {
-                        //Show ad every 4 times
-                        if ((index + 1) % 4 == 0 &&
-                            index < services.length - 1) {
-                          return const AdBannerWidget();
-                        }
-
-                        final serviceIndex = index - (index ~/ 4);
-                        if (serviceIndex >= services.length) return null;
-
-                        return ServiceCard(
-                          service: services[serviceIndex],
-                          onTap: () {
-                            //show the interstitial ad occasionally
-                            if (serviceIndex % 3 == 0) {
-                              _adService.showInterstitialAd();
-                            }
-                          },
+                          child: const AdBannerWidget(),
                         );
-                      }, childCount: services.length + (services.length ~/ 4)),
-                    ),
+                      }
+
+                      final serviceIndex = index - (index ~/ 4);
+                      if (serviceIndex >= services.length) return null;
+
+                      return ServiceCard(
+                        service: services[serviceIndex],
+                        onTap: () {
+                          // Show interstitial ad occasionally
+                          if (serviceIndex % 3 == 0) {
+                            _adService.showInterstitialAd();
+                          }
+
+                          // Navigate to service booking screen
+                          // context.push('/book-service/${services[serviceIndex].id}');
+                        },
+                      );
+                    }, childCount: services.length + (services.length ~/ 4)),
                   );
                 },
               ),
@@ -386,7 +428,9 @@ class _HomeScreenState extends State<HomeScreen> {
                   backgroundColor: Colors.white,
                   selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
-                    color: isSelected ? AppColors.primary : AppColors.textPrimary,
+                    color: isSelected
+                        ? AppColors.primary
+                        : AppColors.textPrimary,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -408,39 +452,72 @@ class _HomeScreenState extends State<HomeScreen> {
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Padding(
-              padding: EdgeInsetsGeometry.all(16),
-              child: Text(
-                'Top Rated Providers Near You',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
+            // Section Header
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Icon(Icons.star, color: Colors.amber, size: 24),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Top Rated Providers Near You',
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
               ),
             ),
 
-            SizedBox(
-              height: 200,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                itemCount: serviceProvider.nearbyProviders.length,
-                itemBuilder: (context, index) {
-                  return Container(
-                    width: 280,
-                    margin: const EdgeInsets.only(right: 16),
-                    child: ProviderCard(
-                      provider: serviceProvider.nearbyProviders[index],
-                      userLocation: _curentLocation,
-                      onTap: () {
-                        //naigate to provider details
-                      },
-                    ),
-                  );
+            // Provider Cards (Full Width)
+            ...serviceProvider.nearbyProviders.take(3).map((provider) {
+              return ProviderCard(
+                provider: provider,
+                userLocation: _curentLocation,
+                onTap: () {
+                  // Navigate to provider details
+                  context.push('/provider-details/${provider.id}');
                 },
+              );
+            }),
+
+            // View All Button (if more than 3 providers)
+            if (serviceProvider.nearbyProviders.length > 3)
+              Container(
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: () {
+                    // Navigate to all providers screen
+                    context.push('/all-providers');
+                  },
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'View All ${serviceProvider.nearbyProviders.length} Providers',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward, size: 18),
+                    ],
+                  ),
+                ),
               ),
-            ),
+
             const SizedBox(height: 20),
           ],
         );

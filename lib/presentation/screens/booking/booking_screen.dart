@@ -13,7 +13,6 @@ import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 
-
 class BookingScreen extends StatefulWidget {
   final String serviceId;
 
@@ -248,7 +247,7 @@ class _BookingScreenState extends State<BookingScreen> {
                       setState(() {
                         _selectedProvider = provider;
                       });
-                    },
+                    }, 
                   ),
                 );
               },
