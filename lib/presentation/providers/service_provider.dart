@@ -52,6 +52,7 @@ class ServiceProvider extends ChangeNotifier {
     required double basePrice,
     String imageUrl = '',
     List<String> subServices = const [],
+    required String mobileNumber,
   }) async {
     _isLoading = true;
     _errorMessage = null;
@@ -87,6 +88,7 @@ class ServiceProvider extends ChangeNotifier {
         basePrice: basePrice,
         imageUrl: imageUrl,
         subServices: subServices,
+        mobileNumber: mobileNumber,
         providerId: currentUser.uid, // Add provider ID
         createdAt: DateTime.now(),
         metadata: position != null
@@ -253,7 +255,7 @@ class ServiceProvider extends ChangeNotifier {
             provider.latitude,
             provider.longitude,
           );
-          return distance <= 10.0; //within 10km
+          return distance <= 20.0; //within 10km
         }).toList();
 
         //sort by distance
@@ -359,6 +361,8 @@ class ServiceProvider extends ChangeNotifier {
         .where((service) => service.category == selectedCategory)
         .toList();
   }
+
+  
 
   List<ProviderModel> getProvidersByService(String serviceId) {
     return _providers

@@ -18,6 +18,7 @@ class ProviderModel {
   final DateTime createdAt;
   final double? hourlyRate;
   final List<String> portfolioImages;
+  final String mobileNumber;
 
   ProviderModel({
     required this.id,
@@ -37,6 +38,7 @@ class ProviderModel {
     required this.createdAt,
     this.hourlyRate,
     required this.portfolioImages,
+    this.mobileNumber = '',
   });
 
   factory ProviderModel.fromFireStore(DocumentSnapshot doc) {

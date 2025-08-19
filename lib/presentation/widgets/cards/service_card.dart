@@ -1,7 +1,11 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/data/models/provider_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/screens/service/service_detail_screen.dart';
 
 class ServiceCard extends StatelessWidget {
   final ServiceModel service;
@@ -27,7 +31,10 @@ class ServiceCard extends StatelessWidget {
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [Colors.white, AppColors.primary.withValues(alpha: 0.02)],
+                colors: [
+                  Colors.white,
+                  AppColors.primary.withValues(alpha: 0.02),
+                ],
               ),
             ),
             child: Column(
@@ -80,7 +87,9 @@ class ServiceCard extends StatelessWidget {
                                 Icon(
                                   _getCategoryIcon(service.category),
                                   size: 60,
-                                  color: AppColors.primary.withValues(alpha: 0.6),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.6,
+                                  ),
                                 ),
                                 const SizedBox(height: 8),
                                 Text(
@@ -104,8 +113,8 @@ class ServiceCard extends StatelessWidget {
                       left: 12,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 6,
+                          horizontal: 15,
+                          vertical: 10,
                         ),
                         decoration: BoxDecoration(
                           color: AppColors.primary,
@@ -183,7 +192,7 @@ class ServiceCard extends StatelessWidget {
                           fontWeight: FontWeight.bold,
                           color: AppColors.textPrimary,
                         ),
-                        maxLines: 2,
+                        maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 8),
@@ -227,7 +236,9 @@ class ServiceCard extends StatelessWidget {
                                 color: AppColors.primary.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
-                                  color: AppColors.primary.withValues(alpha: 0.2),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.2,
+                                  ),
                                 ),
                               ),
                               child: Text(
@@ -287,7 +298,7 @@ class ServiceCard extends StatelessWidget {
                                       ),
                                     ),
                                     Text(
-                                      ' onwards',
+                                      ' / day',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: AppColors.textSecondary,
@@ -301,12 +312,15 @@ class ServiceCard extends StatelessWidget {
 
                           // Book Now Button
                           ElevatedButton(
-                            onPressed: onTap,
+                            onPressed: () =>
+                                _navigateToServiceDetail(context, service),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: AppColors.primary,
                               foregroundColor: Colors.white,
                               elevation: 2,
-                              shadowColor: AppColors.primary.withValues(alpha: 0.3),
+                              shadowColor: AppColors.primary.withValues(
+                                alpha: 0.3,
+                              ),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
                               ),
@@ -341,6 +355,76 @@ class ServiceCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Future<void> _navigateToServiceDetail(
+    BuildContext context,
+    ServiceModel service,
+  ) async {
+    try {
+      // Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
+      );
+
+      // ✅ Fetch fresh service data to get mobile number
+      final serviceDoc = await FirebaseFirestore.instance
+          .collection('services')
+          .doc(service.id)
+          .get();
+
+      if (!serviceDoc.exists) {
+        Navigator.of(context).pop();
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('Service not found')));
+        return;
+      }
+
+      final freshService = ServiceModel.fromFireStore(serviceDoc);
+      ProviderModel? providerName;
+      print('🔍 Fresh service mobile: "${freshService.mobileNumber}"'); // Debug
+
+      // ✅ Fetch provider data
+      ProviderModel? provider;
+      try {
+        final providerDoc = await FirebaseFirestore.instance
+            .collection('providers')
+            .doc(freshService.providerId)
+            .get();
+
+        if (providerDoc.exists) {
+          provider = ProviderModel.fromFireStore(providerDoc);
+          print('🔍 Provider mobile: "${provider.mobileNumber}"'); // Debug
+        }
+      } catch (e) {
+        print('❌ Error fetching provider: $e');
+      }
+
+      // Close loading dialog
+      Navigator.of(context).pop();
+
+      // ✅ Navigate with both service and provider data
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ServiceDetailScreen(
+            service: freshService, // ✅ Use fresh service data
+            provider: providerName, // ✅ Pass fetched provider
+          ),
+        ),
+      );
+    } catch (e) {
+      // Close loading dialog if still open
+      Navigator.of(context).pop();
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading service details: $e')),
+      );
+      print('❌ Navigation error: $e');
+    }
   }
 
   IconData _getCategoryIcon(String category) {

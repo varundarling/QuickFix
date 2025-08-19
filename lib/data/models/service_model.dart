@@ -12,6 +12,7 @@ class ServiceModel {
   final String providerId;
   final DateTime createdAt;
   final Map<String, dynamic>? metadata;
+  final String mobileNumber;
 
   ServiceModel({
     required this.id,
@@ -25,6 +26,7 @@ class ServiceModel {
     required this.providerId,
     required this.createdAt,
     this.metadata,
+    this.mobileNumber = '',
   });
 
   factory ServiceModel.fromFireStore(
@@ -47,6 +49,7 @@ class ServiceModel {
       providerId: data['providerId'] ?? '',
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       metadata: data['metadata'],
+      mobileNumber: data['mobileNumber'] ?? '',
     );
   }
 
@@ -62,6 +65,7 @@ class ServiceModel {
       'providerId': providerId,
       'createdAt': Timestamp.fromDate(createdAt),
       'metadata': metadata,
+      'mobileNumber' : mobileNumber
     };
   }
 }

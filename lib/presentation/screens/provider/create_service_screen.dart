@@ -32,6 +32,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
   final List<String> _subServices = [];
   final _subServiceController = TextEditingController();
+  final _mobileNumberController = TextEditingController();
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +87,24 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   setState(() {
                     _selectedCategory = value!;
                   });
+                },
+              ),
+
+              const SizedBox(height: 16),
+
+              CustomTextField(
+                controller: _mobileNumberController,
+                label: 'Mobile Number',
+                hintText: '9876543210',
+                keyboardType: TextInputType.phone,
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please enter your phone number';
+                  }
+                  if (value.length < 10) {
+                    return 'Please enter a valid phone number';
+                  }
+                  return null;
                 },
               ),
 
@@ -221,6 +240,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       basePrice: double.parse(_basePriceController.text.trim()),
       imageUrl: '', // You can add image picker later
       subServices: _subServices,
+      mobileNumber: _mobileNumberController.text.trim(),
     );
 
     if (success && mounted) {
@@ -252,6 +272,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     _descriptionController.dispose();
     _basePriceController.dispose();
     _subServiceController.dispose();
+    _mobileNumberController.dispose();
     super.dispose();
   }
 }
