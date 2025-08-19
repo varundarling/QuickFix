@@ -1,22 +1,35 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
+import 'package:provider/provider.dart';
+import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/data/models/provider_model.dart';
 
-class ServiceDetailScreen extends StatelessWidget {
+class ServiceDetailScreen extends StatefulWidget {
+  // ✅ Change to StatefulWidget
   final ServiceModel service;
   final ProviderModel? provider;
 
   const ServiceDetailScreen({super.key, required this.service, this.provider});
 
   @override
+  State<ServiceDetailScreen> createState() => _ServiceDetailScreenState();
+}
+
+class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
+  // ✅ Add State class
+  bool _isBooking = false; // ✅ Now properly managed in state
+
+  @override
   Widget build(BuildContext context) {
     print(
-      '🔍 Building ServiceDetailScreen with mobile: "${service.mobileNumber}"',
+      '🔍 Building ServiceDetailScreen with mobile: "${widget.service.mobileNumber}"',
     );
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: CustomScrollView(
@@ -31,12 +44,12 @@ class ServiceDetailScreen extends StatelessWidget {
                 fit: StackFit.expand,
                 children: [
                   // Service Image
-                  service.imageUrl.isNotEmpty
+                  widget.service.imageUrl.isNotEmpty
                       ? CachedNetworkImage(
-                          imageUrl: service.imageUrl,
+                          imageUrl: widget.service.imageUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
-                            color: AppColors.primary.withOpacity(0.1),
+                            color: AppColors.primary.withValues(alpha: 0.1),
                             child: const Center(
                               child: CircularProgressIndicator(),
                             ),
@@ -48,7 +61,7 @@ class ServiceDetailScreen extends StatelessWidget {
                                 end: Alignment.bottomCenter,
                                 colors: [
                                   AppColors.primary,
-                                  AppColors.primary.withOpacity(0.8),
+                                  AppColors.primary.withValues(alpha: 0.8),
                                 ],
                               ),
                             ),
@@ -56,13 +69,13 @@ class ServiceDetailScreen extends StatelessWidget {
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
                                 Icon(
-                                  _getCategoryIcon(service.category),
+                                  _getCategoryIcon(widget.service.category),
                                   size: 80,
                                   color: Colors.white,
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  service.category,
+                                  widget.service.category,
                                   style: const TextStyle(
                                     color: Colors.white,
                                     fontSize: 18,
@@ -80,7 +93,7 @@ class ServiceDetailScreen extends StatelessWidget {
                               end: Alignment.bottomCenter,
                               colors: [
                                 AppColors.primary,
-                                AppColors.primary.withOpacity(0.8),
+                                AppColors.primary.withValues(alpha: 0.8),
                               ],
                             ),
                           ),
@@ -88,13 +101,13 @@ class ServiceDetailScreen extends StatelessWidget {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Icon(
-                                _getCategoryIcon(service.category),
+                                _getCategoryIcon(widget.service.category),
                                 size: 80,
                                 color: Colors.white,
                               ),
                               const SizedBox(height: 16),
                               Text(
-                                service.category,
+                                widget.service.category,
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 18,
@@ -113,7 +126,7 @@ class ServiceDetailScreen extends StatelessWidget {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.3),
+                          Colors.black.withValues(alpha: 0.3),
                         ],
                       ),
                     ),
@@ -133,7 +146,7 @@ class ServiceDetailScreen extends StatelessWidget {
                         borderRadius: BorderRadius.circular(25),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.success.withOpacity(0.3),
+                            color: AppColors.success.withValues(alpha: 0.3),
                             blurRadius: 8,
                             offset: const Offset(0, 2),
                           ),
@@ -148,7 +161,7 @@ class ServiceDetailScreen extends StatelessWidget {
                             size: 18,
                           ),
                           Text(
-                            '${service.basePrice.toInt()}',
+                            '${widget.service.basePrice.toInt()}',
                             style: const TextStyle(
                               color: Colors.white,
                               fontSize: 16,
@@ -175,11 +188,11 @@ class ServiceDetailScreen extends StatelessWidget {
                   _buildServiceHeader(),
                   const SizedBox(height: 24),
 
-                  // ✅ Add Business Name Section
+                  // Business Name Section
                   _buildBusinessNameSection(),
                   const SizedBox(height: 24),
 
-                  //Mobile Number Section
+                  // Mobile Number Section
                   _buildMobileNumberSection(),
                   const SizedBox(height: 24),
 
@@ -188,13 +201,14 @@ class ServiceDetailScreen extends StatelessWidget {
                   const SizedBox(height: 24),
 
                   // Sub-services
-                  if (service.subServices.isNotEmpty) _buildSubServices(),
-                  if (service.subServices.isNotEmpty)
+                  if (widget.service.subServices.isNotEmpty)
+                    _buildSubServices(),
+                  if (widget.service.subServices.isNotEmpty)
                     const SizedBox(height: 24),
 
                   // Provider Details
-                  if (provider != null) _buildProviderDetails(),
-                  if (provider != null) const SizedBox(height: 24),
+                  if (widget.provider != null) _buildProviderDetails(),
+                  if (widget.provider != null) const SizedBox(height: 24),
 
                   // Book Service Button
                   _buildBookServiceButton(context),
@@ -226,11 +240,11 @@ class ServiceDetailScreen extends StatelessWidget {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
-                    service.category,
+                    widget.service.category,
                     style: TextStyle(
                       color: AppColors.primary,
                       fontSize: 12,
@@ -245,30 +259,35 @@ class ServiceDetailScreen extends StatelessWidget {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color: service.isActive
-                        ? AppColors.success.withOpacity(0.1)
-                        : Colors.orange.withOpacity(0.1),
+                    color:
+                        widget
+                            .service
+                            .isAvailableForBooking // ✅ Use availability check
+                        ? AppColors.success.withValues(alpha: 0.1)
+                        : Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Icon(
-                        service.isActive
+                        widget.service.isAvailableForBooking
                             ? Icons.check_circle
                             : Icons.pause_circle,
                         size: 14,
-                        color: service.isActive
+                        color: widget.service.isAvailableForBooking
                             ? AppColors.success
                             : Colors.orange,
                       ),
                       const SizedBox(width: 4),
                       Text(
-                        service.isActive ? 'Available' : 'Unavailable',
+                        widget.service.isAvailableForBooking
+                            ? 'Available'
+                            : 'Not Available',
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: service.isActive
+                          color: widget.service.isAvailableForBooking
                               ? AppColors.success
                               : Colors.orange,
                         ),
@@ -280,7 +299,7 @@ class ServiceDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              service.name,
+              widget.service.name,
               style: const TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -299,7 +318,7 @@ class ServiceDetailScreen extends StatelessWidget {
                 ),
                 Icon(Icons.currency_rupee, size: 18, color: AppColors.success),
                 Text(
-                  '${service.basePrice.toInt()}',
+                  '${widget.service.basePrice.toInt()}',
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -321,7 +340,6 @@ class ServiceDetailScreen extends StatelessWidget {
     );
   }
 
-  // Add this in your ServiceDetailScreen after _buildServiceHeader()
   Widget _buildMobileNumberSection() {
     return Card(
       elevation: 2,
@@ -346,12 +364,11 @@ class ServiceDetailScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-
             // Mobile Number Row
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.05),
+                color: AppColors.primary.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
@@ -371,9 +388,9 @@ class ServiceDetailScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          service.mobileNumber.isEmpty
+                          widget.service.mobileNumber.isEmpty
                               ? 'Not provided'
-                              : service.mobileNumber,
+                              : widget.service.mobileNumber,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -383,9 +400,10 @@ class ServiceDetailScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                  if (service.mobileNumber.isNotEmpty)
+                  if (widget.service.mobileNumber.isNotEmpty)
                     ElevatedButton.icon(
-                      onPressed: () => _makePhoneCall(service.mobileNumber),
+                      onPressed: () =>
+                          _makePhoneCall(widget.service.mobileNumber),
                       icon: Icon(Icons.call, size: 16),
                       label: Text('Call'),
                       style: ElevatedButton.styleFrom(
@@ -431,8 +449,8 @@ class ServiceDetailScreen extends StatelessWidget {
             ),
             const SizedBox(height: 12),
             Text(
-              service.description.isNotEmpty
-                  ? service.description
+              widget.service.description.isNotEmpty
+                  ? widget.service.description
                   : 'No description available for this service.',
               style: const TextStyle(
                 fontSize: 16,
@@ -470,7 +488,7 @@ class ServiceDetailScreen extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 16),
-            ...service.subServices.map((subService) {
+            ...widget.service.subServices.map((subService) {
               return Padding(
                 padding: const EdgeInsets.only(bottom: 8),
                 child: Row(
@@ -533,8 +551,9 @@ class ServiceDetailScreen extends StatelessWidget {
                   radius: 30,
                   backgroundColor: AppColors.primary,
                   child: Text(
-                    provider != null && provider!.businessName.isNotEmpty
-                        ? provider!.businessName[0].toUpperCase()
+                    widget.provider != null &&
+                            widget.provider!.businessName.isNotEmpty
+                        ? widget.provider!.businessName[0].toUpperCase()
                         : '?',
                     style: const TextStyle(
                       color: Colors.white,
@@ -554,7 +573,8 @@ class ServiceDetailScreen extends StatelessWidget {
                         children: [
                           Expanded(
                             child: Text(
-                              provider?.businessName ?? 'Service Provider',
+                              widget.provider?.businessName ??
+                                  'Service Provider',
                               style: const TextStyle(
                                 fontSize: 18,
                                 fontWeight: FontWeight.bold,
@@ -562,14 +582,14 @@ class ServiceDetailScreen extends StatelessWidget {
                               ),
                             ),
                           ),
-                          if (provider?.isVerified ?? false)
+                          if (widget.provider?.isVerified ?? false)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: AppColors.success.withOpacity(0.1),
+                                color: AppColors.success.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: Row(
@@ -596,26 +616,8 @@ class ServiceDetailScreen extends StatelessWidget {
                       ),
                       const SizedBox(height: 8),
 
-                      Text(
-                        'Debug: Mobile = "${service.mobileNumber}"',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.red,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      Text(
-                        'Debug: Length = ${service.mobileNumber.length}',
-                        style: TextStyle(
-                          fontSize: 10,
-                          color: Colors.red,
-                          fontFamily: 'monospace',
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // ✅ Mobile Number Display with Debug Info
-                      if (service.mobileNumber.isNotEmpty) ...[
+                      // Mobile Number Display
+                      if (widget.service.mobileNumber.isNotEmpty) ...[
                         const SizedBox(height: 12),
                         Row(
                           children: [
@@ -627,7 +629,7 @@ class ServiceDetailScreen extends StatelessWidget {
                             const SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                service.mobileNumber,
+                                widget.service.mobileNumber,
                                 style: const TextStyle(
                                   fontSize: 14,
                                   color: AppColors.textSecondary,
@@ -636,7 +638,7 @@ class ServiceDetailScreen extends StatelessWidget {
                             ),
                             TextButton.icon(
                               onPressed: () =>
-                                  _makePhoneCall(service.mobileNumber),
+                                  _makePhoneCall(widget.service.mobileNumber),
                               icon: Icon(
                                 Icons.call,
                                 size: 16,
@@ -653,31 +655,16 @@ class ServiceDetailScreen extends StatelessWidget {
                             ),
                           ],
                         ),
-                      ] else ...[
-                        // ✅ Debug: Show if mobile number is empty
-                        const SizedBox(height: 12),
-                        Text(
-                          'Mobile number not available',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.red,
-                            fontStyle: FontStyle.italic,
-                          ),
-                        ),
-                        Text(
-                          'Debug: "${service.mobileNumber}"', // Show actual value
-                          style: TextStyle(fontSize: 10, color: Colors.grey),
-                        ),
                       ],
 
                       const SizedBox(height: 8),
 
                       // Rating
-                      if (provider != null)
+                      if (widget.provider != null)
                         Row(
                           children: [
                             RatingBarIndicator(
-                              rating: provider!.raitng,
+                              rating: widget.provider!.raitng,
                               itemBuilder: (context, index) =>
                                   const Icon(Icons.star, color: Colors.amber),
                               itemCount: 5,
@@ -685,7 +672,7 @@ class ServiceDetailScreen extends StatelessWidget {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '${provider!.raitng.toStringAsFixed(1)} (${provider!.totalReviews} reviews)',
+                              '${widget.provider!.raitng.toStringAsFixed(1)} (${widget.provider!.totalReviews} reviews)',
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
@@ -716,7 +703,7 @@ class ServiceDetailScreen extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(Icons.business, color: AppColors.primary, size: 24),
@@ -738,7 +725,8 @@ class ServiceDetailScreen extends StatelessWidget {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    provider?.businessName ?? 'Business Name Not Available',
+                    widget.provider?.businessName ??
+                        'Business Name Not Available',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -750,11 +738,11 @@ class ServiceDetailScreen extends StatelessWidget {
             ),
 
             // Verification Badge
-            if (provider?.isVerified ?? false)
+            if (widget.provider?.isVerified ?? false)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
-                  color: AppColors.success.withOpacity(0.1),
+                  color: AppColors.success.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: Row(
@@ -780,24 +768,48 @@ class ServiceDetailScreen extends StatelessWidget {
   }
 
   Widget _buildBookServiceButton(BuildContext context) {
+    // ✅ Check service availability
+    final isAvailable = widget.service.isAvailableForBooking;
+    final isBooked = widget.service.isBooked;
+    final isInProgress = widget.service.isInProgress;
+
+    String buttonText;
+    Color buttonColor;
+
+    if (isAvailable) {
+      buttonText = 'Book This Service';
+      buttonColor = AppColors.primary;
+    } else if (isBooked) {
+      buttonText = 'Service Already Booked';
+      buttonColor = Colors.orange;
+    } else if (isInProgress) {
+      buttonText = 'Service In Progress';
+      buttonColor = Colors.blue;
+    } else {
+      buttonText = 'Service Unavailable';
+      buttonColor = Colors.grey;
+    }
+
     return Container(
       width: double.infinity,
       height: 56,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+          colors: [buttonColor, buttonColor.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.3),
+            color: buttonColor.withValues(alpha: 0.3),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
         ],
       ),
       child: ElevatedButton(
-        onPressed: service.isActive ? () => _bookService(context) : null,
+        onPressed: (isAvailable && !_isBooking)
+            ? () => _bookService(context)
+            : null,
         style: ElevatedButton.styleFrom(
           backgroundColor: Colors.transparent,
           shadowColor: Colors.transparent,
@@ -805,23 +817,56 @@ class ServiceDetailScreen extends StatelessWidget {
             borderRadius: BorderRadius.circular(16),
           ),
         ),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.calendar_today, size: 20, color: Colors.white),
-            const SizedBox(width: 12),
-            Text(
-              service.isActive ? 'Book This Service' : 'Service Unavailable',
-              style: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+        child: _isBooking
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Booking Service...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    isAvailable ? Icons.calendar_today : Icons.block,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    buttonText,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (isAvailable) ...[
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  ],
+                ],
               ),
-            ),
-            const SizedBox(width: 8),
-            const Icon(Icons.arrow_forward, size: 20, color: Colors.white),
-          ],
-        ),
       ),
     );
   }
@@ -841,7 +886,7 @@ class ServiceDetailScreen extends StatelessWidget {
         return Icons.format_paint;
       case 'carpentry':
       case 'carepentry':
-        return Icons.carpenter;
+        return Icons.construction; // ✅ Fixed from Icons.carpenter
       default:
         return Icons.build;
     }
@@ -858,18 +903,195 @@ class ServiceDetailScreen extends StatelessWidget {
     }
   }
 
-  void _bookService(BuildContext context) {
-    // Navigate to booking confirmation screen
-    // For now, show a snackbar
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Booking ${service.name}...'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
+  // ✅ Fixed booking method with proper state management
+  void _bookService(BuildContext context) async {
+    if (_isBooking || !mounted) return; // Prevent double booking
+
+    final bool? confirmed = await _showBookingConfirmationDialog(context);
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isBooking = true;
+    });
+
+    try {
+      // Get current user
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please login to book service')),
+          );
+        }
+        return;
+      }
+
+      // Get booking provider
+      final bookingProvider = context.read<BookingProvider>();
+
+      final booking = await bookingProvider.createBooking(
+        customerId: user.uid,
+        providerId: widget.service.providerId,
+        service: widget.service,
+        scheduledDateTime: DateTime.now().add(const Duration(days: 1)),
+        description: widget.service.description.isNotEmpty
+            ? widget.service.description
+            : 'Service booking',
+        customerAddress: 'Customer address to be confirmed',
+        customerLatitude: 0.0,
+        customerLongitude: 0.0,
+        totalAmount: widget.service.basePrice,
+      );
+
+      if (!mounted) return;
+
+      if (booking != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${widget.service.name} booked successfully!'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+        // ✅ Schedule navigation for next frame
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            Navigator.of(context).pop();
+          }
+        });
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              bookingProvider.errorMessage ?? 'Failed to book service',
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to book service: $error'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBooking = false;
+        });
+      }
+    }
+  }
+
+  Future<bool?> _showBookingConfirmationDialog(BuildContext context) async {
+    return await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.event_available, color: AppColors.primary, size: 24),
+            const SizedBox(width: 8),
+            const Text('Confirm Booking'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'Are you sure you want to book this service?',
+              style: TextStyle(fontSize: 16),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    widget.service.name,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.currency_rupee,
+                        size: 16,
+                        color: AppColors.success,
+                      ),
+                      Text(
+                        '${widget.service.basePrice.toInt()}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                      Text(
+                        ' (Base Price)',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (widget.provider != null) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      'Provider: ${widget.provider!.businessName}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'The provider will contact you for scheduling details.',
+              style: TextStyle(
+                fontSize: 12,
+                color: AppColors.textSecondary,
+                fontStyle: FontStyle.italic,
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text(
+              'Cancel',
+              style: TextStyle(color: AppColors.textSecondary),
+            ),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Confirm Booking'),
+          ),
+        ],
       ),
     );
-
-    // TODO: Navigate to booking screen
-    // context.push('/book-service', extra: {'service': service, 'provider': provider});
   }
 }

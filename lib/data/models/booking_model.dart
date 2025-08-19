@@ -3,7 +3,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum BookingStatus {
   pending,
   confirmed,
-  inProgresss,
+  inProgress,
   completed,
   cancelled,
   refunded,
@@ -68,7 +68,7 @@ class BookingModel {
       customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       completedAt: data['completedAt'] != null
-          ? (data['compeletedAt'] as Timestamp).toDate()
+          ? (data['completedAt'] as Timestamp).toDate()
           : null,
       paymentId: data['paymentId'],
       cancellationReason: data['cancellationReason'],
@@ -105,7 +105,7 @@ class BookingModel {
         return 'Pending';
       case BookingStatus.confirmed:
         return 'Confirmed';
-      case BookingStatus.inProgresss:
+      case BookingStatus.inProgress:
         return 'inProgress';
       case BookingStatus.completed:
         return 'Completed';
@@ -113,6 +113,27 @@ class BookingModel {
         return 'Cancelled';
       case BookingStatus.refunded:
         return 'Refunded';
+    }
+  }
+}
+
+extension BookingStatusExtension on BookingStatus {
+  String get statusDisplay {
+    switch (this) {
+      case BookingStatus.pending:
+        return 'Pending';
+      case BookingStatus.confirmed:
+        return 'Confirmed';
+      case BookingStatus.inProgress: // ✅ Fixed: was "inProgresss"
+        return 'In Progress';
+      case BookingStatus.completed:
+        return 'Completed';
+      case BookingStatus.cancelled:
+        return 'Cancelled';
+      case BookingStatus.refunded:
+        return 'Refunded';
+      default:
+      return 'Unknown';
     }
   }
 }

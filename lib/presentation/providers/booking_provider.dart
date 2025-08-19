@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
@@ -59,22 +62,88 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  StreamSubscription<QuerySnapshot>? _providerBookingsSubscription;
+
+  // ✅ Add real-time listener for provider bookings
+  void listenToProviderBookings(String providerId) {
+    debugPrint('🔄 Setting up real-time listener for provider: $providerId');
+
+    // Cancel existing subscription if any
+    _providerBookingsSubscription?.cancel();
+
+    _providerBookingsSubscription = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('providerId', isEqualTo: providerId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) {
+            debugPrint(
+              '🔔 Received booking updates: ${snapshot.docs.length} bookings',
+            );
+
+            _providerBookings = snapshot.docs
+                .map((doc) => BookingModel.fromFireStore(doc))
+                .toList();
+
+            debugPrint(
+              '✅ Updated provider bookings: ${_providerBookings.length}',
+            );
+            debugPrint('✅ Pending: ${pendingBookings.length}');
+            debugPrint('✅ Confirmed: ${confirmedBookings.length}');
+            debugPrint('✅ Completed: ${completedBookings.length}');
+
+            if (hasListeners) {
+              notifyListeners();
+            } // ✅ This triggers UI rebuild
+          },
+          onError: (error) {
+            debugPrint('❌ Error listening to bookings: $error');
+            _setError('Failed to listen to bookings: $error');
+          },
+        );
+  }
+
+  void stopListeningToProviderBookings() {
+    _providerBookingsSubscription?.cancel();
+    _providerBookingsSubscription = null;
+    debugPrint('🛑 Stopped listening to provider bookings');
+  }
+
+  @override
+  void dispose() {
+    debugPrint('🧹 Disposing BookingProvider');
+    stopListeningToProviderBookings();
+    super.dispose();
+  }
+
+  // ✅ Keep the existing method but add notifyListeners
   Future<void> loadProviderBookings(String providerId) async {
     try {
-      final querySnapshot = await _firebaseService.getCollection(
-        'bookings',
-        queryBuilder: (query) => query
-            .where('providerId', isEqualTo: providerId)
-            .orderBy('createdAt', descending: true),
-      );
+      _setLoading(true);
+      clearError();
+
+      debugPrint('🔄 Loading provider bookings for: $providerId');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: providerId)
+          .orderBy('createdAt', descending: true)
+          .get();
 
       _providerBookings = querySnapshot.docs
           .map((doc) => BookingModel.fromFireStore(doc))
           .toList();
 
-      notifyListeners();
-    } catch (e) {
-      _setError('Failed to load provider bookings : $e');
+      debugPrint('✅ Loaded ${_providerBookings.length} provider bookings');
+      debugPrint('✅ Pending: ${pendingBookings.length}');
+      debugPrint('✅ Confirmed: ${confirmedBookings.length}');
+      debugPrint('✅ Completed: ${completedBookings.length}');
+
+      notifyListeners(); // ✅ Ensure UI updates
+    } catch (error) {
+      _setError('Failed to load bookings: $error');
+      debugPrint('❌ Error loading provider bookings: $error');
     } finally {
       _setLoading(false);
     }
@@ -92,7 +161,7 @@ class BookingProvider extends ChangeNotifier {
     required double totalAmount,
   }) async {
     try {
-      // _setLoading(true);
+      _setLoading(true);
 
       final bookingId = _uuid.v4();
       final booking = BookingModel(
@@ -111,17 +180,36 @@ class BookingProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
       );
 
-      await _firebaseService.createDocument(
-        'bookings',
-        bookingId,
-        booking.toFireStore(),
+      // ✅ Use batch write to update both booking and service availability
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Add booking document
+      final bookingRef = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId);
+      batch.set(bookingRef, booking.toFireStore());
+
+      // ✅ Update service availability to 'booked'
+      final serviceRef = FirebaseFirestore.instance
+          .collection('services')
+          .doc(service.id);
+      batch.update(serviceRef, {
+        'availability': 'booked',
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      await batch.commit();
+
+      debugPrint(
+        '✅ Booking created and service marked as booked: ${service.name}',
       );
 
-      //reload user bookings
+      // Reload user bookings
       await loadUserBookings(customerId);
 
       return booking;
     } catch (e) {
+      debugPrint('❌ Error creating booking: $e');
       _setError('Failed to create booking: $e');
       return null;
     } finally {
@@ -129,37 +217,110 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  List<BookingModel> getBookingsByStatus(BookingStatus status) {
+    return _providerBookings
+        .where((booking) => booking.status == status)
+        .toList();
+  }
+
+  // ✅ Get pending bookings
+  List<BookingModel> get pendingBookings =>
+      getBookingsByStatus(BookingStatus.pending);
+
+  // ✅ Get confirmed bookings
+  List<BookingModel> get confirmedBookings =>
+      getBookingsByStatus(BookingStatus.confirmed);
+
+  // ✅ Get completed bookings
+  List<BookingModel> get completedBookings =>
+      getBookingsByStatus(BookingStatus.completed);
+
   Future<bool> updateBookingStatus(
     String bookingId,
     BookingStatus status,
+    String providerId,
   ) async {
     try {
-      _setLoading(true);
+      // Get booking data first to access serviceId
+      final bookingDoc = await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .get();
 
-      final updateData = <String, dynamic>{
+      if (!bookingDoc.exists) {
+        _setError('Booking not found');
+        return false;
+      }
+
+      final bookingData = bookingDoc.data() as Map<String, dynamic>;
+      final serviceId = bookingData['serviceId'] as String;
+
+      // ✅ Use batch write to update both booking and service
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Update booking status
+      Map<String, dynamic> bookingUpdate = {
         'status': status.toString().split('.').last,
       };
 
       if (status == BookingStatus.completed) {
-        updateData['completedAt'] = DateTime.now();
+        bookingUpdate['completedAt'] = Timestamp.fromDate(DateTime.now());
       }
 
-      await _firebaseService.updateDocument('bookings', bookingId, updateData);
+      final bookingRef = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId);
+      batch.update(bookingRef, bookingUpdate);
 
-      //update local booking
-      final bookingIndex = _userBookings.indexWhere((b) => b.id == bookingId);
-      if (bookingIndex != 1) {
-        //reload bookings to get updated data
-        await loadUserBookings(_userBookings[bookingIndex].customerId);
+      // ✅ Update service availability based on booking status
+      final serviceRef = FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId);
+
+      if (status == BookingStatus.inProgress) {
+        // When provider starts service
+        batch.update(serviceRef, {
+          'availability': 'active',
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        });
+        debugPrint('✅ Service marked as active (in progress)');
+      } else if (status == BookingStatus.completed ||
+          status == BookingStatus.cancelled) {
+        // When service is completed or cancelled, make it available again
+        batch.update(serviceRef, {
+          'availability': 'available',
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        });
+        debugPrint('✅ Service marked as available again');
       }
 
+      await batch.commit();
+
+      // Reload provider bookings
+      await loadProviderBookings(providerId);
+
+      debugPrint(
+        '✅ Booking status updated: $bookingId -> ${status.toString()}',
+      );
       return true;
-    } catch (e) {
-      _setError('Failed to update bookings: $e');
+    } catch (error) {
+      _setError('Failed to update booking status: $error');
+      debugPrint('❌ Error updating booking status: $error');
       return false;
-    } finally {
-      _setLoading(false);
     }
+  }
+
+  Stream<List<BookingModel>> getProviderBookingsStream(String providerId) {
+    return FirebaseFirestore.instance
+        .collection('bookings')
+        .where('providerId', isEqualTo: providerId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BookingModel.fromFireStore(doc))
+              .toList(),
+        );
   }
 
   Future<BookingModel?> getBookingById(String bookingId) async {

@@ -13,6 +13,7 @@ class ServiceModel {
   final DateTime createdAt;
   final Map<String, dynamic>? metadata;
   final String mobileNumber;
+  final String availability; // ✅ Add this field
 
   ServiceModel({
     required this.id,
@@ -27,6 +28,7 @@ class ServiceModel {
     required this.createdAt,
     this.metadata,
     this.mobileNumber = '',
+    this.availability = 'available', // ✅ Add this with default value
   });
 
   factory ServiceModel.fromFireStore(
@@ -50,6 +52,7 @@ class ServiceModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       metadata: data['metadata'],
       mobileNumber: data['mobileNumber'] ?? '',
+      availability: data['availability'] ?? 'available', // ✅ Add this
     );
   }
 
@@ -65,7 +68,13 @@ class ServiceModel {
       'providerId': providerId,
       'createdAt': Timestamp.fromDate(createdAt),
       'metadata': metadata,
-      'mobileNumber' : mobileNumber
+      'mobileNumber': mobileNumber,
+      'availability': availability, // ✅ Add this
     };
   }
+
+  // ✅ Add helper methods
+  bool get isAvailableForBooking => isActive && availability == 'available';
+  bool get isBooked => availability == 'booked';
+  bool get isInProgress => availability == 'active';
 }

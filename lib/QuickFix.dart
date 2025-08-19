@@ -9,11 +9,13 @@ import 'package:quickfix/presentation/providers/service_provider.dart';
 class QuickFix extends StatelessWidget {
   const QuickFix({super.key});
 
+  
+
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers:[
-        ChangeNotifierProvider(create: (context) => AuthProvider()),
+        ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
       ],

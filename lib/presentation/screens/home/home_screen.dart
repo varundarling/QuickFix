@@ -197,7 +197,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
                       return ServiceCard(
                         service: services[serviceIndex],
+
                         onTap: () {
+                          debugPrint(
+                            '🔘 ServiceCard onTap called for: ${services[serviceIndex].name}',
+                          );
+                          debugPrint(
+                            '🔘 Service availability: ${services[serviceIndex].availability}',
+                          );
+                          debugPrint(
+                            '🔘 Is available for booking: ${services[serviceIndex].isAvailableForBooking}',
+                          );
                           // Show interstitial ad occasionally
                           if (serviceIndex % 3 == 0) {
                             _adService.showInterstitialAd();

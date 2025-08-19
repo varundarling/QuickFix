@@ -18,6 +18,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _basePriceController = TextEditingController();
+  bool _isCreating = false;
 
   String _selectedCategory = 'Plumbing';
   final List<String> _categories = [
@@ -195,16 +196,38 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               const SizedBox(height: 32),
 
               // Create Service Button
-              Consumer<ServiceProvider>(
-                builder: (context, serviceProvider, child) {
-                  return PrimaryButton(
-                    onPressed: serviceProvider.isLoading
-                        ? null
-                        : _createService,
-                    text: 'Create Service',
-                    isLoading: serviceProvider.isLoading,
-                  );
-                },
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: _isCreating ? null : _createService,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: _isCreating
+                      ? const Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                              height: 20,
+                              width: 20,
+                              child: CircularProgressIndicator(
+                                color: Colors.white,
+                                strokeWidth: 2,
+                              ),
+                            ),
+                            SizedBox(width: 12),
+                            Text('Creating Service...'),
+                          ],
+                        )
+                      : const Text(
+                          'Create Service',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
               ),
             ],
           ),
@@ -229,40 +252,61 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   }
 
   void _createService() async {
+    if (_isCreating || !mounted) return; // Prevent double submission
     if (!_formKey.currentState!.validate()) return;
 
-    final serviceProvider = context.read<ServiceProvider>();
+    setState(() {
+      _isCreating = true;
+    });
 
-    final success = await serviceProvider.addService(
-      name: _nameController.text.trim(),
-      description: _descriptionController.text.trim(),
-      category: _selectedCategory,
-      basePrice: double.parse(_basePriceController.text.trim()),
-      imageUrl: '', // You can add image picker later
-      subServices: _subServices,
-      mobileNumber: _mobileNumberController.text.trim(),
-    );
+    try {
+      final serviceProvider = context.read<ServiceProvider>();
 
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Service created successfully!'),
-          backgroundColor: AppColors.success,
-        ),
+      final success = await serviceProvider.addService(
+        name: _nameController.text.trim(),
+        description: _descriptionController.text.trim(),
+        category: _selectedCategory,
+        basePrice: double.parse(_basePriceController.text.trim()),
+        imageUrl: '', // You can add image picker later
+        subServices: _subServices,
+        mobileNumber: _mobileNumberController.text.trim(),
       );
-      await Future.delayed(const Duration(milliseconds: 500));
-      if (mounted) {
-        context.go('/provider-dashboard');
-      }
-    } else if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            serviceProvider.errorMessage ?? 'Failed to create service',
+
+      if (success && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Service created successfully!'),
+            backgroundColor: AppColors.success,
           ),
-          backgroundColor: AppColors.error,
-        ),
-      );
+        );
+        await Future.delayed(const Duration(milliseconds: 500));
+        if (mounted) {
+          context.go('/provider-dashboard');
+        }
+      } else if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              serviceProvider.errorMessage ?? 'Failed to create service',
+            ),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (error) {
+      // ✅ Check mounted before showing error
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
+        );
+      }
+    } finally {
+      // ✅ Check mounted before setState
+      if (mounted) {
+        setState(() {
+          _isCreating = false;
+        });
+      }
     }
   }
 

@@ -9,7 +9,7 @@ import '../../widgets/buttons/primary_button.dart';
 
 class BookingDetailsScreen extends StatefulWidget {
   final String bookingId;
-  
+
   const BookingDetailsScreen({super.key, required this.bookingId});
 
   @override
@@ -29,7 +29,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   Future<void> _loadBookingDetails() async {
     final bookingProvider = context.read<BookingProvider>();
     final booking = await bookingProvider.getBookingById(widget.bookingId);
-    
+
     setState(() {
       _booking = booking;
       _isLoading = false;
@@ -58,11 +58,23 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
 
     if (confirmed == true) {
-      final bookingProvider = context.read<BookingProvider>();
-      final success = await bookingProvider.updateBookingStatus(
-        _booking!.id, 
-        BookingStatus.cancelled,
+      // ✅ Show loading indicator
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const Center(child: CircularProgressIndicator()),
       );
+
+      final bookingProvider = context.read<BookingProvider>();
+
+      final success = await bookingProvider.updateBookingStatus(
+        _booking!.id,
+        BookingStatus.cancelled,
+        _booking!.providerId,
+      );
+
+      // ✅ Close loading dialog
+      Navigator.of(context).pop();
 
       if (success && mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -72,6 +84,15 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           ),
         );
         _loadBookingDetails();
+      } else if (mounted) {
+        final errorMessage =
+            bookingProvider.errorMessage ?? 'Failed to cancel booking';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: AppColors.error,
+          ),
+        );
       }
     }
   }
@@ -86,8 +107,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _booking == null
-              ? const Center(child: Text('Booking not found'))
-              : _buildBookingDetails(),
+          ? const Center(child: Text('Booking not found'))
+          : _buildBookingDetails(),
     );
   }
 
@@ -100,27 +121,27 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
           // Status Card
           _buildStatusCard(),
           const SizedBox(height: 20),
-          
+
           // Service Details
           _buildServiceDetails(),
           const SizedBox(height: 20),
-          
+
           // Provider Details
           _buildProviderDetails(),
           const SizedBox(height: 20),
-          
+
           // Booking Information
           _buildBookingInfo(),
           const SizedBox(height: 20),
-          
+
           // Location Details
           _buildLocationDetails(),
           const SizedBox(height: 20),
-          
+
           // Payment Details
           _buildPaymentDetails(),
           const SizedBox(height: 30),
-          
+
           // Action Buttons
           _buildActionButtons(),
         ],
@@ -130,7 +151,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   Widget _buildStatusCard() {
     final statusColor = Helpers.getStatusColor(_booking!.status.toString());
-    
+
     return Card(
       color: statusColor.withOpacity(0.1),
       child: Padding(
@@ -189,11 +210,16 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
             ),
             const SizedBox(height: 12),
             _buildDetailRow('Service', _booking!.serviceName),
-            _buildDetailRow('Description', _booking!.description.isNotEmpty 
-                ? _booking!.description 
-                : 'No description provided'),
-            _buildDetailRow('Scheduled Date', 
-                Helpers.formatDateTime(_booking!.scheduledDateTime)),
+            _buildDetailRow(
+              'Description',
+              _booking!.description.isNotEmpty
+                  ? _booking!.description
+                  : 'No description provided',
+            ),
+            _buildDetailRow(
+              'Scheduled Date',
+              Helpers.formatDateTime(_booking!.scheduledDateTime),
+            ),
           ],
         ),
       ),
@@ -248,10 +274,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
                         children: [
                           RatingBarIndicator(
                             rating: 4.5,
-                            itemBuilder: (context, index) => const Icon(
-                              Icons.star,
-                              color: Colors.amber,
-                            ),
+                            itemBuilder: (context, index) =>
+                                const Icon(Icons.star, color: Colors.amber),
                             itemCount: 5,
                             itemSize: 16,
                           ),
@@ -304,13 +328,20 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildDetailRow('Booking Date', 
-                Helpers.formatDateTime(_booking!.createdAt)),
+            _buildDetailRow(
+              'Booking Date',
+              Helpers.formatDateTime(_booking!.createdAt),
+            ),
             if (_booking!.completedAt != null)
-              _buildDetailRow('Completed Date', 
-                  Helpers.formatDateTime(_booking!.completedAt!)),
+              _buildDetailRow(
+                'Completed Date',
+                Helpers.formatDateTime(_booking!.completedAt!),
+              ),
             if (_booking!.cancellationReason != null)
-              _buildDetailRow('Cancellation Reason', _booking!.cancellationReason!),
+              _buildDetailRow(
+                'Cancellation Reason',
+                _booking!.cancellationReason!,
+              ),
           ],
         ),
       ),
@@ -381,10 +412,14 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               ),
             ),
             const SizedBox(height: 12),
-            _buildDetailRow('Total Amount', 
-                Helpers.formatCurrency(_booking!.totalAmount)),
-            _buildDetailRow('Payment Status', 
-                _booking!.paymentId != null ? 'Paid' : 'Pending'),
+            _buildDetailRow(
+              'Total Amount',
+              Helpers.formatCurrency(_booking!.totalAmount),
+            ),
+            _buildDetailRow(
+              'Payment Status',
+              _booking!.paymentId != null ? 'Paid' : 'Pending',
+            ),
             if (_booking!.paymentId != null)
               _buildDetailRow('Payment ID', _booking!.paymentId!),
           ],
@@ -426,7 +461,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
   }
 
   Widget _buildActionButtons() {
-    if (_booking!.status == BookingStatus.pending || 
+    if (_booking!.status == BookingStatus.pending ||
         _booking!.status == BookingStatus.confirmed) {
       return Column(
         children: [
@@ -459,7 +494,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         text: 'Rate & Review',
       );
     }
-    
+
     return const SizedBox.shrink();
   }
 
@@ -482,10 +517,8 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
               direction: Axis.horizontal,
               allowHalfRating: true,
               itemCount: 5,
-              itemBuilder: (context, _) => const Icon(
-                Icons.star,
-                color: Colors.amber,
-              ),
+              itemBuilder: (context, _) =>
+                  const Icon(Icons.star, color: Colors.amber),
               onRatingUpdate: (value) {
                 rating = value;
               },
@@ -530,7 +563,7 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         return Icons.schedule;
       case BookingStatus.confirmed:
         return Icons.check_circle;
-      case BookingStatus.inProgresss:
+      case BookingStatus.inProgress:
         return Icons.construction;
       case BookingStatus.completed:
         return Icons.check_circle;
@@ -538,6 +571,6 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
         return Icons.cancel;
       case BookingStatus.refunded:
         return Icons.money_off;
-      }
+    }
   }
 }

@@ -56,7 +56,11 @@ class ServiceProvider extends ChangeNotifier {
   }) async {
     _isLoading = true;
     _errorMessage = null;
-    _safeNotifyListeners();
+
+    // ✅ Safe notification - only if there are listeners
+    if (hasListeners) {
+      notifyListeners();
+    }
 
     try {
       final currentUser = FirebaseAuth.instance.currentUser;
@@ -88,6 +92,7 @@ class ServiceProvider extends ChangeNotifier {
         basePrice: basePrice,
         imageUrl: imageUrl,
         subServices: subServices,
+        availability: 'available',
         mobileNumber: mobileNumber,
         providerId: currentUser.uid, // Add provider ID
         createdAt: DateTime.now(),
@@ -110,12 +115,18 @@ class ServiceProvider extends ChangeNotifier {
       _services.add(newService);
 
       _isLoading = false;
-      _safeNotifyListeners();
+      // ✅ Safe notification
+      if (hasListeners) {
+        notifyListeners();
+      }
       return true;
     } catch (e) {
       _isLoading = false;
       _errorMessage = e.toString();
-      _safeNotifyListeners();
+      // ✅ Safe notification
+      if (hasListeners) {
+        notifyListeners();
+      }
       return false;
     }
   }
@@ -362,8 +373,6 @@ class ServiceProvider extends ChangeNotifier {
         .toList();
   }
 
-  
-
   List<ProviderModel> getProvidersByService(String serviceId) {
     return _providers
         .where((provider) => provider.services.contains(serviceId))
@@ -457,6 +466,42 @@ class ServiceProvider extends ChangeNotifier {
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
+    }
+  }
+
+  // ✅ Add this method to ServiceProvider class
+  Future<void> addAvailabilityToExistingServices() async {
+    try {
+      debugPrint('🔄 Adding availability field to existing services...');
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('services')
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('✅ No existing services to update');
+        return;
+      }
+
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var doc in snapshot.docs) {
+        // Only update if availability field doesn't exist
+        final data = doc.data();
+        if (!data.containsKey('availability')) {
+          batch.update(doc.reference, {
+            'availability': 'available',
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+        }
+      }
+
+      await batch.commit();
+      debugPrint(
+        '✅ Updated ${snapshot.docs.length} existing services with availability field',
+      );
+    } catch (e) {
+      debugPrint('❌ Error updating existing services: $e');
     }
   }
 }
