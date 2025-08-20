@@ -730,14 +730,101 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             ),
             const SizedBox(height: 8),
 
-            Text(
-              'Customer: ${booking.customerId.substring(0, 8)}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.grey!),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.person, size: 16, color: AppColors.primary),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Customer Details',
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+
+                  // ✅ Customer name
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_circle,
+                        size: 16,
+                        color: Colors.grey[600],
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          booking.customerName ?? 'Loading customer...',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: booking.customerName != null
+                                ? AppColors.textPrimary
+                                : Colors.grey[600],
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+
+                  // ✅ Customer phone (only show if not null and not 'No Phone')
+                  if (booking.customerPhone != null &&
+                      booking.customerPhone != 'No Phone' &&
+                      booking.customerPhone!.isNotEmpty) ...[
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            booking.customerPhone!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ),
+                        // ✅ Call button
+                        InkWell(
+                          onTap: () {
+                            if (booking.customerPhone != null &&
+                                booking.customerPhone != 'No Phone') {
+                              Helpers.launchPhone(booking.customerPhone!);
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.all(6),
+                            decoration: BoxDecoration(
+                              color: AppColors.primary,
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Icon(
+                              Icons.call,
+                              size: 16,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
               ),
             ),
-            const SizedBox(height: 4),
 
             Text(
               'Date: ${Helpers.formatDateTime(booking.scheduledDateTime)}',
@@ -944,7 +1031,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         // ✅ Navigate to appropriate tab IMMEDIATELY
         _navigateToAppropriateTab(newStatus);
 
-        if(mounted){
+        if (mounted) {
           setState(() {});
         }
 
@@ -1065,84 +1152,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       default:
         return Icons.info;
     }
-  }
-
-  Widget _buildAllBookingsTab() {
-    return Consumer<BookingProvider>(
-      builder: (context, bookingProvider, child) {
-        final pendingBookings = bookingProvider.pendingBookings;
-        final confirmedBookings = bookingProvider.confirmedBookings;
-        final activeBookings = bookingProvider.activeBookings;
-
-        return DefaultTabController(
-          length: 3,
-          child: Column(
-            children: [
-              // Sub-tabs for booking statuses
-              Container(
-                color: Colors.grey[100],
-                child: const TabBar(
-                  labelColor: AppColors.primary,
-                  unselectedLabelColor: Colors.grey,
-                  indicatorColor: AppColors.primary,
-                  tabs: [
-                    Tab(text: 'Pending'),
-                    Tab(text: 'Confirmed'),
-                    Tab(text: 'Active'),
-                  ],
-                ),
-              ),
-
-              Expanded(
-                child: TabBarView(
-                  children: [
-                    _buildBookingsList(pendingBookings, 'No pending bookings'),
-                    _buildBookingsList(
-                      confirmedBookings,
-                      'No confirmed bookings',
-                    ),
-                    _buildBookingsList(activeBookings, 'No active bookings'),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildBookingsList(List<BookingModel> bookings, String emptyMessage) {
-    if (bookings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.inbox, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
-            Text(
-              emptyMessage,
-              style: TextStyle(color: Colors.grey, fontSize: 16),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return RefreshIndicator(
-      onRefresh: () async {
-        if (_currentUserId != null) {
-          await context.read<BookingProvider>().smartRefreshProviderBookings(
-            _currentUserId!,
-          );
-        }
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: bookings.length,
-        itemBuilder: (context, index) => _buildBookingCard(bookings[index]),
-      ),
-    );
   }
 
   Widget _buildServicesTab() {

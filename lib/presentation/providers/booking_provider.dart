@@ -40,6 +40,31 @@ class BookingProvider extends ChangeNotifier {
   String get customerAddress => _customerAddress;
   double get totalAmount => _totalAmount;
 
+  Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
+    try {
+      final userDoc = await _firebaseService.getUserData(customerId);
+
+      if (userDoc.exists) {
+        final userData = userDoc.value as Map<dynamic, dynamic>;
+        debugPrint(
+          '✅ Found customer data: ${userData['name']}, ${userData['phone']}',
+        );
+
+        return {
+          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
+          'customerPhone': userData['phone']?.toString() ?? 'No Phone',
+          'customerEmail': userData['email']?.toString() ?? 'No Email',
+        };
+      } else {
+        debugPrint('❌ Customer not found in Realtime Database');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching customer details: $e');
+      return null;
+    }
+  }
+
   Future<void> loadUserBookings(String userId) async {
     try {
       _setLoading(true);
@@ -51,9 +76,30 @@ class BookingProvider extends ChangeNotifier {
             .orderBy('createdAt', descending: true),
       );
 
-      _userBookings = querySnapshot.docs
-          .map((doc) => BookingModel.fromFireStore(doc))
-          .toList();
+      List<BookingModel> bookingsWithCustomerDetails = [];
+
+      for (var doc in querySnapshot.docs) {
+        // Create basic booking model
+        BookingModel booking = BookingModel.fromFireStore(doc);
+
+        // Fetch customer details
+        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+
+        // Update booking with customer details
+        if (customerDetails != null) {
+          booking = booking.copyWith(
+            customerName: customerDetails['customerName'],
+            customerPhone: customerDetails['customerPhone'],
+            customerEmail: customerDetails['customerEmail'],
+          );
+        }
+
+        bookingsWithCustomerDetails.add(booking);
+      }
+
+      _providerBookings = bookingsWithCustomerDetails;
+
+      _userBookings = bookingsWithCustomerDetails;
 
       notifyListeners();
     } catch (e) {
@@ -78,14 +124,38 @@ class BookingProvider extends ChangeNotifier {
         .orderBy('createdAt', descending: true)
         .snapshots()
         .listen(
-          (snapshot) {
+          (snapshot) async {
             debugPrint(
               '🔔 Received booking updates: ${snapshot.docs.length} bookings',
             );
+            List<BookingModel> bookingsWithCustomerDetails = [];
 
-            _providerBookings = snapshot.docs
-                .map((doc) => BookingModel.fromFireStore(doc))
-                .toList();
+            for (var doc in snapshot.docs) {
+              BookingModel booking = BookingModel.fromFireStore(doc);
+
+              // Fetch customer details for each booking
+              final customerDetails = await _fetchCustomerDetails(
+                booking.customerId,
+              );
+
+              if (customerDetails != null) {
+                booking = booking.copyWith(
+                  customerName: customerDetails['customerName'],
+                  customerPhone: customerDetails['customerPhone'],
+                  customerEmail: customerDetails['customerEmail'],
+                );
+                debugPrint(
+                  '✅ Added customer details: ${booking.customerName}, ${booking.customerPhone}',
+                );
+              } else {
+                debugPrint(
+                  '⚠️ No customer details found for: ${booking.customerId.substring(0, 8)}',
+                );
+              }
+
+              bookingsWithCustomerDetails.add(booking);
+            }
+            _providerBookings = bookingsWithCustomerDetails;
 
             debugPrint(
               '✅ Updated provider bookings: ${_providerBookings.length}',
@@ -132,11 +202,41 @@ class BookingProvider extends ChangeNotifier {
           .orderBy('createdAt', descending: true)
           .get();
 
-      _providerBookings = querySnapshot.docs
-          .map((doc) => BookingModel.fromFireStore(doc))
-          .toList();
+      List<BookingModel> bookingsWithCustomerDetails = [];
 
-      debugPrint('✅ Loaded ${_providerBookings.length} provider bookings');
+      for (var doc in querySnapshot.docs) {
+        BookingModel booking = BookingModel.fromFireStore(doc);
+
+        debugPrint(
+          '📋 Processing booking: ${booking.id.substring(0, 8)} for customer: ${booking.customerId.substring(0, 8)}',
+        );
+
+        // Fetch customer details
+        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+
+        if (customerDetails != null) {
+          booking = booking.copyWith(
+            customerName: customerDetails['customerName'],
+            customerPhone: customerDetails['customerPhone'],
+            customerEmail: customerDetails['customerEmail'],
+          );
+          debugPrint(
+            '✅ Added customer details: ${booking.customerName}, ${booking.customerPhone}',
+          );
+        } else {
+          debugPrint(
+            '⚠️ No customer details found for: ${booking.customerId.substring(0, 8)}',
+          );
+        }
+
+        bookingsWithCustomerDetails.add(booking);
+      }
+
+      _providerBookings = bookingsWithCustomerDetails;
+
+      debugPrint(
+        '✅ Loaded ${_providerBookings.length} provider bookings with customer details',
+      );
       debugPrint('✅ Pending: ${pendingBookings.length}');
       debugPrint('✅ Confirmed: ${confirmedBookings.length}');
       debugPrint('✅ Completed: ${completedBookings.length}');
@@ -164,6 +264,8 @@ class BookingProvider extends ChangeNotifier {
     try {
       _setLoading(true);
 
+      final customerDetails = await _fetchCustomerDetails(customerId);
+
       final bookingId = _uuid.v4();
       final booking = BookingModel(
         id: bookingId,
@@ -179,6 +281,9 @@ class BookingProvider extends ChangeNotifier {
         customerLatitude: customerLatitude,
         customerLongitude: customerLongitude,
         createdAt: DateTime.now(),
+        customerName: customerDetails?['customerName'],
+        customerPhone: customerDetails?['customerPhone'],
+        customerEmail: customerDetails?['customerEmail'],
       );
 
       // ✅ Use batch write to update both booking and service availability

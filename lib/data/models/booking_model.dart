@@ -27,6 +27,9 @@ class BookingModel {
   final String? paymentId;
   final String? cancellationReason;
   final Map<String, dynamic>? metadata;
+  final String? customerName;
+  final String? customerPhone;
+  final String? customerEmail;
 
   BookingModel({
     required this.id,
@@ -46,6 +49,9 @@ class BookingModel {
     this.paymentId,
     this.cancellationReason,
     this.metadata,
+    this.customerName,
+    this.customerPhone,
+    this.customerEmail,
   });
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
@@ -73,6 +79,9 @@ class BookingModel {
       paymentId: data['paymentId'],
       cancellationReason: data['cancellationReason'],
       metadata: data['metaData'],
+      customerName: data['customerName'],
+      customerEmail: data['customerEmail'],
+      customerPhone: data['customerPhone'],
     );
   }
 
@@ -96,6 +105,9 @@ class BookingModel {
       'paymentId': paymentId,
       'cancellationReason': cancellationReason,
       'metadata': metadata,
+      'customerName': customerName ?? customerName,
+      'customerPhone': customerPhone ?? customerPhone,
+      'customerEmail': customerEmail ?? customerEmail,
     };
   }
 
@@ -157,6 +169,9 @@ extension BookingModelCopyWith on BookingModel {
     String? paymentId,
     String? cancellationReason,
     Map<String, dynamic>? metadata,
+    String? customerName,
+    String? customerPhone,
+    String? customerEmail,
   }) {
     return BookingModel(
       id: id ?? this.id,
