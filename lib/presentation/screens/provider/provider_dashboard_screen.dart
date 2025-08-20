@@ -26,10 +26,38 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   BookingProvider? _bookingProvider; // ✅ Store provider reference
   AuthProvider? _authProvider; // ✅ Store provider reference
 
+  final Map<String, bool> _processingBookings = {};
+
+  bool _isBookingProcessing(String bookingId) {
+    return _processingBookings[bookingId] ?? false;
+  }
+
+  void _setBookingProcessing(String bookingId, bool processing) {
+    if (mounted) {
+      setState(() {
+        _processingBookings[bookingId] = processing;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
+
+    _tabController.addListener(() {
+      if (!_tabController.indexIsChanging) {
+        debugPrint('📱 Tab changed to: ${_tabController.index}');
+        final tabNames = [
+          'Overview',
+          'Services',
+          'Pending',
+          'Active',
+          'History',
+        ];
+        debugPrint('📱 Current tab: ${tabNames[_tabController.index]}');
+      }
+    });
 
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -243,9 +271,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         children: [
           _buildOverviewTab(),
           _buildServicesTab(),
-          _buildBookingsTab(BookingStatus.pending),
-          _buildBookingsTab(BookingStatus.inProgress),
-          _buildHistoryTab(),
+          _buildBookingsTab(BookingStatus.pending), // Pending tab
+          _buildBookingsTab(
+            BookingStatus.inProgress,
+          ), // Active tab (in progress bookings)
+          _buildHistoryTab(), // History tab
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -465,9 +495,27 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   Widget _buildBookingsTab(BookingStatus status) {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
-        final bookings = bookingProvider.providerbookings
-            .where((b) => b.status == status)
-            .toList();
+        List<BookingModel> bookings;
+
+        // ✅ Fix filtering logic for Active tab
+        if (status == BookingStatus.inProgress) {
+          // Active tab shows BOTH confirmed AND inProgress bookings
+          bookings = [
+            ...bookingProvider.confirmedBookings, // Accepted bookings
+            ...bookingProvider.activeBookings, // Started bookings
+          ];
+          debugPrint(
+            '🔍 Active tab bookings: ${bookings.length} (${bookingProvider.confirmedBookings.length} confirmed + ${bookingProvider.activeBookings.length} in progress)',
+          );
+        } else {
+          // Other tabs show their specific status
+          bookings = bookingProvider.providerbookings
+              .where((b) => b.status == status)
+              .toList();
+          debugPrint(
+            '🔍 ${status.toString().split('.').last} tab bookings: ${bookings.length}',
+          );
+        }
 
         if (bookings.isEmpty) {
           return RefreshIndicator(
@@ -478,7 +526,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
-              child: Container(
+              child: SizedBox(
                 height: MediaQuery.of(context).size.height * 0.7,
                 child: Center(
                   child: Column(
@@ -491,7 +539,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        'No ${status.toString().split('.').last} bookings',
+                        status == BookingStatus.inProgress
+                            ? 'No active bookings'
+                            : 'No ${_getStatusDisplayName(status)} bookings',
                         style: const TextStyle(
                           fontSize: 16,
                           color: AppColors.textSecondary,
@@ -506,7 +556,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                             );
                           }
                         },
-                        child: const Text('Tap to Refresh'),
+                        child: const Text('Tap to refresh'),
                       ),
                     ],
                   ),
@@ -523,6 +573,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             }
           },
           child: ListView.builder(
+            key: PageStorageKey<String>('${status.toString()}_list'),
             padding: const EdgeInsets.all(16),
             itemCount: bookings.length,
             itemBuilder: (context, index) {
@@ -636,7 +687,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     final statusColor = Helpers.getStatusColor(booking.status.toString());
 
     return Card(
+      key: ValueKey('booking_${booking.id}'),
       margin: const EdgeInsets.only(bottom: 12),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -675,6 +729,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ],
             ),
             const SizedBox(height: 8),
+
             Text(
               'Customer: ${booking.customerId.substring(0, 8)}',
               style: const TextStyle(
@@ -683,6 +738,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
             const SizedBox(height: 4),
+
             Text(
               'Date: ${Helpers.formatDateTime(booking.scheduledDateTime)}',
               style: const TextStyle(
@@ -691,6 +747,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
             ),
             const SizedBox(height: 4),
+
             Text(
               'Amount: ${Helpers.formatCurrency(booking.totalAmount)}',
               style: const TextStyle(
@@ -701,70 +758,129 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             ),
             const SizedBox(height: 12),
 
-            // Action buttons
-            if (booking.status == BookingStatus.pending) ...[
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton(
-                      onPressed: () => _updateBookingStatus(
-                        booking.id,
-                        BookingStatus.cancelled,
-                      ),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppColors.error,
-                        side: const BorderSide(color: AppColors.error),
-                      ),
-                      child: const Text('Decline'),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () => _updateBookingStatus(
-                        booking.id,
-                        BookingStatus.confirmed,
-                      ),
-                      child: const Text('Accept'),
-                    ),
-                  ),
-                ],
-              ),
-            ] else if (booking.status == BookingStatus.confirmed) ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () => _updateBookingStatus(
-                    booking.id,
-                    BookingStatus.inProgress,
-                  ),
-                  child: const Text('Start Service'),
-                ),
-              ),
-            ] else if (booking.status == BookingStatus.inProgress) ...[
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () =>
-                      _updateBookingStatus(booking.id, BookingStatus.completed),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                  ),
-                  child: const Text('Mark as Completed'),
-                ),
-              ),
-            ],
+            // ✅ Dynamic action buttons based on booking status
+            _buildBookingActions(booking),
           ],
         ),
       ),
     );
   }
 
+  Widget _buildBookingActions(BookingModel booking) {
+    final isProcessing = _isBookingProcessing(booking.id);
+
+    switch (booking.status) {
+      case BookingStatus.pending:
+        return Row(
+          children: [
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: isProcessing
+                    ? null
+                    : () => _updateBookingStatus(
+                        booking.id,
+                        BookingStatus.cancelled,
+                      ),
+                icon: isProcessing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.close, size: 16),
+                label: Text(isProcessing ? 'Processing...' : 'Decline'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: ElevatedButton.icon(
+                onPressed: isProcessing
+                    ? null
+                    : () => _updateBookingStatus(
+                        booking.id,
+                        BookingStatus.confirmed,
+                      ),
+                icon: isProcessing
+                    ? const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(
+                          color: Colors.white,
+                          strokeWidth: 2,
+                        ),
+                      )
+                    : const Icon(Icons.check, size: 16),
+                label: Text(isProcessing ? 'Accepting...' : 'Accept'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                ),
+              ),
+            ),
+          ],
+        );
+
+      case BookingStatus.confirmed:
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: isProcessing
+                ? null
+                : () => _updateBookingStatus(
+                    booking.id,
+                    BookingStatus.inProgress,
+                  ),
+            icon: isProcessing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.play_arrow, size: 16),
+            label: Text(isProcessing ? 'Starting...' : 'Start Service'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
+          ),
+        );
+
+      case BookingStatus.inProgress:
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: isProcessing
+                ? null
+                : () =>
+                      _updateBookingStatus(booking.id, BookingStatus.completed),
+            icon: isProcessing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.check_circle, size: 16),
+            label: Text(isProcessing ? 'Completing...' : 'Mark as Completed'),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+          ),
+        );
+
+      default:
+        return const SizedBox.shrink();
+    }
+  }
+
   Future<void> _updateBookingStatus(
     String bookingId,
     BookingStatus newStatus,
   ) async {
-    if (!mounted) return;
+    if (!mounted || _isBookingProcessing(bookingId)) return;
 
     final authProvider = context.read<AuthProvider>();
     final bookingProvider = context.read<BookingProvider>();
@@ -779,38 +895,159 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       return;
     }
 
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => const Center(child: CircularProgressIndicator()),
-    );
+    _setBookingProcessing(bookingId, true);
 
-    final success = await bookingProvider.updateBookingStatus(
-      bookingId,
-      newStatus,
-      currentUserId,
-    );
-
-    // ✅ Check mounted before navigation
-    if (!mounted) return;
-
-    // Close loading
-    Navigator.of(context).pop();
-
-    if (success && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Booking status updated to ${newStatus.statusDisplay}'),
-          backgroundColor: AppColors.success,
+    try {
+      bookingProvider.debugCurrentState('Before update');
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => PopScope(
+          canPop: false, // ✅ Updated from WillPopScope
+          child: const AlertDialog(
+            content: Row(
+              children: [
+                CircularProgressIndicator(),
+                SizedBox(width: 20),
+                Text('Updating booking status...'),
+              ],
+            ),
+          ),
         ),
       );
-    } else if (mounted) {
-      final errorMessage =
-          bookingProvider.errorMessage ?? 'Failed to update booking status';
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(errorMessage), backgroundColor: Colors.red),
+
+      final success = await bookingProvider.updateBookingStatus(
+        bookingId,
+        newStatus,
+        currentUserId,
       );
+
+      // Close loading dialog
+      if (mounted) {
+        Navigator.of(context).pop();
+      }
+
+      if (!mounted) return;
+
+      if (success) {
+        bookingProvider.debugCurrentState('After Update');
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Booking ${newStatus.statusDisplay.toLowerCase()} successfully',
+            ),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // ✅ Navigate to appropriate tab IMMEDIATELY
+        _navigateToAppropriateTab(newStatus);
+
+        if(mounted){
+          setState(() {});
+        }
+
+        // ✅ Refresh data after a short delay
+        await Future.delayed(const Duration(milliseconds: 1000));
+        if (mounted) {
+          bookingProvider.debugCurrentState('After refresh');
+          await bookingProvider.loadProviderBookings(
+            currentUserId,
+          ); // Use existing method
+        }
+      } else {
+        final errorMessage =
+            bookingProvider.errorMessage ?? 'Failed to update booking status';
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(errorMessage),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        Navigator.of(context).pop(); // Close loading dialog
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error: $error'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        _setBookingProcessing(bookingId, false);
+      }
     }
+  }
+
+  // ✅ Add this helper method for tab navigation
+  void _navigateToAppropriateTab(BookingStatus newStatus) {
+    int targetTabIndex;
+
+    switch (newStatus) {
+      case BookingStatus.confirmed:
+        targetTabIndex = 3; // Active tab
+        debugPrint('📍 Navigating to Active tab (confirmed booking)');
+        break;
+      case BookingStatus.inProgress:
+        targetTabIndex = 3; // Active tab
+        debugPrint('📍 Staying in Active tab (in progress booking)');
+        break;
+      case BookingStatus.completed:
+        targetTabIndex = 4; // History tab
+        debugPrint('📍 Navigating to History tab (completed booking)');
+        break;
+      case BookingStatus.cancelled:
+        targetTabIndex = 4; // History tab
+        debugPrint('📍 Navigating to History tab (cancelled booking)');
+        break;
+      default:
+        debugPrint('📍 No tab navigation needed for status: $newStatus');
+        return;
+    }
+
+    // Animate to target tab with smooth transition
+    _tabController.animateTo(
+      targetTabIndex,
+      duration: const Duration(milliseconds: 400),
+      curve: Curves.easeInOut,
+    );
+
+    debugPrint('📍 Tab animation initiated to index: $targetTabIndex');
+  }
+
+  Future<bool> _showConfirmationDialog(
+    String action,
+    String serviceName,
+  ) async {
+    return await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Confirm $action'),
+            content: Text(
+              'Are you sure you want to $action the booking for "$serviceName"?',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: const Text('Cancel'),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                ),
+                child: Text(action == 'accept' ? 'Accept' : 'Confirm'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
   }
 
   IconData _getStatusIcon(BookingStatus status) {
@@ -828,6 +1065,84 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       default:
         return Icons.info;
     }
+  }
+
+  Widget _buildAllBookingsTab() {
+    return Consumer<BookingProvider>(
+      builder: (context, bookingProvider, child) {
+        final pendingBookings = bookingProvider.pendingBookings;
+        final confirmedBookings = bookingProvider.confirmedBookings;
+        final activeBookings = bookingProvider.activeBookings;
+
+        return DefaultTabController(
+          length: 3,
+          child: Column(
+            children: [
+              // Sub-tabs for booking statuses
+              Container(
+                color: Colors.grey[100],
+                child: const TabBar(
+                  labelColor: AppColors.primary,
+                  unselectedLabelColor: Colors.grey,
+                  indicatorColor: AppColors.primary,
+                  tabs: [
+                    Tab(text: 'Pending'),
+                    Tab(text: 'Confirmed'),
+                    Tab(text: 'Active'),
+                  ],
+                ),
+              ),
+
+              Expanded(
+                child: TabBarView(
+                  children: [
+                    _buildBookingsList(pendingBookings, 'No pending bookings'),
+                    _buildBookingsList(
+                      confirmedBookings,
+                      'No confirmed bookings',
+                    ),
+                    _buildBookingsList(activeBookings, 'No active bookings'),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildBookingsList(List<BookingModel> bookings, String emptyMessage) {
+    if (bookings.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.inbox, size: 64, color: Colors.grey),
+            SizedBox(height: 16),
+            Text(
+              emptyMessage,
+              style: TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return RefreshIndicator(
+      onRefresh: () async {
+        if (_currentUserId != null) {
+          await context.read<BookingProvider>().smartRefreshProviderBookings(
+            _currentUserId!,
+          );
+        }
+      },
+      child: ListView.builder(
+        padding: const EdgeInsets.all(16),
+        itemCount: bookings.length,
+        itemBuilder: (context, index) => _buildBookingCard(bookings[index]),
+      ),
+    );
   }
 
   Widget _buildServicesTab() {
@@ -1144,8 +1459,26 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     );
   }
 
+  String _getStatusDisplayName(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return 'pending';
+      case BookingStatus.confirmed:
+        return 'confirmed';
+      case BookingStatus.inProgress:
+        return 'active';
+      case BookingStatus.completed:
+        return 'completed';
+      case BookingStatus.cancelled:
+        return 'cancelled';
+      default:
+        return 'unknown';
+    }
+  }
+
   @override
   void dispose() {
+    _processingBookings.clear();
     // ✅ Use stored reference instead of accessing context
     if (_bookingProvider != null) {
       _bookingProvider!.stopListeningToProviderBookings();

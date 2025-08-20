@@ -15,6 +15,7 @@ class BookingProvider extends ChangeNotifier {
   List<BookingModel> _providerBookings = [];
   bool _isLoading = false;
   String? _errorMessage;
+  final Map<String, DateTime> _recentlyUpdatedBookings = {};
 
   //booking creation feilds
   String? _selectedServiceId;
@@ -227,6 +228,10 @@ class BookingProvider extends ChangeNotifier {
   List<BookingModel> get pendingBookings =>
       getBookingsByStatus(BookingStatus.pending);
 
+  // ✅ Get in-progress bookings
+  List<BookingModel> get activeBookings =>
+      getBookingsByStatus(BookingStatus.inProgress);
+
   // ✅ Get confirmed bookings
   List<BookingModel> get confirmedBookings =>
       getBookingsByStatus(BookingStatus.confirmed);
@@ -240,27 +245,43 @@ class BookingProvider extends ChangeNotifier {
     BookingStatus status,
     String providerId,
   ) async {
+    int bookingIndex = -1;
+    BookingModel? originalBooking;
+
     try {
-      // Get booking data first to access serviceId
+      debugPrint('🔄 Updating booking $bookingId to status: $status');
+
+      // ✅ Find the booking first
+      bookingIndex = _providerBookings.indexWhere((b) => b.id == bookingId);
+      if (bookingIndex == -1) {
+        debugPrint('❌ Booking not found in local list');
+        _setError('Booking not found');
+        return false;
+      }
+
+      originalBooking = _providerBookings[bookingIndex];
+      debugPrint('📋 Original booking status: ${originalBooking.status}');
+
+      // ✅ Step 1: Update Firestore FIRST (no optimistic update)
       final bookingDoc = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
           .get();
 
       if (!bookingDoc.exists) {
-        _setError('Booking not found');
+        _setError('Booking not found in database');
         return false;
       }
 
       final bookingData = bookingDoc.data() as Map<String, dynamic>;
       final serviceId = bookingData['serviceId'] as String;
 
-      // ✅ Use batch write to update both booking and service
       final batch = FirebaseFirestore.instance.batch();
 
       // Update booking status
       Map<String, dynamic> bookingUpdate = {
         'status': status.toString().split('.').last,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
       };
 
       if (status == BookingStatus.completed) {
@@ -272,41 +293,184 @@ class BookingProvider extends ChangeNotifier {
           .doc(bookingId);
       batch.update(bookingRef, bookingUpdate);
 
-      // ✅ Update service availability based on booking status
+      // Update service availability
       final serviceRef = FirebaseFirestore.instance
           .collection('services')
           .doc(serviceId);
 
-      if (status == BookingStatus.inProgress) {
-        // When provider starts service
+      if (status == BookingStatus.confirmed) {
+        batch.update(serviceRef, {
+          'availability': 'booked',
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        });
+      } else if (status == BookingStatus.inProgress) {
         batch.update(serviceRef, {
           'availability': 'active',
           'updatedAt': Timestamp.fromDate(DateTime.now()),
         });
-        debugPrint('✅ Service marked as active (in progress)');
       } else if (status == BookingStatus.completed ||
           status == BookingStatus.cancelled) {
-        // When service is completed or cancelled, make it available again
         batch.update(serviceRef, {
           'availability': 'available',
           'updatedAt': Timestamp.fromDate(DateTime.now()),
         });
-        debugPrint('✅ Service marked as available again');
       }
 
       await batch.commit();
+      debugPrint('✅ Firestore updated successfully');
 
-      // Reload provider bookings
-      await loadProviderBookings(providerId);
+      // ✅ Step 2: Update local state AFTER Firestore success
+      final updatedBooking = originalBooking.copyWith(status: status);
+
+      // ✅ Create a NEW list instance (critical for Flutter to detect changes)
+      final newBookingsList = List<BookingModel>.from(_providerBookings);
+      newBookingsList[bookingIndex] = updatedBooking;
+
+      // ✅ Replace the entire list reference
+      _providerBookings = newBookingsList;
 
       debugPrint(
-        '✅ Booking status updated: $bookingId -> ${status.toString()}',
+        '✅ Local state updated: ${_providerBookings[bookingIndex].status}',
       );
+      debugPrint('📊 Current booking counts after update:');
+      debugPrint('   - Pending: ${pendingBookings.length}');
+      debugPrint('   - Confirmed: ${confirmedBookings.length}');
+      debugPrint('   - Active: ${activeBookings.length}');
+      debugPrint('   - Completed: ${completedBookings.length}');
+
+      // ✅ Force UI update
+      if (hasListeners) {
+        notifyListeners();
+      }
+
       return true;
     } catch (error) {
-      _setError('Failed to update booking status: $error');
       debugPrint('❌ Error updating booking status: $error');
+      _setError('Failed to update booking status: $error');
       return false;
+    }
+  }
+
+  Future<void> smartRefreshProviderBookings(String providerId) async {
+    try {
+      debugPrint('🔄 Smart refreshing provider bookings...');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: providerId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final freshBookings = querySnapshot.docs
+          .map((doc) => BookingModel.fromFireStore(doc))
+          .toList();
+
+      // ✅ Merge strategy: keep recent local updates, use fresh data for others
+      final now = DateTime.now();
+      final mergedBookings = <String, BookingModel>{};
+
+      // Start with fresh data
+      for (var booking in freshBookings) {
+        mergedBookings[booking.id] = booking;
+      }
+
+      // Preserve recently updated bookings (within last 2 minutes)
+      for (var localBooking in _providerBookings) {
+        final lastUpdate = _recentlyUpdatedBookings[localBooking.id];
+        if (lastUpdate != null && now.difference(lastUpdate).inMinutes < 2) {
+          debugPrint('🔄 Preserving recent update for ${localBooking.id}');
+          mergedBookings[localBooking.id] = localBooking;
+        }
+      }
+
+      // Clean up old entries
+      _recentlyUpdatedBookings.removeWhere(
+        (key, value) => now.difference(value).inMinutes > 5,
+      );
+
+      _providerBookings = mergedBookings.values.toList();
+      _providerBookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      debugPrint(
+        '✅ Smart refresh completed: ${_providerBookings.length} bookings',
+      );
+
+      if (hasListeners) {
+        notifyListeners();
+      }
+    } catch (error) {
+      debugPrint('❌ Error in smart refresh: $error');
+    }
+  }
+
+  // ✅ Add this debug method to BookingProvider
+  void debugBookingStates() {
+    debugPrint('📊 Current booking states:');
+    for (var booking in _providerBookings) {
+      debugPrint(
+        '   ${booking.serviceName}: ${booking.status} (ID: ${booking.id.substring(0, 8)})',
+      );
+    }
+    debugPrint('📊 Pending: ${pendingBookings.length}');
+    debugPrint('📊 Confirmed: ${confirmedBookings.length}');
+    debugPrint('📊 Active: ${activeBookings.length}');
+    debugPrint('📊 Completed: ${completedBookings.length}');
+  }
+
+  // ✅ Safe refresh that preserves recent local updates
+  Future<void> safeRefreshProviderBookings(String providerId) async {
+    try {
+      debugPrint('🔄 Safe refreshing provider bookings...');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: providerId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      final freshBookings = querySnapshot.docs
+          .map((doc) => BookingModel.fromFireStore(doc))
+          .toList();
+
+      // ✅ Merge fresh data with any recent local updates
+      final Map<String, BookingModel> mergedBookings = {};
+
+      // Start with fresh data from Firestore
+      for (var booking in freshBookings) {
+        mergedBookings[booking.id] = booking;
+      }
+
+      // Override with any recent local updates (last 5 minutes)
+      final fiveMinutesAgo = DateTime.now().subtract(Duration(minutes: 5));
+      for (var localBooking in _providerBookings) {
+        final freshBooking = mergedBookings[localBooking.id];
+        if (freshBooking != null) {
+          // If local booking was recently updated, keep local version
+          final localUpdatedAt =
+              localBooking.createdAt; // Use updatedAt if available
+          if (localUpdatedAt.isAfter(fiveMinutesAgo)) {
+            debugPrint(
+              '🔄 Preserving recent local update for ${localBooking.id}',
+            );
+            mergedBookings[localBooking.id] = localBooking;
+          }
+        }
+      }
+
+      _providerBookings = mergedBookings.values.toList();
+
+      // Sort by creation date
+      _providerBookings.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+
+      debugPrint(
+        '✅ Safe refresh completed: ${_providerBookings.length} bookings',
+      );
+
+      if (hasListeners) {
+        notifyListeners();
+      }
+    } catch (error) {
+      debugPrint('❌ Error in safe refresh: $error');
     }
   }
 
@@ -398,5 +562,21 @@ class BookingProvider extends ChangeNotifier {
   void clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  void debugCurrentState(String operation) {
+    debugPrint('📊 [$operation] Current booking state:');
+    debugPrint('   - Total bookings: ${_providerBookings.length}');
+    debugPrint('   - Pending: ${pendingBookings.length}');
+    debugPrint('   - Confirmed: ${confirmedBookings.length}');
+    debugPrint('   - Active (inProgress): ${activeBookings.length}');
+    debugPrint('   - Completed: ${completedBookings.length}');
+
+    debugPrint('📋 All bookings:');
+    for (var booking in _providerBookings) {
+      debugPrint(
+        '   - ${booking.serviceName}: ${booking.status} (${booking.id.substring(0, 8)})',
+      );
+    }
   }
 }

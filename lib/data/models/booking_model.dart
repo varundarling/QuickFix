@@ -60,7 +60,7 @@ class BookingModel {
       description: data['description'] ?? '',
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
       status: BookingStatus.values.firstWhere(
-        (e) => e.toString() == 'Booking Status.${data['status']}',
+        (e) => e.toString() == 'BookingStatus.${data['status']}',
         orElse: () => BookingStatus.pending,
       ),
       customerAddress: data['customerAddress'] ?? '',
@@ -133,7 +133,49 @@ extension BookingStatusExtension on BookingStatus {
       case BookingStatus.refunded:
         return 'Refunded';
       default:
-      return 'Unknown';
+        return 'Unknown';
     }
+  }
+}
+
+extension BookingModelCopyWith on BookingModel {
+  BookingModel copyWith({
+    String? id,
+    String? customerId,
+    String? providerId,
+    String? serviceId,
+    String? serviceName,
+    DateTime? scheduledDateTime,
+    String? description,
+    double? totalAmount,
+    BookingStatus? status,
+    String? customerAddress,
+    double? customerLatitude,
+    double? customerLongitude,
+    DateTime? createdAt,
+    DateTime? completedAt,
+    String? paymentId,
+    String? cancellationReason,
+    Map<String, dynamic>? metadata,
+  }) {
+    return BookingModel(
+      id: id ?? this.id,
+      customerId: customerId ?? this.customerId,
+      providerId: providerId ?? this.providerId,
+      serviceId: serviceId ?? this.serviceId,
+      serviceName: serviceName ?? this.serviceName,
+      scheduledDateTime: scheduledDateTime ?? this.scheduledDateTime,
+      description: description ?? this.description,
+      totalAmount: totalAmount ?? this.totalAmount,
+      status: status ?? this.status,
+      customerAddress: customerAddress ?? this.customerAddress,
+      customerLatitude: customerLatitude ?? this.customerLatitude,
+      customerLongitude: customerLongitude ?? this.customerLongitude,
+      createdAt: createdAt ?? this.createdAt,
+      completedAt: completedAt ?? this.completedAt,
+      paymentId: paymentId ?? this.paymentId,
+      cancellationReason: cancellationReason ?? this.cancellationReason,
+      metadata: metadata ?? this.metadata,
+    );
   }
 }
