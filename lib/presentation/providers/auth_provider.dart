@@ -266,39 +266,59 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<bool> updateProfile({
+    // Individual parameters (optional)
     String? name,
     String? phone,
     String? photoUrl,
     double? latitude,
     double? longitude,
     String? address,
+    String? businessName,
+    String? description,
+
+    // Map-based parameter (optional) - for backward compatibility
+    Map<String, dynamic>? profileData,
   }) async {
     debugPrint('🔄 Starting profile update...');
-    debugPrint('📍 New address: $address');
-    debugPrint('📍 New coords: $latitude, $longitude');
 
-    if (_user == null || _userModel == null) return false;
+    if (_user == null || _userModel == null) {
+      debugPrint('❌ User not authenticated');
+      return false;
+    }
 
     try {
       _setUpdateProfileLoading(true);
 
+      // ✅ Merge all parameters into a single update map
       final Map<String, dynamic> updateData = {};
+
+      // Add profileData if provided (for backward compatibility)
+      if (profileData != null) {
+        updateData.addAll(profileData);
+      }
+
+      // Override with individual parameters if provided
       if (name != null) updateData['name'] = name;
       if (phone != null) updateData['phone'] = phone;
       if (photoUrl != null) updateData['photoUrl'] = photoUrl;
       if (latitude != null) updateData['latitude'] = latitude;
       if (longitude != null) updateData['longitude'] = longitude;
       if (address != null) updateData['address'] = address;
+      if (businessName != null) updateData['businessName'] = businessName;
+      if (description != null) updateData['description'] = description;
+
+      // Always add timestamp
       updateData['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
 
+      debugPrint('📝 Updating profile data: $updateData');
+
+      // Update Firebase Realtime Database
       await _firebaseService.updateUserData(_user!.uid, updateData);
       debugPrint('✅ Firebase update successful');
 
-      // ✅ Reload user model
+      // Reload user model to get fresh data
       await _loadUserModel();
       debugPrint('✅ User model reloaded');
-      debugPrint('📍 New user address: ${_userModel?.address}');
-      notifyListeners();
 
       return true;
     } catch (e) {

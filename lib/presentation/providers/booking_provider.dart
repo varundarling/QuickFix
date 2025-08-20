@@ -31,6 +31,8 @@ class BookingProvider extends ChangeNotifier {
   List<BookingModel> get providerbookings => _providerBookings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  List<BookingModel> get cancelledBookings =>
+      getBookingsByStatus(BookingStatus.cancelled);
 
   //getters for booking creation
   String? get selectedServiceId => _selectedServiceId;
@@ -391,6 +393,10 @@ class BookingProvider extends ChangeNotifier {
 
       if (status == BookingStatus.completed) {
         bookingUpdate['completedAt'] = Timestamp.fromDate(DateTime.now());
+        bookingUpdate['customerAddress'] = '';
+        bookingUpdate['customerLatitude'] = 0.0;
+        bookingUpdate['customerLongitude'] = 0.0;
+        debugPrint('✅ Setting completion date to: ${DateTime.now()}');
       }
 
       final bookingRef = FirebaseFirestore.instance

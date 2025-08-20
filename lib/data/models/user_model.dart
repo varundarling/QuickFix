@@ -10,6 +10,8 @@ class UserModel {
   final double? latitude;
   final double? longitude;
   final String? address;
+  final String? businessName;
+  final String? description;
 
   UserModel({
     required this.id,
@@ -23,6 +25,8 @@ class UserModel {
     this.latitude,
     this.longitude,
     this.address,
+    this.businessName,
+    this.description,
   });
 
   // ✅ Add convenience getter methods
@@ -44,6 +48,8 @@ class UserModel {
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
       address: data['address']?.toString(),
+      businessName: data['businessName']?.toString(),
+      description: data['description']?.toString(),
     );
   }
 
@@ -60,6 +66,8 @@ class UserModel {
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
+      'businessName': businessName,
+      'description': description,
     };
   }
 

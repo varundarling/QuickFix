@@ -3,6 +3,7 @@ import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
+import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 import '../../../core/utils/navigation_helper.dart';
 import '../../providers/auth_provider.dart';
@@ -230,30 +231,63 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     debugPrint('🏗️ Building ProviderDashboardScreen');
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Dashboard'),
         backgroundColor: AppColors.primary,
-        actions: [
-          IconButton(
-            onPressed: () => context.go('/provider-profile'),
-            icon: const Icon(Icons.person),
-          ),
-          PopupMenuButton<String>(
-            onSelected: (value) async {
-              if (value == 'logout') {
-                NavigationHelper.handleLogout(context);
-              }
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'logout',
-                child: ListTile(
-                  leading: Icon(Icons.logout, color: Colors.red),
-                  title: Text('Logout', style: TextStyle(color: Colors.red)),
+        elevation: 0,
+        automaticallyImplyLeading: false, // Remove default back button
+        flexibleSpace: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                // ✅ Dashboard title on the left
+                const Text(
+                  'Dashboard',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-              ),
-            ],
+
+                // ✅ Profile section on the right
+                InkWell(
+                  onTap: () => context.go('/provider-profile'),
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        CircleAvatar(
+                          radius: 16,
+                          backgroundColor: Colors.white.withValues(alpha: 0.2),
+                          child: Icon(
+                            Icons.person_rounded,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'Profile',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: Colors.white,
@@ -325,6 +359,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             .length;
         final completedBookings = bookings
             .where((b) => b.status == BookingStatus.completed)
+            .length;
+        final cancelledBookings = bookings
+            .where((b) => b.status == BookingStatus.cancelled)
             .length;
         final totalEarnings = bookings
             .where((b) => b.status == BookingStatus.completed)
@@ -451,6 +488,12 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       Helpers.formatCurrency(totalEarnings),
                       Icons.account_balance_wallet,
                       AppColors.primary,
+                    ),
+                    _buildStatCard(
+                      'Cancelled',
+                      cancelledBookings.toString(),
+                      Icons.cancel,
+                      AppColors.error,
                     ),
                   ],
                 ),
@@ -631,12 +674,72 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           onRefresh: () async {
             await _loadData();
           },
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: bookings.length,
-            itemBuilder: (context, index) {
-              return _buildBookingCard(bookings[index]);
-            },
+          child: Column(
+            children: [
+              // ✅ Add summary header for history
+              Container(
+                padding: const EdgeInsets.all(8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    Column(
+                      children: [
+                        Text(
+                          bookings
+                              .where((b) => b.status == BookingStatus.completed)
+                              .length
+                              .toString(),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.success,
+                          ),
+                        ),
+                        const Text(
+                          'Completed',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      children: [
+                        Text(
+                          bookings
+                              .where((b) => b.status == BookingStatus.cancelled)
+                              .length
+                              .toString(),
+                          style: const TextStyle(
+                            fontSize: 24,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.error,
+                          ),
+                        ),
+                        const Text(
+                          'Cancelled',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              const Divider(),
+              Expanded(
+                child: ListView.builder(
+                  padding: const EdgeInsets.all(16),
+                  itemCount: bookings.length,
+                  itemBuilder: (context, index) {
+                    return _buildBookingCard(bookings[index]);
+                  },
+                ),
+              ),
+            ],
           ),
         );
       },
@@ -685,171 +788,334 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
 
     final statusColor = Helpers.getStatusColor(booking.status.toString());
+    final bool showAddress =
+        (booking.status == BookingStatus.confirmed ||
+            booking.status == BookingStatus.inProgress) &&
+        booking.customerAddress.isNotEmpty;
 
-    return Card(
-      key: ValueKey('booking_${booking.id}'),
-      margin: const EdgeInsets.only(bottom: 12),
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    booking.serviceName ?? 'Unknown Service',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 4,
-                  ),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    booking.statusDisplay,
-                    style: TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: statusColor,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.grey[50],
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.grey!),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+    return InkWell(
+      // ✅ Add tap functionality to navigate to detail screen
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => BookingDetailForProvider(bookingId: booking.id),
+          ),
+        );
+      },
+      borderRadius: BorderRadius.circular(12),
+      splashColor: AppColors.primary.withValues(alpha: 0.1),
+      highlightColor: AppColors.primary.withValues(alpha: 0.05),
+      child: Card(
+        key: ValueKey('booking_${booking.id}'),
+        margin: const EdgeInsets.only(bottom: 12),
+        elevation: 2,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
                 children: [
-                  Row(
-                    children: [
-                      Icon(Icons.person, size: 16, color: AppColors.primary),
-                      const SizedBox(width: 8),
-                      Text(
-                        'Customer Details',
-                        style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primary,
-                        ),
+                  Expanded(
+                    child: Text(
+                      booking.serviceName ?? 'Unknown Service',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
                       ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 8),
-
-                  // ✅ Customer name
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.account_circle,
-                        size: 16,
-                        color: Colors.grey[600],
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      booking.statusDisplay,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: statusColor,
                       ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Text(
-                          booking.customerName ?? 'Loading customer...',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: booking.customerName != null
-                                ? AppColors.textPrimary
-                                : Colors.grey[600],
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
+              const SizedBox(height: 8),
 
-                  // ✅ Customer phone (only show if not null and not 'No Phone')
-                  if (booking.customerPhone != null &&
-                      booking.customerPhone != 'No Phone' &&
-                      booking.customerPhone!.isNotEmpty) ...[
-                    const SizedBox(height: 6),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
                     Row(
                       children: [
-                        Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                        Icon(Icons.person, size: 16, color: AppColors.primary),
+                        const SizedBox(width: 8),
+                        Text(
+                          'Customer Details',
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // ✅ Customer name
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.account_circle,
+                          size: 16,
+                          color: Colors.grey[600],
+                        ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            booking.customerPhone!,
-                            style: const TextStyle(
+                            booking.customerName ?? 'Loading customer...',
+                            style: TextStyle(
                               fontSize: 14,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ),
-                        // ✅ Call button
-                        InkWell(
-                          onTap: () {
-                            if (booking.customerPhone != null &&
-                                booking.customerPhone != 'No Phone') {
-                              Helpers.launchPhone(booking.customerPhone!);
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(6),
-                            ),
-                            child: const Icon(
-                              Icons.call,
-                              size: 16,
-                              color: Colors.white,
+                              fontWeight: FontWeight.w500,
+                              color: booking.customerName != null
+                                  ? AppColors.textPrimary
+                                  : Colors.grey[600],
                             ),
                           ),
                         ),
                       ],
                     ),
+
+                    // ✅ Customer phone (only show if not null and not 'No Phone')
+                    if (booking.customerPhone != null &&
+                        booking.customerPhone != 'No Phone' &&
+                        booking.customerPhone!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(
+                        children: [
+                          Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              booking.customerPhone!,
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                              ),
+                            ),
+                          ),
+                          // ✅ Call button
+                          InkWell(
+                            onTap: () {
+                              if (booking.customerPhone != null &&
+                                  booking.customerPhone != 'No Phone') {
+                                Helpers.launchPhone(booking.customerPhone!);
+                              }
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.all(6),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.call,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 4),
 
-            Text(
-              'Date: ${Helpers.formatDateTime(booking.scheduledDateTime)}',
-              style: const TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
+              if (showAddress) ...[
+                const SizedBox(height: 12),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.primary.withValues(alpha: 0.1),
+                        AppColors.primary.withValues(alpha: 0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: AppColors.primary.withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            size: 16,
+                            color: AppColors.primary,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Customer Location',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.primary,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            'Tap to navigate',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppColors.primary,
+                              fontStyle: FontStyle.italic,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Padding(
+                        padding: const EdgeInsets.all(4),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.place,
+                              size: 16,
+                              color: Colors.grey[700],
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                booking.customerAddress.isNotEmpty
+                                    ? booking.customerAddress
+                                    : 'Address not provided',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: AppColors.textPrimary,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: AppColors.primary,
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: const Icon(
+                                Icons.directions,
+                                size: 16,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 4),
+
+              _buildDateDisplay(booking),
+
+              const SizedBox(height: 4),
+
+              Text(
+                'Amount: ${Helpers.formatCurrency(booking.totalAmount)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
               ),
-            ),
-            const SizedBox(height: 4),
+              const SizedBox(height: 12),
 
-            Text(
-              'Amount: ${Helpers.formatCurrency(booking.totalAmount)}',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primary,
-              ),
-            ),
-            const SizedBox(height: 12),
-
-            // ✅ Dynamic action buttons based on booking status
-            _buildBookingActions(booking),
-          ],
+              // ✅ Dynamic action buttons based on booking status
+              _buildBookingActions(booking),
+            ],
+          ),
         ),
       ),
+    );
+  }
+
+  Widget _buildDateDisplay(BookingModel booking) {
+    String dateLabel;
+    DateTime dateToShow;
+    Color? dateColor;
+
+    switch (booking.status) {
+      case BookingStatus.pending:
+      case BookingStatus.confirmed:
+      case BookingStatus.inProgress:
+        dateLabel = 'Scheduled Date:';
+        dateToShow = booking.scheduledDateTime;
+        dateColor = AppColors.textSecondary;
+        break;
+      case BookingStatus.completed:
+        dateLabel = 'Completed Date:';
+        dateToShow = booking.completedAt ?? booking.scheduledDateTime;
+        dateColor = AppColors.success;
+        break;
+      case BookingStatus.cancelled:
+        dateLabel = 'Cancelled Date:';
+        dateToShow = booking.completedAt ?? booking.scheduledDateTime;
+        dateColor = AppColors.error;
+        break;
+      default:
+        dateLabel = 'Date:';
+        dateToShow = booking.scheduledDateTime;
+        dateColor = AppColors.textSecondary;
+    }
+
+    return Row(
+      children: [
+        Icon(
+          booking.status == BookingStatus.completed
+              ? Icons.check_circle_outline
+              : booking.status == BookingStatus.cancelled
+              ? Icons.cancel_outlined
+              : Icons.schedule,
+          size: 16,
+          color: dateColor,
+        ),
+        const SizedBox(width: 8),
+        Text(
+          '$dateLabel ${Helpers.formatDateTime(dateToShow)}',
+          style: TextStyle(
+            fontSize: 16,
+            color: dateColor,
+            fontWeight: booking.status == BookingStatus.completed
+                ? FontWeight.w600
+                : FontWeight.normal,
+          ),
+        ),
+      ],
     );
   }
 
@@ -1108,35 +1374,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     debugPrint('📍 Tab animation initiated to index: $targetTabIndex');
   }
 
-  Future<bool> _showConfirmationDialog(
-    String action,
-    String serviceName,
-  ) async {
-    return await showDialog<bool>(
-          context: context,
-          builder: (context) => AlertDialog(
-            title: Text('Confirm $action'),
-            content: Text(
-              'Are you sure you want to $action the booking for "$serviceName"?',
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(false),
-                child: const Text('Cancel'),
-              ),
-              ElevatedButton(
-                onPressed: () => Navigator.of(context).pop(true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                ),
-                child: Text(action == 'accept' ? 'Accept' : 'Confirm'),
-              ),
-            ],
-          ),
-        ) ??
-        false;
-  }
-
   IconData _getStatusIcon(BookingStatus status) {
     switch (status) {
       case BookingStatus.pending:
@@ -1255,8 +1492,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   final service = services[index];
                   return ProviderCard(
                     service: service,
-                    onTap: () => context.go('/edit-service/${service.id}'),
-                    customButtonText: 'Manage Service',
+                    onTap: () {},
                     onServiceDeleted: () => _refreshServicesAfterDeletion(),
                   );
                 },

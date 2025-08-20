@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
-import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
 
 class CreateServiceScreen extends StatefulWidget {
@@ -73,7 +72,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
               // Category Dropdown
               DropdownButtonFormField<String>(
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),

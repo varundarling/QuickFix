@@ -2,13 +2,14 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
+import 'package:quickfix/presentation/screens/booking/booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
+import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
 import 'package:quickfix/presentation/screens/provider/create_service_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
 import '../../presentation/screens/auth/sign_Up_Screen.dart';
-import '../../presentation/screens/booking/booking_details_screen.dart';
 import '../../presentation/screens/profile/profile_screen.dart';
 import '../../presentation/screens/provider/provider_dashboard_screen.dart';
 
@@ -104,6 +105,15 @@ class AppRouter {
         builder: (context, state) {
           final serviceId = state.pathParameters['serviceId']!;
           return BookingScreen(serviceId: serviceId);
+        },
+      ),
+
+      GoRoute(
+        path: '/booking-details/:bookingId',
+        name: 'booking-details',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          return BookingDetailForProvider(bookingId: bookingId);
         },
       ),
 
