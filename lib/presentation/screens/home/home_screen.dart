@@ -471,15 +471,11 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _navigateToFavorites(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Favorites feature coming soon!')),
-    );
+    context.push('/favorites');
   }
 
   void _navigateToHistory(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('History feature coming soon!')),
-    );
+    context.push('/history');
   }
 
   void _showMoreOptions(BuildContext context) {

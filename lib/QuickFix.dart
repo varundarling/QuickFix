@@ -5,6 +5,7 @@ import 'package:quickfix/core/routes/app_router.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
+import 'package:quickfix/presentation/screens/provider/favourites_provider.dart';
 
 class QuickFix extends StatelessWidget {
   const QuickFix({super.key});
@@ -18,6 +19,7 @@ class QuickFix extends StatelessWidget {
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
+        ChangeNotifierProvider(create: (_) => FavoritesProvider()),
       ],
       child: MaterialApp.router(
         title: 'QuickFix',

@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/screens/provider/favourites_provider.dart';
 import 'package:quickfix/presentation/screens/service/service_detail_screen.dart';
 
 class ServiceCard extends StatelessWidget {
@@ -8,6 +10,7 @@ class ServiceCard extends StatelessWidget {
   final VoidCallback onTap;
   final double? userLatitude;
   final double? userLongitude;
+  final bool showFavoriteButton;
 
   const ServiceCard({
     super.key,
@@ -15,6 +18,7 @@ class ServiceCard extends StatelessWidget {
     required this.onTap,
     this.userLatitude,
     this.userLongitude,
+    this.showFavoriteButton = true,
   });
 
   @override
@@ -269,6 +273,43 @@ class ServiceCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 12),
+
+                      // Favorite Button
+                      if (showFavoriteButton)
+                        Consumer<FavoritesProvider>(
+                          builder: (context, favoritesProvider, child) {
+                            final isFavorite = favoritesProvider.isFavorite(
+                              service.id,
+                            );
+                            return IconButton(
+                              onPressed: () {
+                                favoritesProvider.toggleFavorite(service);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text(
+                                      isFavorite
+                                          ? '${service.name} removed from favorites'
+                                          : '${service.name} added to favorites',
+                                    ),
+                                    duration: const Duration(seconds: 2),
+                                  ),
+                                );
+                              },
+                              icon: AnimatedSwitcher(
+                                duration: const Duration(milliseconds: 200),
+                                child: Icon(
+                                  isFavorite
+                                      ? Icons.favorite
+                                      : Icons.favorite_border,
+                                  key: ValueKey(isFavorite),
+                                  color: isFavorite
+                                      ? AppColors.error
+                                      : Colors.grey[600],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
 
                       // Location Information
                       if (service.address != null &&

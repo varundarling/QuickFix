@@ -1,3 +1,4 @@
+// lib/core/router/app_router.dart (Updated)
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
@@ -5,6 +6,8 @@ import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
+import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
+import 'package:quickfix/presentation/screens/home/histroy_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/profile/profile_screen.dart';
 import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
@@ -24,12 +27,10 @@ class AppRouter {
           state.matchedLocation == '/signup' ||
           state.matchedLocation == '/user-type-selection';
 
-      // If user is logged in and trying to access auth screens, redirect to home
       if (isLoggedIn && isLoggingIn) {
         return '/home';
       }
 
-      // If user is not logged in and trying to access protected routes, redirect to user type selection
       if (!isLoggedIn && !isLoggingIn && state.matchedLocation != '/splash') {
         return '/user-type-selection';
       }
@@ -83,14 +84,12 @@ class AppRouter {
         builder: (context, state) => const ProfileScreen(),
       ),
 
-      // ✅ FIXED: CustomerBookingsScreen shows ALL bookings (no parameter needed)
       GoRoute(
         path: '/customer-bookings',
         name: 'customer-bookings',
         builder: (context, state) => const CustomerBookingsScreen(),
       ),
 
-      // ✅ FIXED: CustomerBookingDetailScreen shows specific booking details
       GoRoute(
         path: '/customer-booking-detail/:bookingId',
         name: 'customer-booking-detail',
@@ -98,6 +97,20 @@ class AppRouter {
           final bookingId = state.pathParameters['bookingId']!;
           return CustomerBookingDetailScreen(bookingId: bookingId);
         },
+      ),
+
+      // ✅ NEW: Favorites Screen
+      GoRoute(
+        path: '/favorites',
+        name: 'favorites',
+        builder: (context, state) => const FavoritesScreen(),
+      ),
+
+      // ✅ NEW: History Screen
+      GoRoute(
+        path: '/history',
+        name: 'history',
+        builder: (context, state) => const HistoryScreen(),
       ),
 
       // Provider Routes
