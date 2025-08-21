@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:geolocator/geolocator.dart';
+import 'package:geocoding/geocoding.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
@@ -17,7 +19,11 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   final _nameController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _basePriceController = TextEditingController();
+  final _mobileNumberController = TextEditingController();
+  final _addressController = TextEditingController();
+
   bool _isCreating = false;
+  bool _isLoadingLocation = false;
 
   String _selectedCategory = 'Plumbing';
   final List<String> _categories = [
@@ -32,7 +38,72 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
   final List<String> _subServices = [];
   final _subServiceController = TextEditingController();
-  final _mobileNumberController = TextEditingController();
+
+  // Location data
+  double? _latitude;
+  double? _longitude;
+  String? _currentAddress;
+
+  @override
+  void initState() {
+    super.initState();
+    _getCurrentLocation();
+  }
+
+  Future<void> _getCurrentLocation() async {
+    setState(() {
+      _isLoadingLocation = true;
+    });
+
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+        if (permission == LocationPermission.denied) {
+          throw Exception('Location permissions are denied');
+        }
+      }
+
+      if (permission == LocationPermission.deniedForever) {
+        throw Exception('Location permissions are permanently denied');
+      }
+
+      Position position = await Geolocator.getCurrentPosition(
+        desiredAccuracy: LocationAccuracy.medium,
+        timeLimit: const Duration(seconds: 10),
+      );
+
+      _latitude = position.latitude;
+      _longitude = position.longitude;
+
+      // Get address from coordinates
+      List<Placemark> placemarks = await placemarkFromCoordinates(
+        position.latitude,
+        position.longitude,
+      );
+
+      if (placemarks.isNotEmpty) {
+        final placemark = placemarks.first;
+        _currentAddress =
+            '${placemark.street}, ${placemark.locality}, ${placemark.administrativeArea}';
+        _addressController.text = _currentAddress ?? '';
+      }
+    } catch (e) {
+      debugPrint('Error getting location: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to get location: $e'),
+            backgroundColor: Colors.orange,
+          ),
+        );
+      }
+    } finally {
+      setState(() {
+        _isLoadingLocation = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -42,9 +113,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
         leading: IconButton(
-          onPressed: () {
-            context.go('/provider-dashboard');
-          },
+          onPressed: () => context.go('/provider-dashboard'),
           icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
         ),
       ),
@@ -67,11 +136,11 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 16),
 
               // Category Dropdown
               DropdownButtonFormField<String>(
+                dropdownColor: Colors.white,
                 initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
@@ -89,9 +158,9 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   });
                 },
               ),
-
               const SizedBox(height: 16),
 
+              // Mobile Number
               CustomTextField(
                 controller: _mobileNumberController,
                 label: 'Mobile Number',
@@ -107,7 +176,60 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   return null;
                 },
               ),
+              const SizedBox(height: 16),
 
+              // Location Section
+              Card(
+                color: Colors.white,
+                elevation: 2,
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.location_on, color: AppColors.primary),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Service Location',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (_isLoadingLocation)
+                            const SizedBox(
+                              width: 20,
+                              height: 20,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          else
+                            IconButton(
+                              onPressed: _getCurrentLocation,
+                              icon: const Icon(Icons.refresh),
+                              tooltip: 'Refresh Location',
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      CustomTextField(
+                        controller: _addressController,
+                        label: 'Address',
+                        hintText: 'Enter your service area address',
+                        maxLines: 2,
+                        validator: (value) {
+                          if (value == null || value.isEmpty) {
+                            return 'Please enter service location';
+                          }
+                          return null;
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+              ),
               const SizedBox(height: 16),
 
               // Description
@@ -123,7 +245,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 16),
 
               // Base Price
@@ -142,7 +263,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   return null;
                 },
               ),
-
               const SizedBox(height: 24),
 
               // Sub Services Section
@@ -151,8 +271,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 8),
-
-              // Add Sub Service
               Row(
                 children: [
                   Expanded(
@@ -175,7 +293,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   ),
                 ],
               ),
-
               const SizedBox(height: 16),
 
               // Sub Services List
@@ -191,7 +308,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                     );
                   }).toList(),
                 ),
-
               const SizedBox(height: 32),
 
               // Create Service Button
@@ -251,8 +367,18 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   }
 
   void _createService() async {
-    if (_isCreating || !mounted) return; // Prevent double submission
+    if (_isCreating || !mounted) return;
     if (!_formKey.currentState!.validate()) return;
+
+    if (_latitude == null || _longitude == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enable location to create service'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isCreating = true;
@@ -266,9 +392,12 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         description: _descriptionController.text.trim(),
         category: _selectedCategory,
         basePrice: double.parse(_basePriceController.text.trim()),
-        imageUrl: '', // You can add image picker later
+        imageUrl: '',
         subServices: _subServices,
         mobileNumber: _mobileNumberController.text.trim(),
+        latitude: _latitude!,
+        longitude: _longitude!,
+        address: _addressController.text.trim(),
       );
 
       if (success && mounted) {
@@ -293,14 +422,12 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         );
       }
     } catch (error) {
-      // ✅ Check mounted before showing error
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
         );
       }
     } finally {
-      // ✅ Check mounted before setState
       if (mounted) {
         setState(() {
           _isCreating = false;
@@ -316,6 +443,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     _basePriceController.dispose();
     _subServiceController.dispose();
     _mobileNumberController.dispose();
+    _addressController.dispose();
     super.dispose();
   }
 }

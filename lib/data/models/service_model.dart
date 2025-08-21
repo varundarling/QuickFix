@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ServiceModel {
@@ -13,7 +15,12 @@ class ServiceModel {
   final DateTime createdAt;
   final Map<String, dynamic>? metadata;
   final String mobileNumber;
-  final String availability; // ✅ Add this field
+  final String availability;
+
+  // Location fields
+  final double? latitude;
+  final double? longitude;
+  final String? address;
 
   ServiceModel({
     required this.id,
@@ -28,7 +35,10 @@ class ServiceModel {
     required this.createdAt,
     this.metadata,
     this.mobileNumber = '',
-    this.availability = 'available', // ✅ Add this with default value
+    this.availability = 'available',
+    this.latitude,
+    this.longitude,
+    this.address,
   });
 
   factory ServiceModel.fromFireStore(
@@ -52,7 +62,10 @@ class ServiceModel {
       createdAt: (data['createdAt'] as Timestamp).toDate(),
       metadata: data['metadata'],
       mobileNumber: data['mobileNumber'] ?? '',
-      availability: data['availability'] ?? 'available', // ✅ Add this
+      availability: data['availability'] ?? 'available',
+      latitude: data['latitude']?.toDouble(),
+      longitude: data['longitude']?.toDouble(),
+      address: data['address'],
     );
   }
 
@@ -69,12 +82,45 @@ class ServiceModel {
       'createdAt': Timestamp.fromDate(createdAt),
       'metadata': metadata,
       'mobileNumber': mobileNumber,
-      'availability': availability, // ✅ Add this
+      'availability': availability,
+      'latitude': latitude,
+      'longitude': longitude,
+      'address': address,
     };
   }
 
-  // ✅ Add helper methods
   bool get isAvailableForBooking => isActive && availability == 'available';
   bool get isBooked => availability == 'booked';
   bool get isInProgress => availability == 'active';
+
+  // Calculate distance from user location
+  double? distanceFromUser(double? userLat, double? userLng) {
+    if (latitude == null ||
+        longitude == null ||
+        userLat == null ||
+        userLng == null) {
+      return null;
+    }
+
+    // Haversine formula for distance calculation
+    const double earthRadius = 6371; // Earth's radius in km
+    final double dLat = _toRadians(latitude! - userLat);
+    final double dLng = _toRadians(longitude! - userLng);
+    final double a =
+        (dLat / 2).sin() * (dLat / 2).sin() +
+        userLat.cos() * latitude!.cos() * (dLng / 2).sin() * (dLng / 2).sin();
+    final double c = 2 * a.sqrt().asin();
+    return earthRadius * c;
+  }
+
+  double _toRadians(double degree) {
+    return degree * (3.14159265359 / 180);
+  }
+}
+
+extension on double {
+  double sin() => math.sin(this);
+  double cos() => math.cos(this);
+  double sqrt() => math.sqrt(this);
+  double asin() => math.asin(this);
 }

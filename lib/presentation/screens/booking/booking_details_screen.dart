@@ -1,101 +1,80 @@
-//This is for the customer side to give the review to the provider
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
-import '../../providers/booking_provider.dart';
-import '../../../core/constants/app_colors.dart';
-import '../../../core/utils/helpers.dart';
-import '../../../data/models/booking_model.dart';
-import '../../widgets/buttons/primary_button.dart';
+import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/utils/helpers.dart';
+import 'package:quickfix/data/models/booking_model.dart';
+import 'package:quickfix/presentation/providers/booking_provider.dart';
 
-class BookingDetailsScreen extends StatefulWidget {
-  final String bookingId;
+class CustomerBookingDetailScreen extends StatefulWidget {
+  final String
+  bookingId; // Changed from BookingModel booking to String bookingId
 
-  const BookingDetailsScreen({super.key, required this.bookingId});
+  const CustomerBookingDetailScreen({super.key, required this.bookingId});
 
   @override
-  State<BookingDetailsScreen> createState() => _BookingDetailsScreenState();
+  State<CustomerBookingDetailScreen> createState() =>
+      _CustomerBookingDetailScreenState();
 }
 
-class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
-  BookingModel? _booking;
-  bool _isLoading = true;
+class _CustomerBookingDetailScreenState
+    extends State<CustomerBookingDetailScreen> {
+  BookingModel? booking;
+  bool isLoading = true;
+  String? errorMessage;
 
   @override
   void initState() {
     super.initState();
-    _loadBookingDetails();
+    _loadBooking();
   }
 
-  Future<void> _loadBookingDetails() async {
-    final bookingProvider = context.read<BookingProvider>();
-    final booking = await bookingProvider.getBookingById(widget.bookingId);
-
-    setState(() {
-      _booking = booking;
-      _isLoading = false;
-    });
-  }
-
-  Future<void> _cancelBooking() async {
-    if (_booking == null) return;
-
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Cancel Booking'),
-        content: const Text('Are you sure you want to cancel this booking?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('No'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Yes'),
-          ),
-        ],
-      ),
-    );
-
-    if (confirmed == true) {
-      // ✅ Show loading indicator
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => const Center(child: CircularProgressIndicator()),
-      );
+  Future<void> _loadBooking() async {
+    try {
+      setState(() {
+        isLoading = true;
+        errorMessage = null;
+      });
 
       final bookingProvider = context.read<BookingProvider>();
 
-      final success = await bookingProvider.updateBookingStatus(
-        _booking!.id,
-        BookingStatus.cancelled,
-        _booking!.providerId,
+      // First try to find booking in existing list
+      final existingBooking =
+          bookingProvider.userBookings
+              .where((b) => b.id == widget.bookingId)
+              .isNotEmpty
+          ? bookingProvider.userBookings.firstWhere(
+              (b) => b.id == widget.bookingId,
+            )
+          : null;
+
+      if (existingBooking != null) {
+        setState(() {
+          booking = existingBooking;
+          isLoading = false;
+        });
+        return;
+      }
+
+      // If not found, fetch from database
+      final loadedBooking = await bookingProvider.getBookingById(
+        widget.bookingId,
       );
 
-      // ✅ Close loading dialog
-      Navigator.of(context).pop();
+      setState(() {
+        booking = loadedBooking;
+        isLoading = false;
+      });
 
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Booking cancelled successfully'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        _loadBookingDetails();
-      } else if (mounted) {
-        final errorMessage =
-            bookingProvider.errorMessage ?? 'Failed to cancel booking';
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
-            backgroundColor: AppColors.error,
-          ),
-        );
+      if (loadedBooking == null) {
+        setState(() {
+          errorMessage = 'Booking not found';
+        });
       }
+    } catch (e) {
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Failed to load booking: $e';
+      });
     }
   }
 
@@ -105,325 +84,245 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
       appBar: AppBar(
         title: const Text('Booking Details'),
         backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _booking == null
-          ? const Center(child: Text('Booking not found'))
-          : _buildBookingDetails(),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildBookingDetails() {
+  Widget _buildBody() {
+    if (isLoading) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(height: 16),
+            Text('Loading booking details...'),
+          ],
+        ),
+      );
+    }
+
+    if (errorMessage != null || booking == null) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.error_outline, size: 64, color: Colors.grey[400]),
+            const SizedBox(height: 16),
+            Text(
+              errorMessage ?? 'Booking not found',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadBooking,
+              child: const Text('Try Again'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return _buildBookingDetails(booking!);
+  }
+
+  Widget _buildBookingDetails(BookingModel booking) {
+    final statusColor = Helpers.getStatusColor(booking.status.toString());
+
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Status Card
-          _buildStatusCard(),
-          const SizedBox(height: 20),
-
-          // Service Details
-          _buildServiceDetails(),
-          const SizedBox(height: 20),
-
-          // Provider Details
-          _buildProviderDetails(),
-          const SizedBox(height: 20),
-
-          // Booking Information
-          _buildBookingInfo(),
-          const SizedBox(height: 20),
-
-          // Location Details
-          _buildLocationDetails(),
-          const SizedBox(height: 20),
-
-          // Payment Details
-          _buildPaymentDetails(),
-          const SizedBox(height: 30),
-
-          // Action Buttons
-          _buildActionButtons(),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatusCard() {
-    final statusColor = Helpers.getStatusColor(_booking!.status.toString());
-
-    return Card(
-      color: statusColor.withOpacity(0.1),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
-          children: [
-            Icon(
-              _getStatusIcon(_booking!.status),
-              color: statusColor,
-              size: 32,
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+          Card(
+            color: statusColor.withValues(alpha: 0.1),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
                 children: [
-                  Text(
-                    'Booking ${_booking!.statusDisplay}',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: statusColor,
-                    ),
+                  Icon(
+                    _getStatusIcon(booking.status),
+                    color: statusColor,
+                    size: 32,
                   ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Booking ID: ${_booking!.id.substring(0, 8)}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Booking ${booking.statusDisplay}',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: statusColor,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          'Booking ID: ${booking.id.substring(0, 8)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
               ),
             ),
-          ],
-        ),
+          ),
+          const SizedBox(height: 20),
+
+          // Service Details
+          _buildDetailCard(
+            title: 'Service Details',
+            icon: Icons.build_circle,
+            children: [
+              _buildDetailRow('Service', booking.serviceName),
+              _buildDetailRow(
+                'Description',
+                booking.description.isNotEmpty
+                    ? booking.description
+                    : 'No description provided',
+              ),
+              _buildDetailRow(
+                'Scheduled Date',
+                Helpers.formatDateTime(booking.scheduledDateTime),
+              ),
+              _buildDetailRow(
+                'Amount',
+                Helpers.formatCurrency(booking.totalAmount),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Provider Details
+          _buildDetailCard(
+            title: 'Service Provider',
+            icon: Icons.person,
+            children: [
+              _buildDetailRow(
+                'Provider ID',
+                booking.providerId.substring(0, 8),
+              ),
+              if (booking.customerPhone != null &&
+                  booking.customerPhone!.isNotEmpty)
+                _buildDetailRowWithAction(
+                  'Contact',
+                  booking.customerPhone!,
+                  Icons.phone,
+                  () => Helpers.launchPhone(booking.customerPhone!),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+
+          // Location Details
+          if (booking.customerAddress.isNotEmpty)
+            _buildDetailCard(
+              title: 'Service Location',
+              icon: Icons.location_on,
+              children: [_buildDetailRow('Address', booking.customerAddress)],
+            ),
+          const SizedBox(height: 16),
+
+          // Timeline
+          _buildDetailCard(
+            title: 'Booking Timeline',
+            icon: Icons.timeline,
+            children: [
+              _buildTimelineItem(
+                'Booking Created',
+                Helpers.formatDateTime(booking.createdAt),
+                Icons.add_circle_outline,
+                Colors.blue,
+              ),
+              if (booking.status == BookingStatus.completed &&
+                  booking.completedAt != null)
+                _buildTimelineItem(
+                  'Service Completed',
+                  Helpers.formatDateTime(booking.completedAt!),
+                  Icons.check_circle,
+                  AppColors.success,
+                ),
+            ],
+          ),
+          const SizedBox(height: 20),
+
+          // Action Buttons
+          if (booking.status == BookingStatus.inProgress)
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => _markAsCompleted(booking),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.success,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Mark as Completed',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            )
+          else if (booking.status == BookingStatus.pending)
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () => _cancelBooking(booking),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: AppColors.error,
+                  side: const BorderSide(color: AppColors.error),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  'Cancel Booking',
+                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
 
-  Widget _buildServiceDetails() {
+  Widget _buildDetailCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
     return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              'Service Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildDetailRow('Service', _booking!.serviceName),
-            _buildDetailRow(
-              'Description',
-              _booking!.description.isNotEmpty
-                  ? _booking!.description
-                  : 'No description provided',
-            ),
-            _buildDetailRow(
-              'Scheduled Date',
-              Helpers.formatDateTime(_booking!.scheduledDateTime),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildProviderDetails() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Service Provider',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
             Row(
               children: [
-                CircleAvatar(
-                  radius: 25,
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    _booking!.providerId[0].toUpperCase(),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 18,
-                    ),
-                  ),
-                ),
+                Icon(icon, color: AppColors.primary, size: 24),
                 const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Provider ID: ${_booking!.providerId.substring(0, 8)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          RatingBarIndicator(
-                            rating: 4.5,
-                            itemBuilder: (context, index) =>
-                                const Icon(Icons.star, color: Colors.amber),
-                            itemCount: 5,
-                            itemSize: 16,
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            '4.5 (120)',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: AppColors.textSecondary,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
                   ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.phone, color: AppColors.primary),
-                  onPressed: () {
-                    // Call provider
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.message, color: AppColors.primary),
-                  onPressed: () {
-                    // Message provider
-                  },
                 ),
               ],
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBookingInfo() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Booking Information',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildDetailRow(
-              'Booking Date',
-              Helpers.formatDateTime(_booking!.createdAt),
-            ),
-            if (_booking!.completedAt != null)
-              _buildDetailRow(
-                'Completed Date',
-                Helpers.formatDateTime(_booking!.completedAt!),
-              ),
-            if (_booking!.cancellationReason != null)
-              _buildDetailRow(
-                'Cancellation Reason',
-                _booking!.cancellationReason!,
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildLocationDetails() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Service Location',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Icon(
-                  Icons.location_on,
-                  color: AppColors.primary,
-                  size: 20,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    _booking!.customerAddress,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  icon: const Icon(Icons.map, color: AppColors.primary),
-                  onPressed: () {
-                    //Open in maps
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildPaymentDetails() {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              'Payment Details',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: AppColors.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 12),
-            _buildDetailRow(
-              'Total Amount',
-              Helpers.formatCurrency(_booking!.totalAmount),
-            ),
-            _buildDetailRow(
-              'Payment Status',
-              _booking!.paymentId != null ? 'Paid' : 'Pending',
-            ),
-            if (_booking!.paymentId != null)
-              _buildDetailRow('Payment ID', _booking!.paymentId!),
+            const SizedBox(height: 16),
+            ...children,
           ],
         ),
       ),
@@ -432,12 +331,12 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
 
   Widget _buildDetailRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
+      padding: const EdgeInsets.only(bottom: 12),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 100,
             child: Text(
               label,
               style: const TextStyle(
@@ -462,101 +361,185 @@ class _BookingDetailsScreenState extends State<BookingDetailsScreen> {
     );
   }
 
-  Widget _buildActionButtons() {
-    if (_booking!.status == BookingStatus.pending ||
-        _booking!.status == BookingStatus.confirmed) {
-      return Column(
+  Widget _buildDetailRowWithAction(
+    String label,
+    String value,
+    IconData actionIcon,
+    VoidCallback onTap,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          PrimaryButton(
-            onPressed: _cancelBooking,
-            text: 'Cancel Booking',
-            backgroundColor: AppColors.error,
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton(
-            onPressed: () {
-              // Reschedule booking
-            },
-            style: OutlinedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(vertical: 16),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(8),
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
               ),
             ),
-            child: const Text('Reschedule'),
           ),
-        ],
-      );
-    } else if (_booking!.status == BookingStatus.completed) {
-      return PrimaryButton(
-        onPressed: () {
-          // Rate and review
-          _showRatingDialog();
-        },
-        text: 'Rate & Review',
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
-  void _showRatingDialog() {
-    double rating = 5.0;
-    final reviewController = TextEditingController();
-
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Rate & Review'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('How was your service?'),
-            const SizedBox(height: 16),
-            RatingBar.builder(
-              initialRating: rating,
-              minRating: 1,
-              direction: Axis.horizontal,
-              allowHalfRating: true,
-              itemCount: 5,
-              itemBuilder: (context, _) =>
-                  const Icon(Icons.star, color: Colors.amber),
-              onRatingUpdate: (value) {
-                rating = value;
-              },
-            ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: reviewController,
-              decoration: const InputDecoration(
-                labelText: 'Review (Optional)',
-                border: OutlineInputBorder(),
+          const Text(': '),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
               ),
-              maxLines: 3,
             ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              // Submit rating and review
-              Navigator.of(context).pop();
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Thank you for your feedback!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-            },
-            child: const Text('Submit'),
+          InkWell(
+            onTap: onTap,
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Icon(actionIcon, size: 16, color: Colors.white),
+            ),
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildTimelineItem(
+    String title,
+    String time,
+    IconData icon,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  time,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _markAsCompleted(BookingModel booking) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Confirm Completion'),
+        content: const Text(
+          'Are you sure the service has been completed to your satisfaction?',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+            child: const Text('Confirm'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final bookingProvider = context.read<BookingProvider>();
+      final success = await bookingProvider.updateBookingStatus(
+        booking.id,
+        BookingStatus.completed,
+        booking.providerId,
+      );
+
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Service marked as completed!'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Refresh the booking data after marking as completed
+        await _loadBooking();
+      }
+    }
+  }
+
+  Future<void> _cancelBooking(BookingModel booking) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Cancel Booking'),
+        content: const Text('Are you sure you want to cancel this booking?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('No'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('Yes, Cancel'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && context.mounted) {
+      final bookingProvider = context.read<BookingProvider>();
+      final success = await bookingProvider.updateBookingStatus(
+        booking.id,
+        BookingStatus.cancelled,
+        booking.providerId,
+      );
+
+      if (success && context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Booking cancelled successfully'),
+            backgroundColor: AppColors.success,
+          ),
+        );
+
+        // Refresh the booking data after cancellation
+        await _loadBooking();
+      }
+    }
   }
 
   IconData _getStatusIcon(BookingStatus status) {

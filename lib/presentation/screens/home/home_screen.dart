@@ -1,23 +1,17 @@
-// ignore_for_file: deprecated_member_use, use_build_context_synchronously
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/constants/app_strings.dart';
-import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
-import 'package:quickfix/presentation/widgets/common/ad_banner_widget.dart';
-import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
-import '../../widgets/cards/service_card.dart';
+import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.passedLocation});
-
   final String? passedLocation;
 
   @override
@@ -26,8 +20,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService.instance;
-  final AdService _adService = AdService.instance;
-  LocationData? _curentLocation;
+  LocationData? _currentLocation;
   String? _currentAddress;
 
   @override
@@ -35,69 +28,26 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _initializeScreen();
-      _loadAds();
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    _checkQueryParameters();
-  }
-
-  void _checkQueryParameters() {
-    // ✅ Get query parameters from go_router
-    final router = GoRouter.of(context);
-    final location = router.routeInformationProvider.value.location;
-    final uri = Uri.parse(location);
-    final locationParam = uri.queryParameters['location'];
-
-    debugPrint('🔍 Query parameter location: $locationParam');
-
-    if (locationParam != null && locationParam != _currentAddress) {
-      setState(() {
-        _currentAddress = Uri.decodeComponent(locationParam);
-      });
-      debugPrint('✅ Location updated: $_currentAddress');
-    }
-  }
-
   Future<void> _initializeScreen() async {
-    //Load current location
-    _curentLocation = await _locationService.getCurrentLocation();
-    if (_curentLocation != null) {
+    // Load current location
+    _currentLocation = await _locationService.getCurrentLocation();
+    if (_currentLocation != null) {
       _currentAddress = await _locationService.getAddressFromCoordinates(
-        _curentLocation!.latitude!,
-        _curentLocation!.longitude!,
+        _currentLocation!.latitude!,
+        _currentLocation!.longitude!,
       );
       setState(() {});
     }
 
-    //Load Service and providers
+    // Load services and providers
     final serviceProvider = context.read<ServiceProvider>();
-    // Load all services with location filtering for customers
     await serviceProvider.loadAllServices(
-      userLat: _curentLocation?.latitude,
-      userLng: _curentLocation?.longitude,
+      userLat: _currentLocation?.latitude,
+      userLng: _currentLocation?.longitude,
     );
-
-    // Load providers
-    await serviceProvider.loadProviders(
-      userLat: _curentLocation?.latitude,
-      userLng: _curentLocation?.longitude,
-    );
-  }
-
-  void _loadAds() {
-    _adService.loadBannerAd();
-    _adService.loadInterstitialAd();
-    _adService.loadRewardedAd();
-  }
-
-  @override
-  void dispose() {
-    _adService.disposeBannerAd();
-    super.dispose();
   }
 
   @override
@@ -109,120 +59,23 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: _initializeScreen,
           child: CustomScrollView(
             slivers: [
-              //custom App bar
-              _buildCustomAppBar(),
+              // ✅ REDUCED Header Size
+              _buildCompactAppBar(),
 
-              //Location Banner
+              // Quick Access Menu (improved design)
+              SliverToBoxAdapter(child: _buildQuickAccessMenu()),
+
+              // Location Banner
               SliverToBoxAdapter(child: _buildLocationBanner()),
 
-              //search Bar
+              // Search Bar
               SliverToBoxAdapter(child: _buildSearchBar(context)),
 
-              //Category tabs
+              // Category Tabs
               SliverToBoxAdapter(child: _buildCategoryTabs()),
 
-              //Services Grid
-              Consumer<ServiceProvider>(
-                builder: (context, serviceProvider, child) {
-                  if (serviceProvider.isLoading) {
-                    return const SliverToBoxAdapter(
-                      child: Center(
-                        child: Padding(
-                          padding: EdgeInsets.all(20),
-                          child: CircularProgressIndicator(),
-                        ),
-                      ),
-                    );
-                  }
-
-                  final services = serviceProvider.getServicesByCategory();
-
-                  // Show message if no services
-                  if (services.isEmpty) {
-                    return SliverToBoxAdapter(
-                      child: Container(
-                        margin: const EdgeInsets.all(32),
-                        padding: const EdgeInsets.all(32),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[50],
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: Column(
-                          children: [
-                            Icon(
-                              Icons.search_off,
-                              size: 64,
-                              color: Colors.grey[400],
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              'No services available',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              'Try selecting a different category or check back later',
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }
-
-                  // Use SliverList for full-width cards instead of SliverGrid
-                  return SliverList(
-                    delegate: SliverChildBuilderDelegate((context, index) {
-                      // Show ad every 3 services
-                      if ((index + 1) % 4 == 0 && index < services.length - 1) {
-                        return Container(
-                          margin: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 8,
-                          ),
-                          child: const AdBannerWidget(),
-                        );
-                      }
-
-                      final serviceIndex = index - (index ~/ 4);
-                      if (serviceIndex >= services.length) return null;
-
-                      return ServiceCard(
-                        service: services[serviceIndex],
-
-                        onTap: () {
-                          debugPrint(
-                            '🔘 ServiceCard onTap called for: ${services[serviceIndex].name}',
-                          );
-                          debugPrint(
-                            '🔘 Service availability: ${services[serviceIndex].availability}',
-                          );
-                          debugPrint(
-                            '🔘 Is available for booking: ${services[serviceIndex].isAvailableForBooking}',
-                          );
-                          // Show interstitial ad occasionally
-                          if (serviceIndex % 3 == 0) {
-                            _adService.showInterstitialAd();
-                          }
-
-                          // Navigate to service booking screen
-                          // context.push('/book-service/${services[serviceIndex].id}');
-                        },
-                      );
-                    }, childCount: services.length + (services.length ~/ 4)),
-                  );
-                },
-              ),
-              //nearby providers section
-              SliverToBoxAdapter(child: _buildNearByProvidersSection()),
+              // Services Grid
+              _buildServicesGrid(),
             ],
           ),
         ),
@@ -230,9 +83,10 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildCustomAppBar() {
+  Widget _buildCompactAppBar() {
     return SliverAppBar(
-      expandedHeight: 120,
+      // ✅ REDUCED from 140 to 80
+      expandedHeight: 80,
       floating: false,
       pinned: true,
       backgroundColor: AppColors.primary,
@@ -241,7 +95,7 @@ class _HomeScreenState extends State<HomeScreen> {
           decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
           child: SafeArea(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               child: Consumer<AuthProvider>(
                 builder: (context, authProvider, child) {
                   return Row(
@@ -259,26 +113,32 @@ class _HomeScreenState extends State<HomeScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            const SizedBox(height: 4),
+                            const SizedBox(height: 2),
                             const Text(
                               AppStrings.findServices,
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 14,
+                                fontSize: 12,
                               ),
                             ),
                           ],
                         ),
                       ),
+                      // Notification Icon
                       IconButton(
-                        onPressed: () {},
-                        icon: Icon(Icons.notifications_outlined),
+                        onPressed: () => _showNotifications(context),
+                        icon: const Icon(
+                          Icons.notifications_outlined,
+                          color: Colors.white,
+                          size: 22,
+                        ),
                       ),
-
+                      // Profile Icon
                       IconButton(
                         icon: const Icon(
                           Icons.person_outline,
                           color: Colors.white,
+                          size: 22,
                         ),
                         onPressed: () => context.push('/profile'),
                       ),
@@ -293,16 +153,121 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildLocationBanner() {
+  Widget _buildQuickAccessMenu() {
     return Container(
       margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.08),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.dashboard, color: AppColors.primary, size: 20),
+              const SizedBox(width: 8),
+              const Text(
+                'Quick Access',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // ✅ IMPROVED Grid Layout - More Balanced
+          Row(
+            children: [
+              Expanded(
+                child: _buildQuickAccessItem(
+                  icon: Icons.calendar_today_outlined,
+                  label: 'Bookings',
+                  onTap: () => _navigateToBookings(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAccessItem(
+                  icon: Icons.favorite_outline,
+                  label: 'Favorites',
+                  onTap: () => _navigateToFavorites(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAccessItem(
+                  icon: Icons.history,
+                  label: 'History',
+                  onTap: () => _navigateToHistory(context),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildQuickAccessItem(
+                  icon: Icons.help_outline,
+                  label: 'Help',
+                  onTap: () => _showMoreOptions(context),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildQuickAccessItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 4),
+        decoration: BoxDecoration(borderRadius: BorderRadius.circular(8)),
+        child: Column(
+          children: [
+            Icon(icon, color: AppColors.primary, size: 20),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Rest of the methods remain the same...
+  Widget _buildLocationBanner() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 2),
           ),
@@ -310,24 +275,10 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       child: Consumer<AuthProvider>(
         builder: (context, authProvider, child) {
-          debugPrint(
-            '🏗️ Consumer called with address: ${authProvider.userModel?.address}',
-          );
-
-          // ✅ Get route arguments for passed location
-          final args =
-              ModalRoute.of(context)?.settings.arguments
-                  as Map<String, dynamic>?;
-          final passedLocation = args?['location'] as String?;
-
-          // ✅ Priority order: passed location > provider address > current address > default
           final displayAddress =
-              passedLocation ??
               authProvider.userModel?.address ??
               _currentAddress ??
               'Set your location';
-
-          debugPrint('🏗️ Final display address: $displayAddress');
 
           return Row(
             children: [
@@ -358,24 +309,24 @@ class _HomeScreenState extends State<HomeScreen> {
                   ],
                 ),
               ),
-              // TextButton(
-              //   onPressed: () =>
-              //       LocationService.showLocationChangeOptions(context),
-              //   child: const Row(
-              //     mainAxisSize: MainAxisSize.min,
-              //     children: [
-              //       Icon(Icons.edit_location, size: 16),
-              //       SizedBox(width: 4),
-              //       Text(
-              //         'Change',
-              //         style: TextStyle(
-              //           fontSize: 12,
-              //           fontWeight: FontWeight.w600,
-              //         ),
-              //       ),
-              //     ],
-              //   ),
-              // ),
+              TextButton(
+                onPressed: () =>
+                    LocationService.showLocationChangeOptions(context),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.edit_location, size: 16),
+                    SizedBox(width: 4),
+                    Text(
+                      'Change',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ],
           );
         },
@@ -385,7 +336,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildSearchBar(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
+      margin: const EdgeInsets.all(16),
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Search for services...',
@@ -399,7 +350,6 @@ class _HomeScreenState extends State<HomeScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         onTap: () {
-          // Navigate to search screen with available services
           final serviceProvider = context.read<ServiceProvider>();
           Navigator.push(
             context,
@@ -452,86 +402,153 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _buildNearByProvidersSection() {
+  Widget _buildServicesGrid() {
     return Consumer<ServiceProvider>(
       builder: (context, serviceProvider, child) {
-        if (serviceProvider.nearbyProviders.isEmpty) {
-          return const SizedBox.shrink();
+        if (serviceProvider.isLoading) {
+          return const SliverToBoxAdapter(
+            child: Center(
+              child: Padding(
+                padding: EdgeInsets.all(20),
+                child: CircularProgressIndicator(),
+              ),
+            ),
+          );
         }
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Section Header
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
+        final services = serviceProvider.getServicesByCategory();
+
+        if (services.isEmpty) {
+          return SliverToBoxAdapter(
+            child: Container(
+              margin: const EdgeInsets.all(32),
+              padding: const EdgeInsets.all(32),
+              decoration: BoxDecoration(
+                color: Colors.grey[50],
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Column(
                 children: [
-                  Icon(Icons.star, color: Colors.amber, size: 24),
-                  const SizedBox(width: 8),
-                  const Text(
-                    'Top Rated Providers Near You',
+                  Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                  const SizedBox(height: 16),
+                  Text(
+                    'No services available',
                     style: TextStyle(
-                      fontSize: 20,
+                      fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
+                      color: Colors.grey[600],
                     ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Try selecting a different category or check back later',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
                   ),
                 ],
               ),
             ),
+          );
+        }
 
-            // Provider Cards (Full Width)
-            ...serviceProvider.nearbyProviders.take(3).map((provider) {
-              return ProviderCard(
-                provider: provider,
-                userLocation: _curentLocation,
-                onTap: () {
-                  // Navigate to provider details
-                  context.push('/provider-details/${provider.id}');
-                },
-              );
-            }),
-
-            // View All Button (if more than 3 providers)
-            if (serviceProvider.nearbyProviders.length > 3)
-              Container(
-                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                width: double.infinity,
-                child: OutlinedButton(
-                  onPressed: () {
-                    // Navigate to all providers screen
-                    context.push('/all-providers');
-                  },
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.primary,
-                    side: BorderSide(color: AppColors.primary),
-                    padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'View All ${serviceProvider.nearbyProviders.length} Providers',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.arrow_forward, size: 18),
-                    ],
-                  ),
-                ),
-              ),
-
-            const SizedBox(height: 20),
-          ],
+        return SliverList(
+          delegate: SliverChildBuilderDelegate((context, index) {
+            return ServiceCard(
+              service: services[index],
+              onTap: () {},
+              userLatitude: _currentLocation?.latitude,
+              userLongitude: _currentLocation?.longitude,
+            );
+          }, childCount: services.length),
         );
       },
+    );
+  }
+
+  // Navigation methods
+  void _navigateToBookings(BuildContext context) {
+    context.push('/customer-bookings');
+  }
+
+  void _navigateToFavorites(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Favorites feature coming soon!')),
+    );
+  }
+
+  void _navigateToHistory(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('History feature coming soon!')),
+    );
+  }
+
+  void _showMoreOptions(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => _buildMoreOptionsSheet(),
+    );
+  }
+
+  Widget _buildMoreOptionsSheet() {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+          const Text(
+            'Help & Support',
+            style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+          ),
+          const SizedBox(height: 20),
+          _buildMoreOptionItem(
+            icon: Icons.help_outline,
+            title: 'FAQ',
+            onTap: () => Navigator.pop(context),
+          ),
+          _buildMoreOptionItem(
+            icon: Icons.feedback_outlined,
+            title: 'Feedback',
+            onTap: () => Navigator.pop(context),
+          ),
+          _buildMoreOptionItem(
+            icon: Icons.info_outline,
+            title: 'About Us',
+            onTap: () => Navigator.pop(context),
+          ),
+          const SizedBox(height: 20),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMoreOptionItem({
+    required IconData icon,
+    required String title,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      leading: Icon(icon, color: AppColors.primary),
+      title: Text(title),
+      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+      onTap: onTap,
+    );
+  }
+
+  void _showNotifications(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('Notifications feature coming soon!')),
     );
   }
 }

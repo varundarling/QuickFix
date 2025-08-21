@@ -53,11 +53,13 @@ class ServiceProvider extends ChangeNotifier {
     String imageUrl = '',
     List<String> subServices = const [],
     required String mobileNumber,
+    required double latitude,
+    required double longitude,
+    required String address,
   }) async {
     _isLoading = true;
     _errorMessage = null;
 
-    // ✅ Safe notification - only if there are listeners
     if (hasListeners) {
       notifyListeners();
     }
@@ -68,22 +70,10 @@ class ServiceProvider extends ChangeNotifier {
         throw Exception('User not logged in');
       }
 
-      final position = await _getCurrentLocation();
-      String address = 'Location not available';
-
-      if (position != null) {
-        address =
-            await _getAddressFromCoordinates(
-              position.latitude,
-              position.longitude,
-            ) ??
-            'Address not available';
-      }
-
       // Generate unique ID
       final serviceId = const Uuid().v4();
 
-      // Create service model
+      // Create service model with location
       final newService = ServiceModel(
         id: serviceId,
         name: name,
@@ -94,15 +84,16 @@ class ServiceProvider extends ChangeNotifier {
         subServices: subServices,
         availability: 'available',
         mobileNumber: mobileNumber,
-        providerId: currentUser.uid, // Add provider ID
+        providerId: currentUser.uid,
         createdAt: DateTime.now(),
-        metadata: position != null
-            ? {
-                'latitude': position.latitude,
-                'longitude': position.longitude,
-                'address': address,
-              }
-            : null,
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+        metadata: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'address': address,
+        },
       );
 
       // Save to Firestore
@@ -115,7 +106,6 @@ class ServiceProvider extends ChangeNotifier {
       _services.add(newService);
 
       _isLoading = false;
-      // ✅ Safe notification
       if (hasListeners) {
         notifyListeners();
       }
@@ -123,7 +113,6 @@ class ServiceProvider extends ChangeNotifier {
     } catch (e) {
       _isLoading = false;
       _errorMessage = e.toString();
-      // ✅ Safe notification
       if (hasListeners) {
         notifyListeners();
       }

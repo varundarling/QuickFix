@@ -1,17 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
+import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_details_screen.dart';
-import 'package:quickfix/presentation/screens/booking/booking_screen.dart';
+import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
+import 'package:quickfix/presentation/screens/profile/profile_screen.dart';
 import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
 import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
 import 'package:quickfix/presentation/screens/provider/create_service_screen.dart';
+import 'package:quickfix/presentation/screens/provider/provider_dashboard_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
-import '../../presentation/screens/auth/sign_Up_Screen.dart';
-import '../../presentation/screens/profile/profile_screen.dart';
-import '../../presentation/screens/provider/provider_dashboard_screen.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -38,13 +38,14 @@ class AppRouter {
     },
 
     routes: [
+      // Splash Screen
       GoRoute(
         path: '/splash',
         name: 'splash',
         builder: (context, state) => const SplashScreen(),
       ),
 
-      // ✅ Add User Type Selection Screen
+      // Authentication Routes
       GoRoute(
         path: '/user-type-selection',
         name: 'user-type-selection',
@@ -69,6 +70,7 @@ class AppRouter {
         },
       ),
 
+      // Customer Routes
       GoRoute(
         path: '/home',
         name: 'home',
@@ -81,6 +83,24 @@ class AppRouter {
         builder: (context, state) => const ProfileScreen(),
       ),
 
+      // ✅ FIXED: CustomerBookingsScreen shows ALL bookings (no parameter needed)
+      GoRoute(
+        path: '/customer-bookings',
+        name: 'customer-bookings',
+        builder: (context, state) => const CustomerBookingsScreen(),
+      ),
+
+      // ✅ FIXED: CustomerBookingDetailScreen shows specific booking details
+      GoRoute(
+        path: '/customer-booking-detail/:bookingId',
+        name: 'customer-booking-detail',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          return CustomerBookingDetailScreen(bookingId: bookingId);
+        },
+      ),
+
+      // Provider Routes
       GoRoute(
         path: '/provider-dashboard',
         name: 'provider-dashboard',
@@ -100,29 +120,11 @@ class AppRouter {
       ),
 
       GoRoute(
-        path: '/booking/:serviceId',
-        name: 'booking',
-        builder: (context, state) {
-          final serviceId = state.pathParameters['serviceId']!;
-          return BookingScreen(serviceId: serviceId);
-        },
-      ),
-
-      GoRoute(
-        path: '/booking-details/:bookingId',
-        name: 'booking-details',
+        path: '/provider-booking-detail/:bookingId',
+        name: 'provider-booking-detail',
         builder: (context, state) {
           final bookingId = state.pathParameters['bookingId']!;
           return BookingDetailForProvider(bookingId: bookingId);
-        },
-      ),
-
-      GoRoute(
-        path: '/booking-details/:bookingId',
-        name: 'booking-details',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          return BookingDetailsScreen(bookingId: bookingId);
         },
       ),
     ],
