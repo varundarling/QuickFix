@@ -49,6 +49,7 @@ class CustomTextField extends StatelessWidget {
           validator: validator,
           maxLines: maxLines,
           enabled: enabled,
+          key: ValueKey('${label}_${controller.text}'),
           decoration: InputDecoration(
             hintText: hintText,
             prefixIcon: prefixIcon != null

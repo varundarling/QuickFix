@@ -170,29 +170,27 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           currentBooking.customerName ?? 'Loading...',
                         ),
 
-                        if (currentBooking.customerPhone != null &&
-                            currentBooking.customerPhone != 'No Phone')
-                          _buildDetailRowWithAction(
-                            Icons.phone,
-                            'Phone Number',
-                            currentBooking.customerPhone!,
-                            onTap: () => Helpers.launchPhone(
-                              currentBooking.customerPhone!,
-                            ),
-                          ),
+                        // if (currentBooking.customerPhone != null &&
+                        //     currentBooking.customerPhone != 'No Phone')
+                        //   _buildDetailRowWithAction(
+                        //     Icons.phone,
+                        //     'Phone Number',
+                        //     currentBooking.customerPhone!,
+                        //     onTap: () => Helpers.launchPhone(
+                        //       currentBooking.customerPhone!,
+                        //     ),
+                        //   ),
 
-                        if (currentBooking.customerEmail != null &&
-                            currentBooking.customerEmail != 'No Email')
-                          _buildDetailRowWithAction(
-                            Icons.email,
-                            'Email Address',
-                            currentBooking.customerEmail!,
-                            onTap: () => Helpers.launchEmail(
-                              currentBooking.customerEmail!,
-                            ),
-                          ),
-
-                        _buildSimpleAddressText(currentBooking),
+                        // if (currentBooking.customerEmail != null &&
+                        //     currentBooking.customerEmail != 'No Email')
+                        //   _buildDetailRowWithAction(
+                        //     Icons.email,
+                        //     'Email Address',
+                        //     currentBooking.customerEmail!,
+                        //     onTap: () => Helpers.launchEmail(
+                        //       currentBooking.customerEmail!,
+                        //     ),
+                        //   ),
                       ],
                     ),
                   ),
@@ -236,14 +234,14 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           Helpers.formatDateTime(currentBooking.createdAt),
                           Colors.blue,
                         ),
-                        _buildTimelineRow(
-                          Icons.schedule,
-                          'Scheduled Date',
-                          Helpers.formatDateTime(
-                            currentBooking.scheduledDateTime,
-                          ),
-                          Colors.orange,
-                        ),
+                        // _buildTimelineRow(
+                        //   Icons.schedule,
+                        //   'Scheduled Date',
+                        //   Helpers.formatDateTime(
+                        //     currentBooking.scheduledDateTime,
+                        //   ),
+                        //   Colors.orange,
+                        // ),
                         if (currentBooking.completedAt != null)
                           _buildTimelineRow(
                             Icons.check_circle,
@@ -281,23 +279,6 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
             ),
           );
         },
-      ),
-    );
-  }
-
-  Widget _buildSimpleAddressText(BookingModel booking) {
-    return Text(
-      booking.customerAddress.isNotEmpty
-          ? booking.customerAddress
-          : 'Call the customer',
-      style: TextStyle(
-        fontSize: 16,
-        color: booking.customerAddress.isNotEmpty
-            ? Colors.black87
-            : Colors.orange[700],
-        fontStyle: booking.customerAddress.isNotEmpty
-            ? FontStyle.normal
-            : FontStyle.italic,
       ),
     );
   }

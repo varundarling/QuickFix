@@ -15,10 +15,12 @@ import 'package:quickfix/presentation/screens/provider/booking_detail_for_provid
 import 'package:quickfix/presentation/screens/provider/create_service_screen.dart';
 import 'package:quickfix/presentation/screens/provider/provider_dashboard_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
+import 'package:quickfix/quickFix.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
     initialLocation: '/splash',
+    navigatorKey: navigatorKey,
     redirect: (context, state) {
       final user = FirebaseAuth.instance.currentUser;
       final isLoggedIn = user != null;

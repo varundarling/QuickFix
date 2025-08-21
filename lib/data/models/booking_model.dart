@@ -9,6 +9,16 @@ enum BookingStatus {
   refunded,
 }
 
+BookingStatus? bookingStatusFromString(String value) {
+  try {
+    return BookingStatus.values.firstWhere(
+      (e) => e.name == value.toLowerCase(),
+    );
+  } catch (e) {
+    return null; // Return null if no match found
+  }
+}
+
 class BookingModel {
   final String id;
   final String customerId;
@@ -65,10 +75,7 @@ class BookingModel {
       scheduledDateTime: (data['scheduledDateTime'] as Timestamp).toDate(),
       description: data['description'] ?? '',
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
-      status: BookingStatus.values.firstWhere(
-        (e) => e.toString() == 'BookingStatus.${data['status']}',
-        orElse: () => BookingStatus.pending,
-      ),
+      status: bookingStatusFromString(data['status']) ?? BookingStatus.pending,
       customerAddress: data['customerAddress'] ?? '',
       customerLatitude: (data['customerLatitude'] ?? 0.0).toDouble(),
       customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
@@ -94,7 +101,7 @@ class BookingModel {
       'scheduledDateTime': Timestamp.fromDate(scheduledDateTime),
       "description": description,
       'totalAmount': totalAmount,
-      'status': status.toString().split('.').last,
+      'status': status.name,
       'customerAddress': customerAddress,
       'customerLatitude': customerLatitude,
       'customerLongitude': customerLongitude,
@@ -108,6 +115,23 @@ class BookingModel {
       'customerName': customerName ?? customerName,
       'customerPhone': customerPhone ?? customerPhone,
       'customerEmail': customerEmail ?? customerEmail,
+    };
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'customerId': customerId,
+      'providerId': providerId,
+      'serviceId': serviceId,
+      'serviceName': serviceName,
+      'description': description,
+      'scheduledDateTime': scheduledDateTime.millisecondsSinceEpoch,
+      'customerAddress': customerAddress,
+      'customerLatitude': customerLatitude,
+      'customerLongitude': customerLongitude,
+      'totalAmount': totalAmount,
+      'status': status.toString().split('.').last,
+      'createdAt': createdAt.millisecondsSinceEpoch,
     };
   }
 

@@ -1,8 +1,10 @@
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
@@ -10,7 +12,6 @@ import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/data/models/provider_model.dart';
 
 class ServiceDetailScreen extends StatefulWidget {
-  // ✅ Change to StatefulWidget
   final ServiceModel service;
   final ProviderModel? provider;
 
@@ -21,163 +22,161 @@ class ServiceDetailScreen extends StatefulWidget {
 }
 
 class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
-  // ✅ Add State class
-  bool _isBooking = false; // ✅ Now properly managed in state
+  bool _isBooking = false;
+  ProviderModel? _provider;
+  bool _isLoadingProvider = false;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Debug authentication
+    final user = FirebaseAuth.instance.currentUser;
+    debugPrint('=== AUTH VERIFICATION ===');
+    debugPrint('User ID: ${user?.uid}');
+    debugPrint('Email: ${user?.email}');
+    debugPrint('Is Authenticated: ${user != null}');
+    debugPrint('========================');
+
+    _provider = widget.provider;
+
+    // If provider not passed, fetch it
+    if (_provider == null) {
+      debugPrint('🔄 Provider not passed, fetching from Firestore...');
+      _fetchProviderData();
+    } else {
+      debugPrint('✅ Provider passed from parent: ${_provider!.businessName}');
+    }
+
+    // Load bookings for this service
+    _loadBookingData();
+
+    // Debug initial state
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _debugProviderState();
+    });
+  }
+
+  void _debugProviderState() {
+    debugPrint('=== PROVIDER STATE DEBUG ===');
+    debugPrint('Service Provider ID: ${widget.service.providerId}');
+    debugPrint('Is Loading Provider: $_isLoadingProvider');
+    debugPrint('Provider Object: $_provider');
+    debugPrint('Provider Business Name: ${_provider?.businessName}');
+    debugPrint('Provider Address: ${_provider?.address}');
+    debugPrint('Provider Experience: ${_provider?.experience}');
+    debugPrint('Widget Mounted: $mounted');
+    debugPrint('===========================');
+  }
+
+  Future<void> _fetchProviderData() async {
+    if (widget.service.providerId.isEmpty) {
+      debugPrint('❌ No provider ID provided');
+      return;
+    }
+
+    setState(() {
+      _isLoadingProvider = true;
+    });
+
+    try {
+      debugPrint('🔄 Fetching provider data for: ${widget.service.providerId}');
+
+      final doc = await FirebaseFirestore.instance
+          .collection('providers')
+          .doc(widget.service.providerId)
+          .get();
+
+      debugPrint('📡 Firestore response - exists: ${doc.exists}');
+
+      if (doc.exists && doc.data() != null) {
+        final data = doc.data()!;
+        debugPrint('📄 Raw provider data: $data');
+
+        final providerModel = ProviderModel.fromFireStore(doc);
+        debugPrint('✅ Provider model created: ${providerModel.businessName}');
+        debugPrint('Provider Address: ${providerModel.address}');
+        debugPrint('Provider Experience: ${providerModel.experience}');
+
+        if (mounted) {
+          setState(() {
+            _provider = providerModel;
+            _isLoadingProvider = false;
+          });
+          debugPrint('✅ UI state updated with provider data');
+        }
+      } else {
+        debugPrint('❌ Provider document does not exist or has no data');
+        if (mounted) {
+          setState(() {
+            _provider = null;
+            _isLoadingProvider = false;
+          });
+        }
+      }
+    } catch (e, stackTrace) {
+      debugPrint('❌ Error fetching provider: $e');
+      debugPrint('Stack trace: $stackTrace');
+
+      if (mounted) {
+        setState(() {
+          _provider = null;
+          _isLoadingProvider = false;
+        });
+
+        // Show error to user
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to load provider details: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  void _loadBookingData() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final bookingProvider = context.read<BookingProvider>();
+      bookingProvider.loadServiceBookings(widget.service.id);
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    print(
-      '🔍 Building ServiceDetailScreen with mobile: "${widget.service.mobileNumber}"',
-    );
-
     return Scaffold(
       backgroundColor: AppColors.background,
+      // ✅ FIXED: Use regular AppBar, not inside CustomScrollView
+      appBar: AppBar(
+        title: const Text('Service Details'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        actions: [
+          IconButton(
+            onPressed: () {
+              debugPrint('🔄 Manual refresh triggered');
+              _fetchProviderData();
+              _loadBookingData();
+            },
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh',
+          ),
+        ],
+      ),
       body: CustomScrollView(
         slivers: [
-          // Custom App Bar with Service Image
+          // ✅ Service Image Header as SliverAppBar
           SliverAppBar(
             expandedHeight: 250,
-            pinned: true,
+            pinned: false,
             backgroundColor: AppColors.primary,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Service Image
-                  widget.service.imageUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.service.imageUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: AppColors.primary.withValues(alpha: 0.1),
-                            child: const Center(
-                              child: CircularProgressIndicator(),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: [
-                                  AppColors.primary,
-                                  AppColors.primary.withValues(alpha: 0.8),
-                                ],
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _getCategoryIcon(widget.service.category),
-                                  size: 80,
-                                  color: Colors.white,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  widget.service.category,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : Container(
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                              colors: [
-                                AppColors.primary,
-                                AppColors.primary.withValues(alpha: 0.8),
-                              ],
-                            ),
-                          ),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                _getCategoryIcon(widget.service.category),
-                                size: 80,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(height: 16),
-                              Text(
-                                widget.service.category,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-
-                  // Gradient Overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Colors.black.withValues(alpha: 0.3),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Price Badge
-                  Positioned(
-                    top: 100,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 8,
-                      ),
-                      decoration: BoxDecoration(
-                        color: AppColors.success,
-                        borderRadius: BorderRadius.circular(25),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.success.withValues(alpha: 0.3),
-                            blurRadius: 8,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.currency_rupee,
-                            color: Colors.white,
-                            size: 18,
-                          ),
-                          Text(
-                            '${widget.service.basePrice.toInt()}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            automaticallyImplyLeading:
+                false, // Remove back button since we have one in main AppBar
+            flexibleSpace: FlexibleSpaceBar(background: _buildHeaderImage()),
           ),
 
-          // Service Content
+          // ✅ CRITICAL FIX: Wrap all content in SliverToBoxAdapter
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.all(16),
@@ -188,27 +187,26 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   _buildServiceHeader(),
                   const SizedBox(height: 24),
 
-                  // Business Name Section
-                  _buildBusinessNameSection(),
+                  // Provider Details Section
+                  _buildProviderSection(),
                   const SizedBox(height: 24),
 
-                  // Mobile Number Section
-                  _buildMobileNumberSection(),
+                  // Contact Information
+                  _buildContactSection(),
                   const SizedBox(height: 24),
+
+                  // Booking Details Section (for existing bookings)
+                  _buildBookingDetailsSection(),
 
                   // Service Description
                   _buildServiceDescription(),
                   const SizedBox(height: 24),
 
                   // Sub-services
-                  if (widget.service.subServices.isNotEmpty)
+                  if (widget.service.subServices.isNotEmpty) ...[
                     _buildSubServices(),
-                  if (widget.service.subServices.isNotEmpty)
                     const SizedBox(height: 24),
-
-                  // Provider Details
-                  if (widget.provider != null) _buildProviderDetails(),
-                  if (widget.provider != null) const SizedBox(height: 24),
+                  ],
 
                   // Book Service Button
                   _buildBookServiceButton(context),
@@ -216,6 +214,102 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   const SizedBox(height: 32),
                 ],
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderImage() {
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        // Service Image
+        widget.service.imageUrl.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: widget.service.imageUrl,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Container(
+                  color: AppColors.primary.withValues(alpha: 0.1),
+                  child: const Center(child: CircularProgressIndicator()),
+                ),
+                errorWidget: (context, url, error) => _buildDefaultHeader(),
+              )
+            : _buildDefaultHeader(),
+
+        // Gradient Overlay
+        Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
+            ),
+          ),
+        ),
+
+        // Price Badge
+        Positioned(
+          top: 100,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppColors.success,
+              borderRadius: BorderRadius.circular(25),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.success.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.currency_rupee, color: Colors.white, size: 18),
+                Text(
+                  '${widget.service.basePrice.toInt()}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDefaultHeader() {
+    return Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+        ),
+      ),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            _getCategoryIcon(widget.service.category),
+            size: 80,
+            color: Colors.white,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            widget.service.category,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -259,10 +353,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     vertical: 4,
                   ),
                   decoration: BoxDecoration(
-                    color:
-                        widget
-                            .service
-                            .isAvailableForBooking // ✅ Use availability check
+                    color: widget.service.isAvailableForBooking
                         ? AppColors.success.withValues(alpha: 0.1)
                         : Colors.orange.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
@@ -340,7 +431,218 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
-  Widget _buildMobileNumberSection() {
+  Widget _buildProviderSection() {
+    // Use ValueKey to force rebuild when provider data changes
+    return Card(
+      key: ValueKey(
+        'provider_${_provider?.id ?? 'null'}_${_isLoadingProvider}',
+      ),
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: _buildProviderContent(),
+      ),
+    );
+  }
+
+  Widget _buildProviderContent() {
+    // Loading State
+    if (_isLoadingProvider) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const CircularProgressIndicator(),
+          const SizedBox(height: 16),
+          Text(
+            'Loading provider details...',
+            style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+          ),
+        ],
+      );
+    }
+
+    // No Provider State
+    if (_provider == null) {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.business_center, size: 48, color: Colors.grey),
+          const SizedBox(height: 12),
+          Text(
+            'Provider Information Not Available',
+            style: TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton.icon(
+            onPressed: _fetchProviderData,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('Retry'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      );
+    }
+
+    // Provider Data Available
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Icon(Icons.business, color: AppColors.primary, size: 24),
+            const SizedBox(width: 8),
+            const Text(
+              'Service Provider',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+
+        // Provider Info Row
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Provider Avatar
+            CircleAvatar(
+              radius: 30,
+              backgroundColor: AppColors.primary,
+              child: Text(
+                _provider!.businessName.isNotEmpty
+                    ? _provider!.businessName[0].toUpperCase()
+                    : '?',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // Provider Details
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Business Name
+                  Text(
+                    _provider!.businessName.isNotEmpty
+                        ? _provider!.businessName
+                        : 'Service Provider',
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+
+                  // Experience
+                  if (_provider!.experience?.isNotEmpty == true) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.work_history,
+                          size: 14,
+                          color: Colors.grey[600],
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'Experience: ${_provider!.experience}',
+                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // Address with Maps Integration
+                  if (_provider!.address.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(Icons.location_on, size: 14, color: Colors.grey),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            _provider!.address,
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+
+                  // Rating
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      RatingBarIndicator(
+                        rating: _provider!.raitng,
+                        itemBuilder: (context, index) =>
+                            const Icon(Icons.star, color: Colors.amber),
+                        itemCount: 5,
+                        itemSize: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_provider!.raitng.toStringAsFixed(1)} (${_provider!.totalReviews} reviews)',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Verification Badge
+            if (_provider!.isVerified)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.verified, size: 14, color: AppColors.success),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Verified',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildContactSection() {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -364,63 +666,223 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Mobile Number Row
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.05),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.phone, color: AppColors.primary, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Mobile Number',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
+
+            // Service Mobile Number
+            if (widget.service.mobileNumber.isNotEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.phone, color: AppColors.primary, size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Service Contact',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
                           ),
+                          const SizedBox(height: 2),
+                          Text(
+                            widget.service.mobileNumber,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () =>
+                          _makePhoneCall(widget.service.mobileNumber),
+                      icon: const Icon(Icons.call, size: 16),
+                      label: const Text('Call'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.primary,
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // Provider Mobile Number (if different)
+            if (_provider?.mobileNumber.isNotEmpty == true &&
+                _provider!.mobileNumber != widget.service.mobileNumber) ...[
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.business, color: Colors.grey[600], size: 20),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Provider Contact',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _provider!.mobileNumber,
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textPrimary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    ElevatedButton.icon(
+                      onPressed: () => _makePhoneCall(_provider!.mobileNumber),
+                      icon: const Icon(Icons.call, size: 16),
+                      label: const Text('Call'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[600],
+                        foregroundColor: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBookingDetailsSection() {
+    return Consumer<BookingProvider>(
+      builder: (context, bookingProvider, child) {
+        final currentUser = FirebaseAuth.instance.currentUser;
+        if (currentUser == null) return const SizedBox.shrink();
+
+        final booking = bookingProvider.getUserBookingForService(
+          currentUser.uid,
+          widget.service.id,
+        );
+
+        if (booking == null) return const SizedBox.shrink();
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.bookmark, color: AppColors.success, size: 24),
+                    const SizedBox(width: 8),
+                    const Text(
+                      'Your Booking Details',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Booking Status
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: _getStatusColor(
+                      booking.status,
+                    ).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(
+                      color: _getStatusColor(
+                        booking.status,
+                      ).withValues(alpha: 0.3),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            _getStatusIcon(booking.status),
+                            color: _getStatusColor(booking.status),
+                            size: 20,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            'Status: ${booking.status}',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                              color: _getStatusColor(booking.status),
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Booked on: ${_formatDateTime(booking.createdAt)}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
                         ),
-                        const SizedBox(height: 2),
+                      ),
+                      if (booking.scheduledDateTime != null) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          widget.service.mobileNumber.isEmpty
-                              ? 'Not provided'
-                              : widget.service.mobileNumber,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
+                          'Scheduled for: ${_formatDateTime(booking.scheduledDateTime!)}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
                             color: AppColors.textPrimary,
                           ),
                         ),
                       ],
-                    ),
-                  ),
-                  if (widget.service.mobileNumber.isNotEmpty)
-                    ElevatedButton.icon(
-                      onPressed: () =>
-                          _makePhoneCall(widget.service.mobileNumber),
-                      icon: Icon(Icons.call, size: 16),
-                      label: Text('Call'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: AppColors.primary,
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 8,
+                      if (booking.description.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          'Notes: ${booking.description}',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            color: AppColors.textSecondary,
+                          ),
                         ),
-                      ),
-                    ),
-                ],
-              ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
-      ),
+          ),
+        );
+      },
     );
   }
 
@@ -518,273 +980,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
-  Widget _buildProviderDetails() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.business, color: AppColors.primary, size: 24),
-                const SizedBox(width: 8),
-                const Text(
-                  'Service Provider',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-
-            // Provider Info Row
-            Row(
-              children: [
-                // Provider Avatar
-                CircleAvatar(
-                  radius: 30,
-                  backgroundColor: AppColors.primary,
-                  child: Text(
-                    widget.provider != null &&
-                            widget.provider!.businessName.isNotEmpty
-                        ? widget.provider!.businessName[0].toUpperCase()
-                        : '?',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 16),
-
-                // Provider Details
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Text(
-                              widget.provider?.businessName ??
-                                  'Service Provider',
-                              style: const TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.textPrimary,
-                              ),
-                            ),
-                          ),
-                          if (widget.provider?.isVerified ?? false)
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: AppColors.success.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Icon(
-                                    Icons.verified,
-                                    size: 14,
-                                    color: AppColors.success,
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    'Verified',
-                                    style: TextStyle(
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.success,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Mobile Number Display
-                      if (widget.service.mobileNumber.isNotEmpty) ...[
-                        const SizedBox(height: 12),
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.phone,
-                              size: 16,
-                              color: AppColors.primary,
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                widget.service.mobileNumber,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textSecondary,
-                                ),
-                              ),
-                            ),
-                            TextButton.icon(
-                              onPressed: () =>
-                                  _makePhoneCall(widget.service.mobileNumber),
-                              icon: Icon(
-                                Icons.call,
-                                size: 16,
-                                color: AppColors.primary,
-                              ),
-                              label: Text(
-                                'Call',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: AppColors.primary,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-
-                      const SizedBox(height: 8),
-
-                      // Rating
-                      if (widget.provider != null)
-                        Row(
-                          children: [
-                            RatingBarIndicator(
-                              rating: widget.provider!.raitng,
-                              itemBuilder: (context, index) =>
-                                  const Icon(Icons.star, color: Colors.amber),
-                              itemCount: 5,
-                              itemSize: 16,
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${widget.provider!.raitng.toStringAsFixed(1)} (${widget.provider!.totalReviews} reviews)',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ],
-                        ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildBusinessNameSection() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Row(
-          children: [
-            // Business Icon
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(Icons.business, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(width: 16),
-
-            // Business Info
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Service Provider',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    widget.provider?.businessName ??
-                        'Business Name Not Available',
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // Verification Badge
-            if (widget.provider?.isVerified ?? false)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified, size: 14, color: AppColors.success),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Verified',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildBookServiceButton(BuildContext context) {
-    // ✅ Check service availability
     final isAvailable = widget.service.isAvailableForBooking;
     final isBooked = widget.service.isBooked;
-    final isInProgress = widget.service.isInProgress;
 
     String buttonText;
     Color buttonColor;
 
-    if (isAvailable) {
+    if (isAvailable && !isBooked) {
       buttonText = 'Book This Service';
       buttonColor = AppColors.primary;
     } else if (isBooked) {
       buttonText = 'Service Already Booked';
       buttonColor = Colors.orange;
-    } else if (isInProgress) {
-      buttonText = 'Service In Progress';
-      buttonColor = Colors.blue;
     } else {
       buttonText = 'Service Unavailable';
       buttonColor = Colors.grey;
@@ -807,7 +1015,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ],
       ),
       child: ElevatedButton(
-        onPressed: (isAvailable && !_isBooking)
+        onPressed: (isAvailable && !isBooked && !_isBooking)
             ? () => _bookService(context)
             : null,
         style: ElevatedButton.styleFrom(
@@ -844,7 +1052,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    isAvailable ? Icons.calendar_today : Icons.block,
+                    isAvailable && !isBooked
+                        ? Icons.calendar_today
+                        : Icons.block,
                     size: 20,
                     color: Colors.white,
                   ),
@@ -857,7 +1067,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  if (isAvailable) ...[
+                  if (isAvailable && !isBooked) ...[
                     const SizedBox(width: 8),
                     const Icon(
                       Icons.arrow_forward,
@@ -886,10 +1096,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         return Icons.format_paint;
       case 'carpentry':
       case 'carepentry':
-        return Icons.construction; // ✅ Fixed from Icons.carpenter
+        return Icons.construction;
       default:
         return Icons.build;
     }
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    return '${dateTime.day}/${dateTime.month}/${dateTime.year} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
   }
 
   void _makePhoneCall(String phoneNumber) async {
@@ -903,9 +1117,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     }
   }
 
-  // ✅ Fixed booking method with proper state management
   void _bookService(BuildContext context) async {
-    if (_isBooking || !mounted) return; // Prevent double booking
+    if (_isBooking || !mounted) return;
 
     final bool? confirmed = await _showBookingConfirmationDialog(context);
     if (confirmed != true || !mounted) return;
@@ -915,7 +1128,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     });
 
     try {
-      // Get current user
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
         if (mounted) {
@@ -926,7 +1138,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         return;
       }
 
-      // Get booking provider
       final bookingProvider = context.read<BookingProvider>();
 
       final booking = await bookingProvider.createBooking(
@@ -953,7 +1164,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             duration: const Duration(seconds: 3),
           ),
         );
-        // ✅ Schedule navigation for next frame
+
+        // Reload booking data
+        _loadBookingData();
+
         WidgetsBinding.instance.addPostFrameCallback((_) {
           if (mounted) {
             Navigator.of(context).pop();
@@ -1050,10 +1264,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ],
                   ),
-                  if (widget.provider != null) ...[
+                  if (_provider != null) ...[
                     const SizedBox(height: 4),
                     Text(
-                      'Provider: ${widget.provider!.businessName}',
+                      'Provider: ${_provider!.businessName}',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppColors.textSecondary,
@@ -1093,5 +1307,40 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ],
       ),
     );
+  }
+}
+
+// ✅ Update helper methods to work with enum
+Color _getStatusColor(BookingStatus status) {
+  switch (status) {
+    case BookingStatus.pending:
+      return Colors.orange;
+    case BookingStatus.confirmed:
+      return AppColors.primary;
+    case BookingStatus.inProgress:
+      return Colors.blue;
+    case BookingStatus.completed:
+      return AppColors.success;
+    case BookingStatus.cancelled:
+      return AppColors.error;
+    case BookingStatus.refunded:
+      return AppColors.error;
+  }
+}
+
+IconData _getStatusIcon(BookingStatus status) {
+  switch (status) {
+    case BookingStatus.pending:
+      return Icons.schedule;
+    case BookingStatus.confirmed:
+      return Icons.check_circle;
+    case BookingStatus.inProgress:
+      return Icons.construction;
+    case BookingStatus.completed:
+      return Icons.done_all;
+    case BookingStatus.cancelled:
+      return Icons.cancel;
+    case BookingStatus.refunded:
+      return Icons.money_off;
   }
 }

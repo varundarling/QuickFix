@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ServiceModel {
@@ -22,6 +21,13 @@ class ServiceModel {
   final double? longitude;
   final String? address;
 
+  // ✅ NEW: Booking-related fields
+  final bool isBooked;
+  final String? bookedByUserId;
+  final DateTime? bookedAt;
+  final String? customerName;
+  final String? customerPhone;
+
   ServiceModel({
     required this.id,
     required this.name,
@@ -39,6 +45,12 @@ class ServiceModel {
     this.latitude,
     this.longitude,
     this.address,
+    // ✅ NEW: Booking parameters
+    this.isBooked = false,
+    this.bookedByUserId,
+    this.bookedAt,
+    this.customerName,
+    this.customerPhone,
   });
 
   factory ServiceModel.fromFireStore(
@@ -49,6 +61,7 @@ class ServiceModel {
     if (data == null) {
       throw Exception('Document data is null');
     }
+
     return ServiceModel(
       id: doc.id,
       name: data['name'] ?? '',
@@ -66,6 +79,14 @@ class ServiceModel {
       latitude: data['latitude']?.toDouble(),
       longitude: data['longitude']?.toDouble(),
       address: data['address'],
+      // ✅ NEW: Booking field mappings
+      isBooked: data['isBooked'] ?? false,
+      bookedByUserId: data['bookedByUserId'],
+      bookedAt: data['bookedAt'] != null
+          ? (data['bookedAt'] as Timestamp).toDate()
+          : null,
+      customerName: data['customerName'],
+      customerPhone: data['customerPhone'],
     );
   }
 
@@ -86,12 +107,79 @@ class ServiceModel {
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
+      // ✅ NEW: Booking fields in Firestore
+      'isBooked': isBooked,
+      'bookedByUserId': bookedByUserId,
+      'bookedAt': bookedAt != null ? Timestamp.fromDate(bookedAt!) : null,
+      'customerName': customerName,
+      'customerPhone': customerPhone,
     };
   }
 
-  bool get isAvailableForBooking => isActive && availability == 'available';
-  bool get isBooked => availability == 'booked';
-  bool get isInProgress => availability == 'active';
+  // ✅ UPDATED: Enhanced booking status checks
+  bool get isAvailableForBooking =>
+      isActive && availability == 'available' && !isBooked;
+  bool get isInProgress =>
+      availability == 'active' || availability == 'in_progress';
+
+  // ✅ NEW: Additional helper methods
+  bool isBookedByUser(String userId) => isBooked && bookedByUserId == userId;
+
+  String get bookingStatus {
+    if (isBooked) return 'Booked';
+    if (isInProgress) return 'In Progress';
+    if (isAvailableForBooking) return 'Available';
+    return 'Unavailable';
+  }
+
+  // ✅ NEW: CopyWith method for updating booking status
+  ServiceModel copyWith({
+    String? id,
+    String? name,
+    String? description,
+    String? category,
+    double? basePrice,
+    String? imageUrl,
+    List<String>? subServices,
+    bool? isActive,
+    String? providerId,
+    DateTime? createdAt,
+    Map<String, dynamic>? metadata,
+    String? mobileNumber,
+    String? availability,
+    double? latitude,
+    double? longitude,
+    String? address,
+    bool? isBooked,
+    String? bookedByUserId,
+    DateTime? bookedAt,
+    String? customerName,
+    String? customerPhone,
+  }) {
+    return ServiceModel(
+      id: id ?? this.id,
+      name: name ?? this.name,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      basePrice: basePrice ?? this.basePrice,
+      imageUrl: imageUrl ?? this.imageUrl,
+      subServices: subServices ?? this.subServices,
+      isActive: isActive ?? this.isActive,
+      providerId: providerId ?? this.providerId,
+      createdAt: createdAt ?? this.createdAt,
+      metadata: metadata ?? this.metadata,
+      mobileNumber: mobileNumber ?? this.mobileNumber,
+      availability: availability ?? this.availability,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      address: address ?? this.address,
+      isBooked: isBooked ?? this.isBooked,
+      bookedByUserId: bookedByUserId ?? this.bookedByUserId,
+      bookedAt: bookedAt ?? this.bookedAt,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+    );
+  }
 
   // Calculate distance from user location
   double? distanceFromUser(double? userLat, double? userLng) {

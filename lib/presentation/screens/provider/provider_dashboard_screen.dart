@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
-import '../../../core/utils/navigation_helper.dart';
+import 'package:quickfix/presentation/widgets/dialogs/profile_completion_dialog.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -39,6 +39,23 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         _processingBookings[bookingId] = processing;
       });
     }
+  }
+
+  void _navigateToCreateService() async {
+    final authProvider = context.read<AuthProvider>();
+
+    // Check if provider profile is complete
+    if (!authProvider.isProviderProfileComplete) {
+      await ProfileCompletionDialog.show(
+        context,
+        'provider',
+        authProvider.missingProviderFields,
+      );
+      return;
+    }
+
+    // If profile is complete, proceed to create service
+    context.push('/create-service');
   }
 
   @override
@@ -799,7 +816,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => BookingDetailForProvider(bookingId: booking.id),
+            builder: (context) =>
+                BookingDetailForProvider(bookingId: booking.id),
           ),
         );
       },
@@ -1635,7 +1653,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   ],
                 ),
                 child: ElevatedButton.icon(
-                  onPressed: () => context.go('/create-service'),
+                  onPressed: _navigateToCreateService,
                   icon: const Icon(Icons.add_business, size: 24),
                   label: const Text('Create Your First Service'),
                   style: ElevatedButton.styleFrom(

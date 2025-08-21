@@ -16,7 +16,7 @@ Future<void> main() async {
   ]);
 
   //Initialize firebase
-  await FirebaseService.instance.initalize();
+  await FirebaseService.instance.initialize();
 
   try {
     final serviceProvider = ServiceProvider();

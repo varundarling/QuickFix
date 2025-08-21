@@ -7,15 +7,15 @@ import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/screens/provider/favourites_provider.dart';
 
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 class QuickFix extends StatelessWidget {
   const QuickFix({super.key});
-
-  
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
-      providers:[
+      providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
@@ -57,12 +57,12 @@ class QuickFix extends StatelessWidget {
             ),
             focusedBorder: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary)
+              borderSide: const BorderSide(color: AppColors.primary),
             ),
           ),
         ),
         routerConfig: AppRouter.router,
-      )
+      ),
     );
   }
 }

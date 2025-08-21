@@ -1,11 +1,18 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/data/models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
+
+  StreamSubscription<DatabaseEvent>? _userStreamSubscription;
 
   User? _user;
   UserModel? _userModel;
@@ -90,13 +97,58 @@ class AuthProvider extends ChangeNotifier {
       _user = user;
       if (user != null) {
         debugPrint('✅ User authenticated: ${user.email}');
-        await _loadUserModel();
-        await _validateUserData();
+        await _startUserProfileListener();
       } else {
+        _stopUserProfileListener(); // ✅ Stop listener
         _userModel = null;
       }
       notifyListeners();
     });
+  }
+
+  // ✅ CRITICAL: Start real-time listener for automatic updates
+  Future<void> _startUserProfileListener() async {
+    if (_user == null) return;
+
+    await _userStreamSubscription?.cancel();
+    debugPrint('🔄 Starting Realtime DB listener for: ${_user!.uid}');
+
+    _userStreamSubscription = FirebaseDatabase.instance
+        .ref('users')
+        .child(_user!.uid)
+        .onValue
+        .listen(
+          (DatabaseEvent event) {
+            debugPrint('🔄 Realtime update received from Firebase');
+            final DataSnapshot snapshot = event.snapshot;
+
+            if (snapshot.exists && snapshot.value != null) {
+              try {
+                final data = Map<String, dynamic>.from(snapshot.value as Map);
+                debugPrint('📡 Raw Firebase data: $data');
+
+                _userModel = UserModel.fromRealtimeDatabase(data);
+                debugPrint(
+                  '✅ User model updated: Name="${_userModel?.name}", Address="${_userModel?.address}"',
+                );
+                notifyListeners(); // ✅ CRITICAL: This updates the UI
+              } catch (e) {
+                debugPrint('❌ Error parsing user data: $e');
+              }
+            } else {
+              debugPrint('⚠️ No user data found in Realtime DB');
+            }
+          },
+          onError: (error) {
+            debugPrint('❌ Realtime listener error: $error');
+          },
+        );
+  }
+
+  void _stopUserProfileListener() {
+    _userStreamSubscription?.cancel();
+    _userStreamSubscription = null;
+    debugPrint('🛑 Stopped Realtime DB listener');
   }
 
   Future<void> _loadUserModel() async {
@@ -265,8 +317,8 @@ class AuthProvider extends ChangeNotifier {
     return 'customer';
   }
 
+  // ✅ UPDATED: Added experience parameter
   Future<bool> updateProfile({
-    // Individual parameters (optional)
     String? name,
     String? phone,
     String? photoUrl,
@@ -275,29 +327,31 @@ class AuthProvider extends ChangeNotifier {
     String? address,
     String? businessName,
     String? description,
-
-    // Map-based parameter (optional) - for backward compatibility
+    String? experience,
     Map<String, dynamic>? profileData,
   }) async {
     debugPrint('🔄 Starting profile update...');
+    debugPrint(
+      '📝 Update data: name="$name", phone="$phone", address="$address"',
+    );
 
-    if (_user == null || _userModel == null) {
+    if (_user == null) {
       debugPrint('❌ User not authenticated');
+      _setError('User not authenticated');
       return false;
     }
 
     try {
       _setUpdateProfileLoading(true);
 
-      // ✅ Merge all parameters into a single update map
       final Map<String, dynamic> updateData = {};
 
-      // Add profileData if provided (for backward compatibility)
+      // Add profileData if provided
       if (profileData != null) {
         updateData.addAll(profileData);
       }
 
-      // Override with individual parameters if provided
+      // Add individual parameters (only if not null)
       if (name != null) updateData['name'] = name;
       if (phone != null) updateData['phone'] = phone;
       if (photoUrl != null) updateData['photoUrl'] = photoUrl;
@@ -306,24 +360,25 @@ class AuthProvider extends ChangeNotifier {
       if (address != null) updateData['address'] = address;
       if (businessName != null) updateData['businessName'] = businessName;
       if (description != null) updateData['description'] = description;
+      if (experience != null) updateData['experience'] = experience;
 
-      // Always add timestamp
-      updateData['updatedAt'] = DateTime.now().millisecondsSinceEpoch;
+      // Add server timestamp
+      updateData['updatedAt'] = ServerValue.timestamp;
 
-      debugPrint('📝 Updating profile data: $updateData');
+      debugPrint('📝 Update data prepared: $updateData');
 
-      // Update Firebase Realtime Database
-      await _firebaseService.updateUserData(_user!.uid, updateData);
-      debugPrint('✅ Firebase update successful');
+      // ✅ Use Realtime Database update
+      await FirebaseDatabase.instance
+          .ref('users')
+          .child(_user!.uid)
+          .update(updateData);
 
-      // Reload user model to get fresh data
-      await _loadUserModel();
-      debugPrint('✅ User model reloaded');
+      debugPrint('✅ Profile update completed successfully');
 
       return true;
     } catch (e) {
       debugPrint('❌ Profile update failed: $e');
-      _setError(_getErrorMessage(e));
+      _setError('Failed to update profile: ${e.toString()}');
       return false;
     } finally {
       _setUpdateProfileLoading(false);
@@ -338,6 +393,12 @@ class AuthProvider extends ChangeNotifier {
   void _clearError() {
     _errorMessage = null;
     notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _stopUserProfileListener(); // ✅ Clean up
+    super.dispose();
   }
 
   String _getErrorMessage(dynamic error) {
@@ -378,26 +439,130 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> reloadUserData() async {
+    if (_user == null) return;
+
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        _userModel = null;
-        notifyListeners();
-        return;
-      }
+      debugPrint('🔄 Manually reloading user data...');
 
-      // ✅ Load user data from database
-      final userData = await _loadUserFromDatabase(currentUser.uid);
+      final snapshot = await FirebaseDatabase.instance
+          .ref('users')
+          .child(_user!.uid)
+          .get();
 
-      if (userData != null) {
-        _userModel = userData;
-        // ✅ Update cached user type
-        await _saveUserType(userData.userType);
+      if (snapshot.exists && snapshot.value != null) {
+        final data = Map<String, dynamic>.from(snapshot.value as Map);
+        _userModel = UserModel.fromRealtimeDatabase(data);
+        debugPrint(
+          '✅ Manual reload successful: Address="${_userModel?.address}"',
+        );
         notifyListeners();
-        debugPrint('✅ User data reloaded: ${userData.userType}');
+      } else {
+        debugPrint('⚠️ No data found during manual reload');
       }
     } catch (e) {
-      debugPrint('Error reloading user data: $e');
+      debugPrint('❌ Manual reload failed: $e');
+    }
+  }
+
+  /// Check if customer profile is complete
+  bool get isCustomerProfileComplete {
+    if (userModel == null) return false;
+
+    return userModel!.name.isNotEmpty &&
+        userModel!.phone.isNotEmpty &&
+        userModel!.address != null &&
+        userModel!.address!.isNotEmpty;
+  }
+
+  /// Check if provider profile is complete
+  bool get isProviderProfileComplete {
+    if (userModel == null) return false;
+
+    return userModel!.name.isNotEmpty &&
+        userModel!.phone.isNotEmpty &&
+        userModel!.address != null &&
+        userModel!.address!.isNotEmpty &&
+        userModel!.businessName != null &&
+        userModel!.businessName!.isNotEmpty &&
+        userModel!.experience != null &&
+        userModel!
+            .experience!
+            .isNotEmpty; // ✅ UPDATED: Check for non-empty string
+  }
+
+  /// Get missing profile fields for customer
+  List<String> get missingCustomerFields {
+    if (userModel == null) return ['All profile information'];
+
+    List<String> missing = [];
+    if (userModel!.name.isEmpty) missing.add('Full Name');
+    if (userModel!.phone.isEmpty) missing.add('Phone Number');
+    if (userModel!.address == null || userModel!.address!.isEmpty) {
+      missing.add('Address');
+    }
+    return missing;
+  }
+
+  /// Get missing profile fields for provider
+  List<String> get missingProviderFields {
+    if (userModel == null) return ['All profile information'];
+
+    List<String> missing = [];
+    if (userModel!.name.isEmpty) missing.add('Full Name');
+    if (userModel!.phone.isEmpty) missing.add('Phone Number');
+    if (userModel!.address == null || userModel!.address!.isEmpty) {
+      missing.add('Address');
+    }
+    if (userModel!.businessName == null || userModel!.businessName!.isEmpty) {
+      missing.add('Business Name');
+    }
+    // ✅ UPDATED: Check for experience as string, not number
+    if (userModel!.experience == null || userModel!.experience!.isEmpty) {
+      missing.add('Experience');
+    }
+    return missing;
+  }
+
+  Future<void> debugUserData() async {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null) {
+      debugPrint('❌ No authenticated user');
+      return;
+    }
+
+    try {
+      debugPrint('=== DATABASE DEBUG ===');
+      debugPrint('User ID: ${currentUser.uid}');
+      debugPrint('Email: ${currentUser.email}');
+
+      // Check Realtime Database
+      final rtdbSnapshot = await FirebaseDatabase.instance
+          .ref('users')
+          .child(currentUser.uid)
+          .get();
+
+      debugPrint('Realtime DB exists: ${rtdbSnapshot.exists}');
+      if (rtdbSnapshot.exists) {
+        debugPrint('Realtime DB data: ${rtdbSnapshot.value}');
+      }
+
+      // Check if accidentally using Firestore
+      try {
+        final firestoreDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(currentUser.uid)
+            .get();
+        debugPrint('Firestore doc exists: ${firestoreDoc.exists}');
+        if (firestoreDoc.exists) {
+          debugPrint('Firestore data: ${firestoreDoc.data()}');
+        }
+      } catch (e) {
+        debugPrint('Firestore check failed (normal if not using it): $e');
+      }
+
+      debugPrint('====================');
+    } catch (e) {
+      debugPrint('❌ Debug failed: $e');
     }
   }
 }

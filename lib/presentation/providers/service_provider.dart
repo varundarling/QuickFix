@@ -1,8 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:geocoding/geocoding.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/data/models/provider_model.dart';
@@ -14,6 +12,7 @@ class ServiceProvider extends ChangeNotifier {
   final LocationService _locationService = LocationService.instance;
 
   List<ServiceModel> _services = [];
+  List<ServiceModel> _providerServices = [];
   List<ProviderModel> _providers = [];
   List<ProviderModel> _nearbyProviders = [];
   bool _isLoading = false;
@@ -21,6 +20,7 @@ class ServiceProvider extends ChangeNotifier {
   String _selectedCategory = 'All';
 
   List<ServiceModel> get services => _services;
+  List<ServiceModel> get providerServices => _providerServices;
   List<ProviderModel> get providers => _providers;
   List<ProviderModel> get nearbyProviders => _nearbyProviders;
   bool get isLoading => _isLoading;
@@ -89,6 +89,7 @@ class ServiceProvider extends ChangeNotifier {
         latitude: latitude,
         longitude: longitude,
         address: address,
+        isBooked: false, // ✅ NEW: Initialize as not booked
         metadata: {
           'latitude': latitude,
           'longitude': longitude,
@@ -102,8 +103,9 @@ class ServiceProvider extends ChangeNotifier {
           .doc(serviceId)
           .set(newService.toFireStore());
 
-      // Add to local list
+      // Add to local lists
       _services.add(newService);
+      _providerServices.add(newService);
 
       _isLoading = false;
       if (hasListeners) {
@@ -120,45 +122,160 @@ class ServiceProvider extends ChangeNotifier {
     }
   }
 
-  // Helper methods for location
-  Future<Position?> _getCurrentLocation() async {
+  // ✅ NEW: Mark service as booked by a specific user
+  Future<bool> markServiceAsBooked(
+    String serviceId,
+    String userId, {
+    String? customerName,
+    String? customerPhone,
+  }) async {
     try {
-      LocationPermission permission = await Geolocator.checkPermission();
-      if (permission == LocationPermission.denied) {
-        permission = await Geolocator.requestPermission();
-        if (permission == LocationPermission.denied) {
-          return null;
-        }
+      debugPrint('🔄 Marking service $serviceId as booked by user $userId');
+
+      final serviceIndex = _services.indexWhere((s) => s.id == serviceId);
+      if (serviceIndex == -1) {
+        debugPrint('❌ Service not found in local list');
+        return false;
       }
 
-      if (permission == LocationPermission.deniedForever) {
-        return null;
-      }
-
-      return await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
+      // Update local service
+      final updatedService = _services[serviceIndex].copyWith(
+        isBooked: true,
+        bookedByUserId: userId,
+        bookedAt: DateTime.now(),
+        availability: 'booked',
+        customerName: customerName,
+        customerPhone: customerPhone,
       );
+
+      _services[serviceIndex] = updatedService;
+
+      // Update provider services if it exists there
+      final providerIndex = _providerServices.indexWhere(
+        (s) => s.id == serviceId,
+      );
+      if (providerIndex != -1) {
+        _providerServices[providerIndex] = updatedService;
+      }
+
+      // Update in Firestore
+      await FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId)
+          .update({
+            'isBooked': true,
+            'bookedByUserId': userId,
+            'bookedAt': Timestamp.fromDate(DateTime.now()),
+            'availability': 'booked',
+            'customerName': customerName,
+            'customerPhone': customerPhone,
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+
+      debugPrint('✅ Service marked as booked successfully');
+      notifyListeners();
+      return true;
     } catch (e) {
-      print('Error getting location: $e');
-      return null;
+      debugPrint('❌ Error marking service as booked: $e');
+      _errorMessage = 'Failed to book service: $e';
+      notifyListeners();
+      return false;
     }
   }
 
-  Future<String?> _getAddressFromCoordinates(
-    double latitude,
-    double longitude,
-  ) async {
+  // ✅ NEW: Mark service as available (unbook)
+  Future<bool> markServiceAsAvailable(String serviceId) async {
     try {
-      final placemarks = await placemarkFromCoordinates(latitude, longitude);
-      if (placemarks.isNotEmpty) {
-        final placemark = placemarks.first;
-        return '${placemark.street}, ${placemark.locality}, ${placemark.administrativeArea}';
+      final serviceIndex = _services.indexWhere((s) => s.id == serviceId);
+      if (serviceIndex == -1) return false;
+
+      final updatedService = _services[serviceIndex].copyWith(
+        isBooked: false,
+        bookedByUserId: null,
+        bookedAt: null,
+        availability: 'available',
+        customerName: null,
+        customerPhone: null,
+      );
+
+      _services[serviceIndex] = updatedService;
+
+      // Update provider services if it exists there
+      final providerIndex = _providerServices.indexWhere(
+        (s) => s.id == serviceId,
+      );
+      if (providerIndex != -1) {
+        _providerServices[providerIndex] = updatedService;
       }
-      return null;
+
+      // Update in Firestore
+      await FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId)
+          .update({
+            'isBooked': false,
+            'bookedByUserId': FieldValue.delete(),
+            'bookedAt': FieldValue.delete(),
+            'availability': 'available',
+            'customerName': FieldValue.delete(),
+            'customerPhone': FieldValue.delete(),
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+
+      notifyListeners();
+      return true;
     } catch (e) {
-      print('Error getting address: $e');
-      return null;
+      _errorMessage = 'Failed to mark service as available: $e';
+      notifyListeners();
+      return false;
+    }
+  }
+
+  // ✅ NEW: Get available (not booked) services
+  List<ServiceModel> get availableServices {
+    return _services.where((service) => service.isAvailableForBooking).toList();
+  }
+
+  // ✅ NEW: Get booked services
+  List<ServiceModel> get bookedServices {
+    return _services.where((service) => service.isBooked).toList();
+  }
+
+  // ✅ NEW: Get services booked by a specific user
+  List<ServiceModel> getServicesBookedByUser(String userId) {
+    return _services
+        .where(
+          (service) => service.isBooked && service.bookedByUserId == userId,
+        )
+        .toList();
+  }
+
+  // ✅ NEW: Get services provided by a specific provider
+  Future<void> loadProviderServices(String providerId) async {
+    _isLoading = true;
+    _errorMessage = null;
+    _safeNotifyListeners();
+
+    try {
+      final snapshot = await FirebaseFirestore.instance
+          .collection('services')
+          .where('providerId', isEqualTo: providerId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      _providerServices = snapshot.docs
+          .map((doc) => ServiceModel.fromFireStore(doc))
+          .toList();
+
+      debugPrint('✅ Loaded ${_providerServices.length} provider services');
+
+      _isLoading = false;
+      _safeNotifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading provider services: $e');
+      _isLoading = false;
+      _errorMessage = e.toString();
+      _safeNotifyListeners();
     }
   }
 
@@ -179,7 +296,7 @@ class ServiceProvider extends ChangeNotifier {
 
       if (currentUser == null) {
         debugPrint('❌ No current user found, clearing services');
-        _services = [];
+        _providerServices = [];
         _isLoading = false;
         _safeNotifyListeners();
         return;
@@ -211,15 +328,15 @@ class ServiceProvider extends ChangeNotifier {
       for (var doc in snapshot.docs) {
         final data = doc.data();
         debugPrint(
-          '📄 Service: ${data['name']} (ID: ${doc.id}) - Provider: ${data['providerId']}',
+          '📄 Service: ${data['name']} (ID: ${doc.id}) - Provider: ${data['providerId']} - Booked: ${data['isBooked'] ?? false}',
         );
       }
 
-      _services = snapshot.docs
+      _providerServices = snapshot.docs
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
-      debugPrint('✅ Successfully loaded ${_services.length} services');
+      debugPrint('✅ Successfully loaded ${_providerServices.length} services');
 
       _isLoading = false;
       _safeNotifyListeners();
@@ -255,7 +372,7 @@ class ServiceProvider extends ChangeNotifier {
             provider.latitude,
             provider.longitude,
           );
-          return distance <= 20.0; //within 10km
+          return distance <= 20.0; //within 20km
         }).toList();
 
         //sort by distance
@@ -307,24 +424,26 @@ class ServiceProvider extends ChangeNotifier {
         'basePrice': basePrice,
         'imageUrl': imageUrl,
         'subServices': subServices,
-        'updatedAt': DateTime.now().millisecondsSinceEpoch,
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
       });
 
-      // Update in local list
-      final index = _services.indexWhere((service) => service.id == id);
-      if (index != -1) {
-        _services[index] = ServiceModel(
-          id: id,
-          name: name,
-          description: description,
-          category: category,
-          basePrice: basePrice,
-          imageUrl: imageUrl,
-          subServices: subServices,
-          providerId: _services[index].providerId,
-          createdAt: _services[index].createdAt,
-        );
+      // Update in local lists
+      void updateServiceInList(List<ServiceModel> list) {
+        final index = list.indexWhere((service) => service.id == id);
+        if (index != -1) {
+          list[index] = list[index].copyWith(
+            name: name,
+            description: description,
+            category: category,
+            basePrice: basePrice,
+            imageUrl: imageUrl,
+            subServices: subServices,
+          );
+        }
       }
+
+      updateServiceInList(_services);
+      updateServiceInList(_providerServices);
 
       _isLoading = false;
       notifyListeners();
@@ -342,8 +461,10 @@ class ServiceProvider extends ChangeNotifier {
       // Remove from Firestore
       await FirebaseFirestore.instance.collection('services').doc(id).delete();
 
-      // Remove from local list
+      // Remove from local lists
       _services.removeWhere((service) => service.id == id);
+      _providerServices.removeWhere((service) => service.id == id);
+
       notifyListeners();
       return true;
     } catch (e) {
@@ -360,6 +481,20 @@ class ServiceProvider extends ChangeNotifier {
     return services
         .where((service) => service.category == selectedCategory)
         .toList();
+  }
+
+  // ✅ NEW: Filter services by booking status
+  List<ServiceModel> getServicesByStatus(String status) {
+    switch (status.toLowerCase()) {
+      case 'available':
+        return services.where((s) => s.isAvailableForBooking).toList();
+      case 'booked':
+        return services.where((s) => s.isBooked).toList();
+      case 'in_progress':
+        return services.where((s) => s.isInProgress).toList();
+      default:
+        return services;
+    }
   }
 
   List<ProviderModel> getProvidersByService(String serviceId) {
@@ -400,6 +535,8 @@ class ServiceProvider extends ChangeNotifier {
     _safeNotifyListeners();
 
     try {
+      debugPrint('🔄 Loading all services for customers...');
+
       final snapshot = await FirebaseFirestore.instance
           .collection('services')
           .where('isActive', isEqualTo: true)
@@ -409,17 +546,23 @@ class ServiceProvider extends ChangeNotifier {
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
+      debugPrint('📊 Total services loaded: ${allServices.length}');
+      debugPrint(
+        '📊 Available services: ${allServices.where((s) => s.isAvailableForBooking).length}',
+      );
+      debugPrint(
+        '📊 Booked services: ${allServices.where((s) => s.isBooked).length}',
+      );
+
       // Filter by location if provided (within 20km radius)
       if (userLat != null && userLng != null) {
         allServices = allServices.where((service) {
-          if (service.metadata != null &&
-              service.metadata!['latitude'] != null &&
-              service.metadata!['longitude'] != null) {
+          if (service.latitude != null && service.longitude != null) {
             final distance = _locationService.calculateDistance(
               userLat,
               userLng,
-              service.metadata!['latitude'],
-              service.metadata!['longitude'],
+              service.latitude!,
+              service.longitude!,
             );
             return distance <= 20.0; // Within 20km
           }
@@ -428,21 +571,20 @@ class ServiceProvider extends ChangeNotifier {
 
         // Sort by distance
         allServices.sort((a, b) {
-          if (a.metadata?['latitude'] == null ||
-              b.metadata?['latitude'] == null) {
+          if (a.latitude == null || b.latitude == null) {
             return 0;
           }
           final distanceA = _locationService.calculateDistance(
             userLat,
             userLng,
-            a.metadata!['latitude'],
-            a.metadata!['longitude'],
+            a.latitude!,
+            a.longitude!,
           );
           final distanceB = _locationService.calculateDistance(
             userLat,
             userLng,
-            b.metadata!['latitude'],
-            b.metadata!['longitude'],
+            b.latitude!,
+            b.longitude!,
           );
           return distanceA.compareTo(distanceB);
         });
@@ -451,14 +593,60 @@ class ServiceProvider extends ChangeNotifier {
       _services = allServices;
       _isLoading = false;
       _safeNotifyListeners();
+
+      debugPrint(
+        '✅ Successfully loaded and filtered ${_services.length} services',
+      );
     } catch (e) {
+      debugPrint('❌ Error loading all services: $e');
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
     }
   }
 
-  // ✅ Add this method to ServiceProvider class
+  // ✅ Enhanced: Add booking fields to existing services
+  Future<void> addBookingFieldsToExistingServices() async {
+    try {
+      debugPrint('🔄 Adding booking fields to existing services...');
+
+      final snapshot = await FirebaseFirestore.instance
+          .collection('services')
+          .get();
+
+      if (snapshot.docs.isEmpty) {
+        debugPrint('✅ No existing services to update');
+        return;
+      }
+
+      final batch = FirebaseFirestore.instance.batch();
+
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+
+        // Only update if booking fields don't exist
+        if (!data.containsKey('isBooked')) {
+          batch.update(doc.reference, {
+            'isBooked': false,
+            'bookedByUserId': null,
+            'bookedAt': null,
+            'customerName': null,
+            'customerPhone': null,
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+        }
+      }
+
+      await batch.commit();
+      debugPrint(
+        '✅ Updated ${snapshot.docs.length} existing services with booking fields',
+      );
+    } catch (e) {
+      debugPrint('❌ Error updating existing services: $e');
+    }
+  }
+
+  // ✅ Enhanced: Add availability to existing services (keeping original method)
   Future<void> addAvailabilityToExistingServices() async {
     try {
       debugPrint('🔄 Adding availability field to existing services...');
@@ -491,6 +679,47 @@ class ServiceProvider extends ChangeNotifier {
       );
     } catch (e) {
       debugPrint('❌ Error updating existing services: $e');
+    }
+  }
+
+  // ✅ NEW: Get service by ID
+  ServiceModel? getServiceById(String serviceId) {
+    try {
+      return _services.firstWhere((service) => service.id == serviceId);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // ✅ NEW: Refresh a specific service from Firestore
+  Future<ServiceModel?> refreshService(String serviceId) async {
+    try {
+      final doc = await FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId)
+          .get();
+
+      if (doc.exists) {
+        final updatedService = ServiceModel.fromFireStore(doc);
+
+        // Update in local lists
+        void updateInList(List<ServiceModel> list) {
+          final index = list.indexWhere((s) => s.id == serviceId);
+          if (index != -1) {
+            list[index] = updatedService;
+          }
+        }
+
+        updateInList(_services);
+        updateInList(_providerServices);
+
+        notifyListeners();
+        return updatedService;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ Error refreshing service: $e');
+      return null;
     }
   }
 }

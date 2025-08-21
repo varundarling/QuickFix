@@ -27,20 +27,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _loadUserData();
       _loadUserBookings();
     });
-  }
-
-  void _loadUserData() {
-    final authProvider = context.read<AuthProvider>();
-    final user = authProvider.userModel;
-
-    if (user != null) {
-      _nameController.text = user.name;
-      _phoneController.text = user.phone;
-      _addressController.text = user.address ?? '';
-    }
   }
 
   void _loadUserBookings() {
@@ -69,6 +57,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
           _isEditing = false;
         });
         Helpers.showSnackBar(context, 'Profile updated successfully!');
+        await Future.delayed(const Duration(seconds: 1));
       } else if (mounted) {
         Helpers.showSnackBar(
           context,
@@ -131,10 +120,35 @@ class _ProfileScreenState extends State<ProfileScreen> {
             return const Center(child: CircularProgressIndicator());
           }
 
+          // ✅ CRITICAL FIX: Only update controllers if values differ
+          if (!_isEditing) {
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                // Only update if the value is different to prevent unnecessary updates
+                if (_nameController.text != user.name) {
+                  _nameController.text = user.name;
+                  debugPrint('Updated name controller: ${user.name}');
+                }
+                if (_phoneController.text != user.phone) {
+                  _phoneController.text = user.phone;
+                  debugPrint('Updated phone controller: ${user.phone}');
+                }
+                if (_addressController.text != (user.address ?? '')) {
+                  _addressController.text = user.address ?? '';
+                  debugPrint('Updated address controller: ${user.address}');
+                }
+              }
+            });
+          }
+
           return SingleChildScrollView(
             padding: const EdgeInsets.all(16),
             child: Column(
               children: [
+                // Profile Completion Banner
+                if (!authProvider.isCustomerProfileComplete)
+                  _buildCompletionBanner(authProvider.missingCustomerFields),
+
                 // Profile Header
                 _buildProfileHeader(user.name, user.email),
                 const SizedBox(height: 24),
@@ -207,6 +221,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
         final bookings = bookingProvider.userBookings;
+
+        // ✅ Add loading state
+        if (bookingProvider.isLoading) {
+          return Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.1),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
+            ),
+            child: const Center(child: CircularProgressIndicator()),
+          );
+        }
+
         final totalBookings = bookings.length;
         final completedBookings = bookings
             .where((b) => b.status == BookingStatus.completed)
@@ -250,53 +285,132 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Total Bookings',
-                      totalBookings.toString(),
-                      Icons.book_online,
-                      AppColors.primary,
-                    ),
+
+              // ✅ Show message when no bookings
+              if (totalBookings == 0)
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Colors.grey.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Completed',
-                      completedBookings.toString(),
-                      Icons.check_circle,
-                      AppColors.success,
-                    ),
+                  child: const Column(
+                    children: [
+                      Icon(Icons.book_online, size: 40, color: Colors.grey),
+                      SizedBox(height: 8),
+                      Text(
+                        'No bookings yet',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w500,
+                          color: Colors.grey,
+                        ),
+                      ),
+                      Text(
+                        'Book your first service to see statistics',
+                        style: TextStyle(fontSize: 14, color: Colors.grey),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildStatCard(
-                      'Pending',
-                      pendingBookings.toString(),
-                      Icons.schedule,
-                      Colors.orange,
+                )
+              else ...[
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        'Total Bookings',
+                        totalBookings.toString(),
+                        Icons.book_online,
+                        AppColors.primary,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: _buildStatCard(
-                      'Total Spent',
-                      '₹${totalSpent.toInt()}',
-                      Icons.currency_rupee,
-                      AppColors.success,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        'Completed',
+                        completedBookings.toString(),
+                        Icons.check_circle,
+                        AppColors.success,
+                      ),
                     ),
-                  ),
-                ],
-              ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _buildStatCard(
+                        'Pending',
+                        pendingBookings.toString(),
+                        Icons.schedule,
+                        Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _buildStatCard(
+                        'Total Spent',
+                        '₹${totalSpent.toInt()}',
+                        Icons.currency_rupee,
+                        AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCompletionBanner(List<String> missingFields) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 24),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Complete Your Profile',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Please complete your profile to book services.',
+            style: TextStyle(fontSize: 14, color: Colors.orange),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Missing: ${missingFields.join(', ')}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.orange,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -337,89 +451,105 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildProfileDetailsSection() {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.1),
-            blurRadius: 10,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(Icons.person_outline, color: AppColors.primary, size: 20),
-              const SizedBox(width: 8),
-              const Text(
-                'Personal Information',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  setState(() {
-                    _isEditing = !_isEditing;
-                  });
-                },
-                icon: Icon(_isEditing ? Icons.close : Icons.edit, size: 16),
-                label: Text(_isEditing ? 'Cancel' : 'Edit'),
+    return Consumer<AuthProvider>(
+      builder: (context, authProvider, child) {
+        final user = authProvider.userModel;
+
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.1),
+                blurRadius: 10,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          if (_isEditing) ...[
-            CustomTextField(
-              controller: _nameController,
-              label: 'Full Name',
-              prefixIcon: Icons.person,
-              hintText: 'Enter your full name',
-            ),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: _phoneController,
-              label: 'Phone Number',
-              prefixIcon: Icons.phone,
-              keyboardType: TextInputType.phone,
-              hintText: 'Enter your phone number',
-            ),
-            const SizedBox(height: 16),
-            CustomTextField(
-              controller: _addressController,
-              label: 'Address',
-              prefixIcon: Icons.location_on,
-              maxLines: 2,
-              hintText: 'Enter your address',
-            ),
-            const SizedBox(height: 16),
-            PrimaryButton(
-              text: 'Save Changes',
-              onPressed: _updateProfile,
-              isLoading: _isLoading,
-            ),
-          ] else ...[
-            _buildInfoRow('Name', _nameController.text),
-            _buildInfoRow('Phone', _phoneController.text),
-            _buildInfoRow(
-              'Address',
-              _addressController.text.isEmpty
-                  ? 'Not provided'
-                  : _addressController.text,
-            ),
-          ],
-        ],
-      ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(
+                    Icons.person_outline,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Personal Information',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _isEditing = !_isEditing;
+                      });
+                    },
+                    icon: Icon(_isEditing ? Icons.close : Icons.edit, size: 16),
+                    label: Text(_isEditing ? 'Cancel' : 'Edit'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              if (_isEditing) ...[
+                // ✅ Use ValueKey to force rebuild when data changes
+                CustomTextField(
+                  key: ValueKey('name_${user?.name}_$_isEditing'),
+                  controller: _nameController,
+                  label: 'Full Name',
+                  prefixIcon: Icons.person,
+                  hintText: 'Enter your full name',
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  key: ValueKey('phone_${user?.phone}_$_isEditing'),
+                  controller: _phoneController,
+                  label: 'Phone Number',
+                  prefixIcon: Icons.phone,
+                  keyboardType: TextInputType.phone,
+                  hintText: 'Enter your phone number',
+                ),
+                const SizedBox(height: 16),
+                CustomTextField(
+                  key: ValueKey('address_${user?.address}_$_isEditing'),
+                  controller: _addressController,
+                  label: 'Address',
+                  prefixIcon: Icons.location_on,
+                  maxLines: 2,
+                  hintText: 'Enter your address',
+                ),
+                const SizedBox(height: 16),
+                PrimaryButton(
+                  text: 'Save Changes',
+                  onPressed: _updateProfile,
+                  isLoading: _isLoading,
+                ),
+              ] else ...[
+                _buildInfoRow('Name', user?.name ?? _nameController.text),
+                _buildInfoRow('Phone', user?.phone ?? _phoneController.text),
+                _buildInfoRow(
+                  'Address',
+                  (user?.address?.isNotEmpty == true)
+                      ? user!.address!
+                      : (_addressController.text.isNotEmpty
+                            ? _addressController.text
+                            : 'Not provided'),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

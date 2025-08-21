@@ -7,7 +7,7 @@ import 'package:quickfix/presentation/providers/booking_provider.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
   final String
-  bookingId; // Changed from BookingModel booking to String bookingId
+  bookingId; 
 
   const CustomerBookingDetailScreen({super.key, required this.bookingId});
 

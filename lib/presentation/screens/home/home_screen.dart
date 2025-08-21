@@ -8,6 +8,7 @@ import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
+import 'package:quickfix/presentation/screens/service/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -32,16 +33,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _initializeScreen() async {
-    // Load current location
-    _currentLocation = await _locationService.getCurrentLocation();
-    if (_currentLocation != null) {
-      _currentAddress = await _locationService.getAddressFromCoordinates(
-        _currentLocation!.latitude!,
-        _currentLocation!.longitude!,
-      );
-      setState(() {});
-    }
-
     // Load services and providers
     final serviceProvider = context.read<ServiceProvider>();
     await serviceProvider.loadAllServices(
@@ -59,7 +50,7 @@ class _HomeScreenState extends State<HomeScreen> {
           onRefresh: _initializeScreen,
           child: CustomScrollView(
             slivers: [
-              // ✅ REDUCED Header Size
+              // Reduced Header Size
               _buildCompactAppBar(),
 
               // Quick Access Menu (improved design)
@@ -74,7 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // Category Tabs
               SliverToBoxAdapter(child: _buildCategoryTabs()),
 
-              // Services Grid
+              // Services Grid - ✅ FIXED: Removed RefreshIndicator from here
               _buildServicesGrid(),
             ],
           ),
@@ -85,7 +76,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Widget _buildCompactAppBar() {
     return SliverAppBar(
-      // ✅ REDUCED from 140 to 80
       expandedHeight: 80,
       floating: false,
       pinned: true,
@@ -186,7 +176,6 @@ class _HomeScreenState extends State<HomeScreen> {
             ],
           ),
           const SizedBox(height: 16),
-          // ✅ IMPROVED Grid Layout - More Balanced
           Row(
             children: [
               Expanded(
@@ -257,7 +246,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // Rest of the methods remain the same...
   Widget _buildLocationBanner() {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -305,24 +293,6 @@ class _HomeScreenState extends State<HomeScreen> {
                       ),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                ),
-              ),
-              TextButton(
-                onPressed: () =>
-                    LocationService.showLocationChangeOptions(context),
-                child: const Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.edit_location, size: 16),
-                    SizedBox(width: 4),
-                    Text(
-                      'Change',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                      ),
                     ),
                   ],
                 ),
@@ -402,6 +372,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // ✅ FIXED: Removed RefreshIndicator from this method
   Widget _buildServicesGrid() {
     return Consumer<ServiceProvider>(
       builder: (context, serviceProvider, child) {
@@ -429,21 +400,21 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
               child: Column(
                 children: [
-                  Icon(Icons.search_off, size: 64, color: Colors.grey[400]),
+                  Icon(Icons.search_off, size: 64, color: Colors.grey),
                   const SizedBox(height: 16),
                   Text(
                     'No services available',
                     style: TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
-                      color: Colors.grey[600],
+                      color: Colors.grey,
                     ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Try selecting a different category or check back later',
                     textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 14, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
               ),
@@ -455,7 +426,16 @@ class _HomeScreenState extends State<HomeScreen> {
           delegate: SliverChildBuilderDelegate((context, index) {
             return ServiceCard(
               service: services[index],
-              onTap: () {},
+              onTap: () {
+                // ✅ FIXED: Navigate to service detail
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        ServiceDetailScreen(service: services[index]),
+                  ),
+                );
+              },
               userLatitude: _currentLocation?.latitude,
               userLongitude: _currentLocation?.longitude,
             );

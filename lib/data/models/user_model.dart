@@ -1,3 +1,5 @@
+import 'dart:ffi';
+
 class UserModel {
   final String id;
   final String name;
@@ -12,6 +14,8 @@ class UserModel {
   final String? address;
   final String? businessName;
   final String? description;
+  final String? experience;
+  final String? specialization;
 
   UserModel({
     required this.id,
@@ -27,6 +31,8 @@ class UserModel {
     this.address,
     this.businessName,
     this.description,
+    this.experience,
+    this.specialization,
   });
 
   // ✅ Add convenience getter methods
@@ -50,6 +56,8 @@ class UserModel {
       address: data['address']?.toString(),
       businessName: data['businessName']?.toString(),
       description: data['description']?.toString(),
+      experience: data['experience']?.toString(),
+      specialization: data['specialization'],
     );
   }
 
@@ -66,6 +74,8 @@ class UserModel {
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
+      'experience': experience,
+      'specialization': specialization,
       'businessName': businessName,
       'description': description,
     };

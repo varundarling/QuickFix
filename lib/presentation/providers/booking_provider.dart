@@ -2,9 +2,13 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/providers/auth_provider.dart';
+import 'package:quickfix/presentation/providers/service_provider.dart';
+import 'package:quickfix/quickFix.dart';
 import 'package:uuid/uuid.dart';
 
 class BookingProvider extends ChangeNotifier {
@@ -13,6 +17,7 @@ class BookingProvider extends ChangeNotifier {
 
   List<BookingModel> _userBookings = [];
   List<BookingModel> _providerBookings = [];
+  List<BookingModel> _allBookings = [];
   bool _isLoading = false;
   String? _errorMessage;
   final Map<String, DateTime> _recentlyUpdatedBookings = {};
@@ -264,64 +269,101 @@ class BookingProvider extends ChangeNotifier {
     required double totalAmount,
   }) async {
     try {
-      _setLoading(true);
+      _isLoading = true;
+      notifyListeners();
 
-      final customerDetails = await _fetchCustomerDetails(customerId);
-
-      final bookingId = _uuid.v4();
       final booking = BookingModel(
-        id: bookingId,
+        id: '',
         customerId: customerId,
         providerId: providerId,
         serviceId: service.id,
         serviceName: service.name,
-        scheduledDateTime: scheduledDateTime,
         description: description,
-        totalAmount: totalAmount,
-        status: BookingStatus.pending,
+        scheduledDateTime: scheduledDateTime,
         customerAddress: customerAddress,
         customerLatitude: customerLatitude,
         customerLongitude: customerLongitude,
+        totalAmount: totalAmount,
+        status: BookingStatus.pending,
         createdAt: DateTime.now(),
-        customerName: customerDetails?['customerName'],
-        customerPhone: customerDetails?['customerPhone'],
-        customerEmail: customerDetails?['customerEmail'],
       );
 
-      // ✅ Use batch write to update both booking and service availability
-      final batch = FirebaseFirestore.instance.batch();
-
-      // Add booking document
-      final bookingRef = FirebaseFirestore.instance
+      // ✅ FIXED: Use toMap() method
+      final docRef = await FirebaseFirestore.instance
           .collection('bookings')
-          .doc(bookingId);
-      batch.set(bookingRef, booking.toFireStore());
+          .add(booking.toMap());
 
-      // ✅ Update service availability to 'booked'
-      final serviceRef = FirebaseFirestore.instance
-          .collection('services')
-          .doc(service.id);
-      batch.update(serviceRef, {
-        'availability': 'booked',
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-      });
+      final savedBooking = booking.copyWith(id: docRef.id);
 
-      await batch.commit();
+      // ✅ FIXED: Use navigatorKey to get context
+      final context = navigatorKey.currentContext;
+      if (context != null) {
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final serviceProvider = Provider.of<ServiceProvider>(
+          context,
+          listen: false,
+        );
 
-      debugPrint(
-        '✅ Booking created and service marked as booked: ${service.name}',
-      );
+        // Mark service as booked with customer info
+        await serviceProvider.markServiceAsBooked(
+          service.id,
+          customerId,
+          customerName: authProvider.userModel?.name,
+          customerPhone: authProvider.userModel?.phone,
+        );
 
-      // Reload user bookings
-      await loadUserBookings(customerId);
+        // Refresh the services list to show updated status
+        await serviceProvider.loadAllServices();
+      }
 
-      return booking;
+      // Add to local lists
+      _userBookings.add(savedBooking);
+      _allBookings.add(savedBooking);
+
+      _isLoading = false;
+      _errorMessage = null;
+      notifyListeners();
+
+      return savedBooking;
     } catch (e) {
-      debugPrint('❌ Error creating booking: $e');
-      _setError('Failed to create booking: $e');
+      _isLoading = false;
+      _errorMessage = e.toString();
+      notifyListeners();
       return null;
-    } finally {
-      _setLoading(false);
+    }
+  }
+
+  Future<void> loadServiceBookings(String serviceId) async {
+    try {
+      debugPrint('🔄 Loading bookings for service: $serviceId');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('serviceId', isEqualTo: serviceId)
+          .get();
+
+      final serviceBookings = querySnapshot.docs
+          .map((doc) => BookingModel.fromFireStore(doc))
+          .toList();
+
+      // Add to your existing bookings or create a separate list
+      // This depends on your current BookingProvider implementation
+
+      debugPrint('✅ Loaded ${serviceBookings.length} bookings for service');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error loading service bookings: $e');
+    }
+  }
+
+  BookingModel? getUserBookingForService(String userId, String serviceId) {
+    try {
+      return userBookings.firstWhere(
+        (booking) =>
+            booking.customerId == userId && booking.serviceId == serviceId,
+      );
+    } catch (e) {
+      return null; // No booking found
     }
   }
 

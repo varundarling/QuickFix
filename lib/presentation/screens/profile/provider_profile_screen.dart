@@ -20,6 +20,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
   final _addressController = TextEditingController();
   final _phoneController = TextEditingController();
   final _emailController = TextEditingController();
+  final _experienceController = TextEditingController();
 
   bool _isEditing = false;
   bool _isLoading = true;
@@ -52,6 +53,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
         _addressController.text = user.address ?? '';
         _phoneController.text = user.phone;
         _emailController.text = user.email;
+        _experienceController.text = user.experience ?? '';
       }
 
       setState(() {
@@ -126,38 +128,117 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
   }
 
   Widget _buildProfileContent() {
-    return SingleChildScrollView(
+    return Consumer<AuthProvider>(
+      // ✅ FIXED: Use Consumer to access AuthProvider
+      builder: (context, authProvider, child) {
+        final user = authProvider.userModel;
+
+        // ✅ FIX: Update controllers when provider data changes
+        if (user != null && !_isEditing) {
+          // Use post-frame callback to avoid setState during build
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) {
+              setState(() {
+                _businessNameController.text = user.businessName ?? '';
+                _descriptionController.text = user.description ?? '';
+                _addressController.text = user.address ?? '';
+                _phoneController.text = user.phone;
+                _emailController.text = user.email;
+                _experienceController.text = user.experience ?? '';
+              });
+              debugPrint(
+                '✅ Controllers updated: Business=${_businessNameController.text}, Experience=${_experienceController.text}',
+              );
+            }
+          });
+        }
+
+        return SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              children: [
+                // ✅ FIXED: Now authProvider is available through Consumer
+                if (!authProvider.isProviderProfileComplete)
+                  _buildCompletionBanner(authProvider.missingProviderFields),
+
+                // Compact Profile Header
+                _buildCompactProfileHeader(authProvider),
+                const SizedBox(height: 20),
+
+                // Profile Form
+                _buildProfileForm(),
+                const SizedBox(height: 20),
+
+                // Action Buttons
+                if (_isEditing) _buildActionButtons(),
+
+                // Add some spacing before logout button
+                if (!_isEditing) const SizedBox(height: 40),
+
+                // Logout Button (only show when not editing)
+                if (!_isEditing) _buildLogoutButton(),
+
+                const SizedBox(height: 20),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCompletionBanner(List<String> missingFields) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.only(bottom: 24),
       padding: const EdgeInsets.all(16),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          children: [
-            // Compact Profile Header
-            _buildCompactProfileHeader(),
-            const SizedBox(height: 20),
-
-            // Profile Form
-            _buildProfileForm(),
-            const SizedBox(height: 20),
-
-            // Action Buttons
-            if (_isEditing) _buildActionButtons(),
-
-            // ✅ Add some spacing before logout button
-            if (!_isEditing) const SizedBox(height: 40),
-
-            // ✅ Logout Button (only show when not editing)
-            if (!_isEditing) _buildLogoutButton(),
-
-            const SizedBox(height: 20),
-          ],
-        ),
+      decoration: BoxDecoration(
+        color: Colors.orange.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 24),
+              const SizedBox(width: 12),
+              const Expanded(
+                child: Text(
+                  'Complete Your Provider Profile',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Please complete your profile to create and manage services.',
+            style: TextStyle(fontSize: 14, color: Colors.orange),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            'Missing: ${missingFields.join(', ')}',
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: Colors.orange,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildCompactProfileHeader() {
-    final user = context.read<AuthProvider>().userModel;
+  Widget _buildCompactProfileHeader(AuthProvider authProvider) {
+    final user = authProvider.userModel;
     final providerName = user?.name ?? 'Provider';
     final businessName = _businessNameController.text.isEmpty
         ? 'Your Business'
@@ -378,6 +459,16 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
             icon: Icons.email_rounded,
             enabled: false,
             isReadOnly: true,
+          ),
+          const SizedBox(height: 16),
+
+          _buildCompactTextField(
+            controller: _experienceController,
+            label: 'Experience',
+            hint: 'Years of experience (e.g., 5 years)',
+            keyboardType: TextInputType.number,
+            icon: Icons.work_history_rounded,
+            isRequired: true,
           ),
           const SizedBox(height: 16),
 
@@ -664,10 +755,12 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
     try {
       // ✅ Use individual parameters for clarity
       final success = await authProvider.updateProfile(
+        name: authProvider.userModel?.name ?? '',
         businessName: _businessNameController.text.trim(),
         description: _descriptionController.text.trim(),
         address: _addressController.text.trim(),
         phone: _phoneController.text.trim(),
+        experience: _experienceController.text.trim(),
       );
 
       if (success && mounted) {
@@ -723,6 +816,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
     _addressController.dispose();
     _phoneController.dispose();
     _emailController.dispose();
+    _experienceController.dispose();
     super.dispose();
   }
 }
