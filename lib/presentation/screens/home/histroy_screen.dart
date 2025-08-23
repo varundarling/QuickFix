@@ -470,14 +470,18 @@ class _HistoryScreenState extends State<HistoryScreen> {
         return Icons.schedule;
       case BookingStatus.confirmed:
         return Icons.check_circle;
-      case BookingStatus.inProgress:
-        return Icons.construction;
       case BookingStatus.completed:
         return Icons.check_circle;
       case BookingStatus.cancelled:
         return Icons.cancel;
       case BookingStatus.refunded:
         return Icons.money_off;
+      case BookingStatus.paymentPending:
+        // TODO: Handle this case.
+        throw UnimplementedError();
+      case BookingStatus.paid:
+        // TODO: Handle this case.
+        throw UnimplementedError();
     }
   }
 }

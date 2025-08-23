@@ -4,7 +4,7 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
-import 'package:quickfix/presentation/screens/provider/favourites_provider.dart';
+import 'package:quickfix/presentation/providers/favourites_provider.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 
 class FavoritesScreen extends StatefulWidget {

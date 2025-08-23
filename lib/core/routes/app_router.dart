@@ -1,5 +1,6 @@
 // lib/core/router/app_router.dart (Updated)
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
@@ -140,6 +141,30 @@ class AppRouter {
         builder: (context, state) {
           final bookingId = state.pathParameters['bookingId']!;
           return BookingDetailForProvider(bookingId: bookingId);
+        },
+      ),
+
+      // In app_router.dart - ADD these routes
+      GoRoute(
+        path: '/payment/:bookingId',
+        name: 'payment',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to pass the booking object or fetch it
+          // For now, returning a placeholder
+          return const Scaffold(body: Center(child: Text('Payment Screen')));
+        },
+      ),
+
+      GoRoute(
+        path: '/customer-payment/:bookingId',
+        name: 'customer-payment',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to pass the booking object or fetch it
+          return const Scaffold(
+            body: Center(child: Text('Customer Payment Screen')),
+          );
         },
       ),
     ],

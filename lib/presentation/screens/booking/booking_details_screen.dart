@@ -1,13 +1,14 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
+import 'package:quickfix/presentation/screens/payment/customer_payment_screen.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
-  final String
-  bookingId; 
+  final String bookingId;
 
   const CustomerBookingDetailScreen({super.key, required this.bookingId});
 
@@ -47,25 +48,48 @@ class _CustomerBookingDetailScreenState
             )
           : null;
 
-      if (existingBooking != null) {
+      BookingModel? bookingToProcess = existingBooking;
+
+      // If not found, fetch from database
+      if (bookingToProcess == null) {
+        bookingToProcess = await bookingProvider.getBookingById(
+          widget.bookingId,
+        );
+      }
+
+      if (bookingToProcess == null) {
         setState(() {
-          booking = existingBooking;
+          errorMessage = 'Booking not found';
           isLoading = false;
         });
         return;
       }
 
-      // If not found, fetch from database
-      final loadedBooking = await bookingProvider.getBookingById(
-        widget.bookingId,
+      // ✅ NEW: Fetch provider details
+      final providerDetails = await _fetchProviderDetails(
+        bookingToProcess.providerId,
+      );
+
+      // ✅ NEW: Update booking with provider details
+      final updatedBooking = bookingToProcess.copyWith(
+        providerName:
+            providerDetails?['name'] ??
+            providerDetails?['businessName'] ??
+            'Unknown Provider',
+        providerPhone:
+            providerDetails?['phone'] ??
+            providerDetails?['mobileNumber'] ??
+            providerDetails?['mobile'] ??
+            '',
+        providerEmail: providerDetails?['email'] ?? '',
       );
 
       setState(() {
-        booking = loadedBooking;
+        booking = updatedBooking;
         isLoading = false;
       });
 
-      if (loadedBooking == null) {
+      if (updatedBooking == null) {
         setState(() {
           errorMessage = 'Booking not found';
         });
@@ -127,6 +151,15 @@ class _CustomerBookingDetailScreenState
     }
 
     return _buildBookingDetails(booking!);
+  }
+
+  void _navigateToCustomerPayment(BookingModel booking) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomerPaymentScreen(booking: booking),
+      ),
+    );
   }
 
   Widget _buildBookingDetails(BookingModel booking) {
@@ -208,18 +241,27 @@ class _CustomerBookingDetailScreenState
             title: 'Service Provider',
             icon: Icons.person,
             children: [
+              // ✅ UPDATED: Display provider name instead of ID
               _buildDetailRow(
-                'Provider ID',
-                booking.providerId.substring(0, 8),
+                'Provider Name',
+                booking.providerName ?? 'Loading...',
               ),
-              if (booking.customerPhone != null &&
-                  booking.customerPhone!.isNotEmpty)
+
+              // ✅ UPDATED: Show provider contact ONLY if service is NOT completed/paid
+              if (booking.providerPhone != null &&
+                  booking.providerPhone!.isNotEmpty &&
+                  _shouldShowProviderContact(booking.status))
                 _buildDetailRowWithAction(
                   'Contact',
-                  booking.customerPhone!,
+                  booking.providerPhone!,
                   Icons.phone,
-                  () => Helpers.launchPhone(booking.customerPhone!),
+                  () => Helpers.launchPhone(booking.providerPhone!),
                 ),
+
+              // ✅ OPTIONAL: Show provider email if available
+              if (booking.providerEmail != null &&
+                  booking.providerEmail!.isNotEmpty)
+                _buildDetailRow('Email', booking.providerEmail!),
             ],
           ),
           const SizedBox(height: 16),
@@ -257,18 +299,19 @@ class _CustomerBookingDetailScreenState
           const SizedBox(height: 20),
 
           // Action Buttons
-          if (booking.status == BookingStatus.inProgress)
+          if (booking.status == BookingStatus.completed)
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () => _markAsCompleted(booking),
+              child: ElevatedButton.icon(
+                onPressed: () => _navigateToCustomerPayment(booking),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text(
-                  'Mark as Completed',
+                icon: const Icon(Icons.payment, size: 20),
+                label: const Text(
+                  'Complete Payment',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),
@@ -292,6 +335,65 @@ class _CustomerBookingDetailScreenState
         ],
       ),
     );
+  }
+
+  bool _shouldShowProviderContact(BookingStatus? status) {
+    if (status == null) return true;
+
+    // Hide provider contact for completed, paid, cancelled, and refunded services
+    switch (status) {
+      case BookingStatus.completed:
+      case BookingStatus.paid:
+      case BookingStatus.cancelled:
+      case BookingStatus.refunded:
+        return false; // Hide contact info
+      case BookingStatus.pending:
+      case BookingStatus.confirmed:
+      case BookingStatus.paymentPending:
+        return true; // Show contact info
+      default:
+        return true;
+    }
+  }
+
+  // ✅ ADD: Method to fetch provider details from Firestore
+  Future<Map<String, dynamic>?> _fetchProviderDetails(String providerId) async {
+    try {
+      debugPrint('🔍 Fetching provider details for: $providerId');
+
+      final providerDoc = await FirebaseFirestore.instance
+          .collection(
+            'users',
+          ) // or 'providers' if you have a separate collection
+          .doc(providerId)
+          .get();
+
+      if (providerDoc.exists) {
+        final providerData = providerDoc.data();
+        debugPrint('✅ Provider details found: ${providerData?['name']}');
+        return providerData;
+      } else {
+        // Try in providers collection if not found in users
+        final providerInProvidersDoc = await FirebaseFirestore.instance
+            .collection('providers')
+            .doc(providerId)
+            .get();
+
+        if (providerInProvidersDoc.exists) {
+          final providerData = providerInProvidersDoc.data();
+          debugPrint(
+            '✅ Provider details found in providers collection: ${providerData?['businessName']}',
+          );
+          return providerData;
+        }
+
+        debugPrint('❌ Provider document not found');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching provider details: $e');
+      return null;
+    }
   }
 
   Widget _buildDetailCard({
@@ -547,15 +649,20 @@ class _CustomerBookingDetailScreenState
       case BookingStatus.pending:
         return Icons.schedule;
       case BookingStatus.confirmed:
-        return Icons.check_circle;
-      case BookingStatus.inProgress:
-        return Icons.construction;
+        return Icons.construction; // More appropriate for active service
       case BookingStatus.completed:
-        return Icons.check_circle;
+        return Icons.done; // Different from confirmed
       case BookingStatus.cancelled:
         return Icons.cancel;
       case BookingStatus.refunded:
         return Icons.money_off;
+      case BookingStatus.paymentPending:
+        return Icons.pending; // Alternative: Icons.access_time, Icons.timer
+      case BookingStatus.paid:
+        return Icons
+            .verified; // Alternative: Icons.paid, Icons.check_circle_outline
+      default:
+        return Icons.help_outline;
     }
   }
 }

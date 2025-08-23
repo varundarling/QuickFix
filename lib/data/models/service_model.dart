@@ -72,7 +72,7 @@ class ServiceModel {
       subServices: List<String>.from(data['subServices'] ?? []),
       isActive: data['isActive'] ?? true,
       providerId: data['providerId'] ?? '',
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: _parseDateTime(data['createdAt']),
       metadata: data['metadata'],
       mobileNumber: data['mobileNumber'] ?? '',
       availability: data['availability'] ?? 'available',
@@ -83,11 +83,25 @@ class ServiceModel {
       isBooked: data['isBooked'] ?? false,
       bookedByUserId: data['bookedByUserId'],
       bookedAt: data['bookedAt'] != null
-          ? (data['bookedAt'] as Timestamp).toDate()
+          ? _parseDateTime(data['bookedAt'])
           : null,
       customerName: data['customerName'],
       customerPhone: data['customerPhone'],
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    } else if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+
+    return DateTime.now();
   }
 
   Map<String, dynamic> toFireStore() {

@@ -1,6 +1,7 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
@@ -82,29 +83,82 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     try {
       debugPrint('🔄 Fetching provider data for: ${widget.service.providerId}');
 
-      final doc = await FirebaseFirestore.instance
+      // ✅ FIRST: Try to get from providers collection
+      final providerDoc = await FirebaseFirestore.instance
           .collection('providers')
           .doc(widget.service.providerId)
           .get();
 
-      debugPrint('📡 Firestore response - exists: ${doc.exists}');
-
-      if (doc.exists && doc.data() != null) {
-        final data = doc.data()!;
-        debugPrint('📄 Raw provider data: $data');
-
-        final providerModel = ProviderModel.fromFireStore(doc);
-        debugPrint('✅ Provider model created: ${providerModel.businessName}');
-        debugPrint('Provider Address: ${providerModel.address}');
-        debugPrint('Provider Experience: ${providerModel.experience}');
+      if (providerDoc.exists && providerDoc.data() != null) {
+        final providerModel = ProviderModel.fromFireStore(providerDoc);
+        debugPrint(
+          '✅ Provider found in providers collection: ${providerModel.businessName}',
+        );
 
         if (mounted) {
           setState(() {
             _provider = providerModel;
             _isLoadingProvider = false;
           });
-          debugPrint('✅ UI state updated with provider data');
         }
+        return;
+      }
+
+      // ✅ FALLBACK: If not found in providers collection, get from user data
+      debugPrint(
+        '⚠️ Provider not found in providers collection, checking user data...',
+      );
+      final userDoc = await FirebaseDatabase.instance
+          .ref('users')
+          .child(widget.service.providerId)
+          .get();
+
+      if (userDoc.exists && userDoc.value != null) {
+        final userData = Map<String, dynamic>.from(userDoc.value as Map);
+        debugPrint('✅ User data found: ${userData['name']}');
+
+        // Create a temporary provider model from user data and service data
+        final tempProvider = ProviderModel(
+          id: widget.service.providerId,
+          userId: widget.service.providerId,
+          businessName:
+              userData['businessName'] ??
+              userData['name'] ??
+              'Service Provider',
+          description:
+              userData['description'] ?? 'Professional service provider',
+          services: [],
+          raitng: 0.0,
+          totalReviews: 0,
+          certifications: [],
+          latitude: widget.service.latitude ?? 0.0,
+          longitude: widget.service.longitude ?? 0.0,
+          address: widget.service.address ?? userData['address'] ?? '',
+          availability: {},
+          isVerified: false,
+          isActive: true,
+          createdAt: DateTime.now(),
+          portfolioImages: [],
+          mobileNumber: widget.service.mobileNumber,
+          experience: userData['experience'] ?? '1+ years',
+        );
+
+        if (mounted) {
+          setState(() {
+            _provider = tempProvider;
+            _isLoadingProvider = false;
+          });
+          debugPrint('✅ Temporary provider model created');
+        }
+        return;
+      }
+
+      debugPrint('❌ No provider data found anywhere');
+      if (mounted) {
+        setState(() {
+          _provider = null;
+          _isLoadingProvider = false;
+        });
       } else {
         debugPrint('❌ Provider document does not exist or has no data');
         if (mounted) {
@@ -1316,8 +1370,6 @@ Color _getStatusColor(BookingStatus status) {
     case BookingStatus.pending:
       return Colors.orange;
     case BookingStatus.confirmed:
-      return AppColors.primary;
-    case BookingStatus.inProgress:
       return Colors.blue;
     case BookingStatus.completed:
       return AppColors.success;
@@ -1325,8 +1377,15 @@ Color _getStatusColor(BookingStatus status) {
       return AppColors.error;
     case BookingStatus.refunded:
       return AppColors.error;
+    case BookingStatus.paymentPending:
+      // TODO: Handle this case.
+      throw UnimplementedError();
+    case BookingStatus.paid:
+      // TODO: Handle this case.
+      throw UnimplementedError();
   }
 }
+
 
 IconData _getStatusIcon(BookingStatus status) {
   switch (status) {
@@ -1334,13 +1393,17 @@ IconData _getStatusIcon(BookingStatus status) {
       return Icons.schedule;
     case BookingStatus.confirmed:
       return Icons.check_circle;
-    case BookingStatus.inProgress:
-      return Icons.construction;
     case BookingStatus.completed:
       return Icons.done_all;
     case BookingStatus.cancelled:
       return Icons.cancel;
     case BookingStatus.refunded:
       return Icons.money_off;
+    case BookingStatus.paymentPending:
+      // TODO: Handle this case.
+      throw UnimplementedError();
+    case BookingStatus.paid:
+      // TODO: Handle this case.
+      throw UnimplementedError();
   }
 }

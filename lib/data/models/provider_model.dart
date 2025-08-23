@@ -62,9 +62,7 @@ class ProviderModel {
       availability: Map<String, bool>.from(data['availability'] ?? {}),
       isVerified: data['isVerified'] ?? false,
       isActive: data['isActive'] ?? true,
-      createdAt: data['createdAt'] != null
-          ? (data['createdAt'] as Timestamp).toDate()
-          : DateTime.now(), // ✅ IMPROVED: null handling
+      createdAt: _parseDateTime(data['createdAt']),
       hourlyRate: data['hourlyRate'] != null
           ? (data['hourlyRate'] as num).toDouble()
           : null, // ✅ IMPROVED: safe casting
@@ -74,6 +72,20 @@ class ProviderModel {
       mobileNumber: data['mobileNumber'] ?? '', // ✅ ADDED: was missing
       experience: data['experience']?.toString(),
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    } else if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+
+    return DateTime.now();
   }
 
   // ✅ FIXED: Corrected all typos and added missing field

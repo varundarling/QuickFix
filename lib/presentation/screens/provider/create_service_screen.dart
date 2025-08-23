@@ -1,8 +1,11 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
@@ -386,6 +389,10 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
     try {
       final serviceProvider = context.read<ServiceProvider>();
+      final authProvider = context.read<AuthProvider>(); // Add this
+      final currentUser = FirebaseAuth.instance.currentUser!;
+
+      await _createOrUpdateProviderProfile(currentUser.uid, authProvider);
 
       final success = await serviceProvider.addService(
         name: _nameController.text.trim(),
@@ -411,15 +418,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         if (mounted) {
           context.go('/provider-dashboard');
         }
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              serviceProvider.errorMessage ?? 'Failed to create service',
-            ),
-            backgroundColor: AppColors.error,
-          ),
-        );
       }
     } catch (error) {
       if (mounted) {
@@ -433,6 +431,77 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
           _isCreating = false;
         });
       }
+    }
+  }
+
+  // ✅ NEW METHOD: Create or Update Provider Profile
+  Future<void> _createOrUpdateProviderProfile(
+    String providerId,
+    AuthProvider authProvider,
+  ) async {
+    try {
+      final userModel = authProvider.userModel;
+      if (userModel == null) {
+        throw Exception('User profile not found');
+      }
+
+      // Check if provider document already exists
+      final providerDoc = await FirebaseFirestore.instance
+          .collection('providers')
+          .doc(providerId)
+          .get();
+
+      final providerData = {
+        'userId': providerId,
+        'businessName': userModel.businessName ?? userModel.name,
+        'description': userModel.description ?? 'Professional service provider',
+        'services': [], // Will be updated when services are added
+        'rating': 0.0,
+        'totalReviews': 0,
+        'certifications': [],
+        'latitude': _latitude!,
+        'longitude': _longitude!,
+        'address': _addressController.text.trim(),
+        'availability': {
+          'monday': true,
+          'tuesday': true,
+          'wednesday': true,
+          'thursday': true,
+          'friday': true,
+          'saturday': true,
+          'sunday': true,
+        },
+        'isVerified': false,
+        'isActive': true,
+        'createdAt': Timestamp.fromDate(DateTime.now()),
+        'hourlyRate': double.parse(_basePriceController.text.trim()),
+        'portfolioImages': [],
+        'mobileNumber': _mobileNumberController.text.trim(),
+        'experience': userModel.experience ?? '1 year',
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      };
+
+      if (providerDoc.exists) {
+        // Update existing provider
+        await FirebaseFirestore.instance
+            .collection('providers')
+            .doc(providerId)
+            .update({
+              ...providerData,
+              'services': FieldValue.arrayUnion([]), // Keep existing services
+            });
+        debugPrint('✅ Provider profile updated');
+      } else {
+        // Create new provider
+        await FirebaseFirestore.instance
+            .collection('providers')
+            .doc(providerId)
+            .set(providerData);
+        debugPrint('✅ Provider profile created');
+      }
+    } catch (e) {
+      debugPrint('❌ Error creating/updating provider profile: $e');
+      throw e;
     }
   }
 

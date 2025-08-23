@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
@@ -24,11 +27,36 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   String? _currentUserId;
-  BookingProvider? _bookingProvider; // ✅ Store provider reference
-  AuthProvider? _authProvider; // ✅ Store provider reference
+  BookingProvider? _bookingProvider;
+  AuthProvider? _authProvider;
 
+  bool isLoading = true;
+  // ✅ FIXED: Added missing variables
+  StreamSubscription<QuerySnapshot>? _providerBookingsSubscription;
+  bool _isUpdatingStatus = false;
+  Set<String> _updatingBookings = {}; // Track multiple updating bookings
   final Map<String, bool> _processingBookings = {};
 
+  Timer? _realTimeUpdateTimer;
+
+  final List<Map<String, dynamic>> _tabs = [
+    {
+      'label': 'Pending',
+      'status': BookingStatus.pending,
+      'icon': Icons.schedule,
+    },
+    {
+      'label': 'Active',
+      'status': BookingStatus.confirmed,
+      'icon': Icons.construction,
+    },
+    {
+      'label': 'History',
+      'status': BookingStatus.completed,
+      'icon': Icons.history,
+    },
+    {'label': 'Profile', 'icon': Icons.person},
+  ];
   bool _isBookingProcessing(String bookingId) {
     return _processingBookings[bookingId] ?? false;
   }
@@ -37,6 +65,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     if (mounted) {
       setState(() {
         _processingBookings[bookingId] = processing;
+        if (processing) {
+          _updatingBookings.add(bookingId);
+        } else {
+          _updatingBookings.remove(bookingId);
+        }
       });
     }
   }
@@ -62,30 +95,61 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   void initState() {
     super.initState();
     _tabController = TabController(length: 5, vsync: this);
-
-    _tabController.addListener(() {
-      if (!_tabController.indexIsChanging) {
-        debugPrint('📱 Tab changed to: ${_tabController.index}');
-        final tabNames = [
-          'Overview',
-          'Services',
-          'Pending',
-          'Active',
-          'History',
-        ];
-        debugPrint('📱 Current tab: ${tabNames[_tabController.index]}');
-      }
-    });
-
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      _initializeDashboard();
+    });
+  }
+
+  Future<void> _initializeDashboard() async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final bookingProvider = context.read<BookingProvider>();
+
+      // Ensure user is authenticated
+      final isAuthenticated = await authProvider.ensureUserAuthenticated();
+      if (!isAuthenticated) {
+        debugPrint('❌ User not authenticated');
+        return;
+      }
+
+      // Get current user ID
+      final currentUserId = authProvider.getCurrentUserId();
+      if (currentUserId == null) {
+        debugPrint('❌ No user ID available');
+        return;
+      }
+
+      _currentUserId = currentUserId;
+      debugPrint('✅ Initializing dashboard for provider: $currentUserId');
+
+      // ✅ CRITICAL: Initialize BookingProvider with current user ID
+      await bookingProvider.initializeProvider(currentUserId);
+
+      // Load services
+      final serviceProvider = context.read<ServiceProvider>();
+      await serviceProvider.loadMyServices();
+
       if (mounted) {
-        Future.delayed(const Duration(milliseconds: 500), () {
-          if (mounted) {
-            _setupRealTimeListening();
-          }
+        setState(() {
+          isLoading = false;
         });
       }
-    });
+
+      debugPrint('✅ Dashboard initialization completed');
+    } catch (error) {
+      debugPrint('❌ Error initializing dashboard: $error');
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to initialize dashboard: $error'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -96,55 +160,128 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
   }
 
-  Future<void> _setupRealTimeListening() async {
-    if (!mounted) return;
+  // ✅ FIXED: Added missing _fetchCustomerDetails method
+  Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
+    try {
+      context.read<BookingProvider>();
+      // Use the method from BookingProvider if it exists
+      // Otherwise implement the logic here
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(customerId)
+          .get();
+
+      if (userDoc.exists) {
+        final userData = userDoc.data()!;
+        return {
+          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
+          'customerPhone': userData['phone']?.toString() ?? 'No Phone',
+          'customerEmail': userData['email']?.toString() ?? 'No Email',
+        };
+      } else {
+        debugPrint('❌ Customer not found in Firestore');
+        return null;
+      }
+    } catch (e) {
+      debugPrint('❌ Error fetching customer details: $e');
+      return null;
+    }
+  }
+
+  // ✅ FIXED: Properly implemented _setupRealTimeListening method
+  void _setupRealTimeListening(String providerId) {
+    debugPrint('🔄 Setting up SINGLE real-time listener for: $providerId');
+
+    // Cancel existing subscription
+    _providerBookingsSubscription?.cancel();
+
+    _providerBookingsSubscription = FirebaseFirestore.instance
+        .collection('bookings')
+        .where('providerId', isEqualTo: providerId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .listen(
+          (snapshot) async {
+            // ✅ CRITICAL: Enhanced conflict prevention
+            if (_isUpdatingStatus || _updatingBookings.isNotEmpty) {
+              debugPrint('⏭️ [PROVIDER] Skipping update during status change');
+              debugPrint('   - _isUpdatingStatus: $_isUpdatingStatus');
+              debugPrint('   - _updatingBookings: $_updatingBookings');
+              return;
+            }
+
+            debugPrint(
+              '🔔 [REAL-TIME] Received ${snapshot.docs.length} booking updates',
+            );
+
+            // ✅ NEW: Add a small delay to allow Firestore to settle
+            _realTimeUpdateTimer?.cancel();
+            _realTimeUpdateTimer = Timer(Duration(milliseconds: 500), () async {
+              await _processRealTimeUpdate(snapshot);
+            });
+          },
+          onError: (error) {
+            debugPrint('❌ [REAL-TIME] Error: $error');
+          },
+        );
+  }
+
+  // ✅ NEW: Separate method for processing real-time updates
+  Future<void> _processRealTimeUpdate(QuerySnapshot snapshot) async {
+    if (!mounted || _isUpdatingStatus || _updatingBookings.isNotEmpty) {
+      debugPrint('⏭️ [REAL-TIME] Skipping delayed update - still updating');
+      return;
+    }
 
     try {
-      final authProvider = context.read<AuthProvider>();
-      final bookingProvider = context.read<BookingProvider>();
-      final serviceProvider = context.read<ServiceProvider>();
+      List<BookingModel> bookingsWithCustomerDetails = [];
 
-      debugPrint('🏗️ Setting up real-time listeners...');
+      for (var doc in snapshot.docs) {
+        BookingModel booking = BookingModel.fromFireStore(doc);
 
-      final isAuthenticated = await authProvider.ensureUserAuthenticated();
-      if (!isAuthenticated) {
-        debugPrint('❌ User not authenticated, cannot set up listeners');
-        return;
+        // ✅ CRITICAL: Skip bookings that are currently being updated
+        if (_updatingBookings.contains(booking.id)) {
+          debugPrint(
+            '⏭️ [REAL-TIME] Skipping booking ${booking.id} - currently updating',
+          );
+          continue;
+        }
+
+        // Fetch customer details
+        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+
+        if (customerDetails != null) {
+          booking = booking.copyWith(
+            customerName: customerDetails['customerName'],
+            customerPhone: customerDetails['customerPhone'],
+            customerEmail: customerDetails['customerEmail'],
+          );
+        }
+
+        bookingsWithCustomerDetails.add(booking);
       }
 
-      final userId = authProvider.getCurrentUserId();
-      if (userId == null) {
-        debugPrint('❌ No user ID available');
-        return;
-      }
+      // ✅ ENHANCED: Only update if we have valid bookings and no conflicts
+      if (mounted && !_isUpdatingStatus && _updatingBookings.isEmpty) {
+        final bookingProvider = context.read<BookingProvider>();
+        bookingProvider.setProviderBookings(bookingsWithCustomerDetails);
 
-      _currentUserId = userId;
-      debugPrint('✅ Setting up listeners for provider: $userId');
-
-      // Start real-time listening to bookings
-      bookingProvider.listenToProviderBookings(userId);
-
-      // Load services once
-      await serviceProvider.loadMyServices();
-
-      debugPrint('✅ Real-time listening setup completed');
-    } catch (error, stackTrace) {
-      debugPrint('❌ Error setting up real-time listeners: $error');
-      debugPrint('Stack trace: $stackTrace');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to setup dashboard: ${error.toString()}'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () => _setupRealTimeListening(),
-              textColor: Colors.white,
-            ),
-          ),
+        debugPrint('📊 [REAL-TIME] Updated booking counts:');
+        debugPrint(
+          '   - Total processed: ${bookingsWithCustomerDetails.length}',
+        );
+        debugPrint(
+          '   - Pending: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.pending).length}',
+        );
+        debugPrint(
+          '   - Confirmed: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.confirmed).length}',
+        );
+        debugPrint(
+          '   - Completed: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.completed).length}',
         );
       }
+    } catch (error) {
+      debugPrint('❌ [REAL-TIME] Error processing update: $error');
     }
   }
 
@@ -202,7 +339,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             backgroundColor: Colors.red,
             action: SnackBarAction(
               label: 'Retry',
-              onPressed: () => _setupRealTimeListening(),
+              onPressed: () {
+                if (_currentUserId != null) {
+                  _setupRealTimeListening(_currentUserId!);
+                }
+              },
               textColor: Colors.white,
             ),
           ),
@@ -250,14 +391,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       appBar: AppBar(
         backgroundColor: AppColors.primary,
         elevation: 0,
-        automaticallyImplyLeading: false, // Remove default back button
+        automaticallyImplyLeading: false,
         flexibleSpace: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                // ✅ Dashboard title on the left
                 const Text(
                   'Dashboard',
                   style: TextStyle(
@@ -266,8 +406,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-
-                // ✅ Profile section on the right
                 InkWell(
                   onTap: () => context.go('/provider-profile'),
                   borderRadius: BorderRadius.circular(8),
@@ -320,13 +458,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildOverviewTab(),
-          _buildServicesTab(),
-          _buildBookingsTab(BookingStatus.pending), // Pending tab
-          _buildBookingsTab(
-            BookingStatus.inProgress,
-          ), // Active tab (in progress bookings)
-          _buildHistoryTab(), // History tab
+          _buildOverviewTab(), // Tab 0: Overview
+          _buildServicesTab(), // Tab 1: Services
+          _buildBookingsTab(BookingStatus.pending), // Tab 2: Pending
+          _buildBookingsTab(BookingStatus.confirmed), // Tab 3: Active
+          _buildBookingsTab(BookingStatus.completed), // Tab 4: History
         ],
       ),
       floatingActionButton: FloatingActionButton(
@@ -367,12 +503,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         }
 
         final bookings = bookingProvider.providerbookings;
-        final services = serviceProvider.services;
+        final services =
+            serviceProvider.providerServices; // ✅ FIXED: Use correct getter
         final pendingBookings = bookings
             .where((b) => b.status == BookingStatus.pending)
-            .length;
-        final activeBookings = bookings
-            .where((b) => b.status == BookingStatus.inProgress)
             .length;
         final completedBookings = bookings
             .where((b) => b.status == BookingStatus.completed)
@@ -382,7 +516,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             .length;
         final totalEarnings = bookings
             .where((b) => b.status == BookingStatus.completed)
-            .fold(0.0, (sum, booking) => sum + booking.totalAmount);
+            .fold(0.0, (total, booking) => total + booking.totalAmount);
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -398,7 +532,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // ✅ Real-time status indicator
+                // Real-time status indicator
                 Card(
                   child: Padding(
                     padding: const EdgeInsets.all(16),
@@ -482,12 +616,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       Icons.build,
                       AppColors.primary,
                     ),
-                    _buildStatCard(
-                      'Active',
-                      activeBookings.toString(),
-                      Icons.construction,
-                      Colors.blue,
-                    ),
+
                     _buildStatCard(
                       'Pending',
                       pendingBookings.toString(),
@@ -552,29 +681,53 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     );
   }
 
+  String _getActionText(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.confirmed:
+        return 'Accepting booking';
+      case BookingStatus.completed:
+        return 'Completing service';
+      case BookingStatus.cancelled:
+        return 'Cancelling booking';
+      default:
+        return 'Updating booking';
+    }
+  }
+
   Widget _buildBookingsTab(BookingStatus status) {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
         List<BookingModel> bookings;
 
-        // ✅ Fix filtering logic for Active tab
-        if (status == BookingStatus.inProgress) {
-          // Active tab shows BOTH confirmed AND inProgress bookings
-          bookings = [
-            ...bookingProvider.confirmedBookings, // Accepted bookings
-            ...bookingProvider.activeBookings, // Started bookings
-          ];
-          debugPrint(
-            '🔍 Active tab bookings: ${bookings.length} (${bookingProvider.confirmedBookings.length} confirmed + ${bookingProvider.activeBookings.length} in progress)',
-          );
-        } else {
-          // Other tabs show their specific status
-          bookings = bookingProvider.providerbookings
-              .where((b) => b.status == status)
-              .toList();
-          debugPrint(
-            '🔍 ${status.toString().split('.').last} tab bookings: ${bookings.length}',
-          );
+        // ✅ FIXED: Removed inProgress reference, simplified logic
+        switch (status) {
+          case BookingStatus.pending:
+            bookings = bookingProvider.providerbookings
+                .where((b) => b.status == BookingStatus.pending)
+                .toList();
+            break;
+
+          case BookingStatus.confirmed: // ✅ This is the "Active" tab
+            bookings = bookingProvider.providerbookings
+                .where((b) => b.status == BookingStatus.confirmed)
+                .toList();
+            debugPrint('🔍 Provider Active tab bookings: ${bookings.length}');
+            break;
+
+          case BookingStatus.completed: // ✅ This is the "History" tab
+            bookings = bookingProvider.providerbookings
+                .where(
+                  (b) =>
+                      b.status == BookingStatus.completed ||
+                      b.status == BookingStatus.cancelled ||
+                      b.status == BookingStatus.paid,
+                )
+                .toList();
+            break;
+          default:
+            bookings = bookingProvider.providerbookings
+                .where((b) => b.status == status)
+                .toList();
         }
 
         if (bookings.isEmpty) {
@@ -599,9 +752,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        status == BookingStatus.inProgress
-                            ? 'No active bookings'
-                            : 'No ${_getStatusDisplayName(status)} bookings',
+                        _getEmptyStateMessage(status), // ✅ Updated method call
                         style: const TextStyle(
                           fontSize: 16,
                           color: AppColors.textSecondary,
@@ -643,6 +794,22 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       },
     );
+  }
+
+  // ✅ NEW: Helper method for empty state messages
+  String _getEmptyStateMessage(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return 'No pending bookings';
+      case BookingStatus.confirmed:
+        return 'No active bookings';
+      case BookingStatus.completed:
+        return 'No completed bookings';
+      case BookingStatus.cancelled:
+        return 'No cancelled bookings';
+      default:
+        return 'No ${_getStatusDisplayName(status)} bookings';
+    }
   }
 
   Widget _buildHistoryTab() {
@@ -693,7 +860,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           },
           child: Column(
             children: [
-              // ✅ Add summary header for history
+              // Summary header for history
               Container(
                 padding: const EdgeInsets.all(8),
                 child: Row(
@@ -806,12 +973,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
     final statusColor = Helpers.getStatusColor(booking.status.toString());
     final bool showAddress =
-        (booking.status == BookingStatus.confirmed ||
-            booking.status == BookingStatus.inProgress) &&
+        (booking.status == BookingStatus.confirmed) &&
         booking.customerAddress.isNotEmpty;
 
     return InkWell(
-      // ✅ Add tap functionality to navigate to detail screen
       onTap: () {
         Navigator.push(
           context,
@@ -873,7 +1038,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey),
+                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
@@ -894,7 +1059,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     ),
                     const SizedBox(height: 8),
 
-                    // ✅ Customer name
+                    // Customer name
                     Row(
                       children: [
                         Icon(
@@ -918,7 +1083,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       ],
                     ),
 
-                    // ✅ Customer phone (only show if not null and not 'No Phone')
+                    // Customer phone (only show if not null and not 'No Phone')
                     if (booking.customerPhone != null &&
                         booking.customerPhone != 'No Phone' &&
                         booking.customerPhone!.isNotEmpty) ...[
@@ -936,7 +1101,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                               ),
                             ),
                           ),
-                          // ✅ Call button
+                          // Call button
                           InkWell(
                             onTap: () {
                               if (booking.customerPhone != null &&
@@ -1073,7 +1238,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
               const SizedBox(height: 12),
 
-              // ✅ Dynamic action buttons based on booking status
+              // Dynamic action buttons based on booking status
               _buildBookingActions(booking),
             ],
           ),
@@ -1090,11 +1255,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     switch (booking.status) {
       case BookingStatus.pending:
       case BookingStatus.confirmed:
-      case BookingStatus.inProgress:
-        dateLabel = 'Scheduled Date:';
-        dateToShow = booking.scheduledDateTime;
-        dateColor = AppColors.textSecondary;
-        break;
       case BookingStatus.completed:
         dateLabel = 'Completed Date:';
         dateToShow = booking.completedAt ?? booking.scheduledDateTime;
@@ -1194,39 +1354,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           ],
         );
 
+      // ✅ SIMPLIFIED: Direct completion to history
       case BookingStatus.confirmed:
         return SizedBox(
           width: double.infinity,
           child: ElevatedButton.icon(
             onPressed: isProcessing
                 ? null
-                : () => _updateBookingStatus(
-                    booking.id,
-                    BookingStatus.inProgress,
-                  ),
-            icon: isProcessing
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  )
-                : const Icon(Icons.play_arrow, size: 16),
-            label: Text(isProcessing ? 'Starting...' : 'Start Service'),
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.blue),
-          ),
-        );
-
-      case BookingStatus.inProgress:
-        return SizedBox(
-          width: double.infinity,
-          child: ElevatedButton.icon(
-            onPressed: isProcessing
-                ? null
-                : () =>
-                      _updateBookingStatus(booking.id, BookingStatus.completed),
+                : () => _markServiceCompleted(booking),
             icon: isProcessing
                 ? const SizedBox(
                     width: 16,
@@ -1247,11 +1382,100 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
   }
 
+  Future<void> _markServiceCompleted(BookingModel booking) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Row(
+          children: [
+            Icon(Icons.check_circle, color: AppColors.success),
+            SizedBox(width: 8),
+            Text('Mark as Completed'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('Service: ${booking.serviceName}'),
+            const SizedBox(height: 8),
+            Text('Customer: ${booking.customerName ?? "Customer"}'),
+            const SizedBox(height: 16),
+            const Text(
+              'Are you sure you want to mark this service as completed?',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'This will move the booking to completed status and the customer can choose their payment method.',
+              style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
+            child: const Text('Mark Completed'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed == true && mounted) {
+      final authProvider = context.read<AuthProvider>();
+      final bookingProvider = context.read<BookingProvider>();
+
+      final currentUserId = authProvider.getCurrentUserId();
+      if (currentUserId == null) return;
+
+      _setBookingProcessing(booking.id, true);
+
+      try {
+        // ✅ SIMPLIFIED: Direct update to completed status
+        final success = await bookingProvider.updateBookingStatus(
+          booking.id,
+          BookingStatus.completed,
+          currentUserId,
+        );
+
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Service marked as completed!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+
+          _navigateToAppropriateTab(BookingStatus.completed);
+        }
+      } catch (error) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Error: $error'),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      } finally {
+        _setBookingProcessing(booking.id, false);
+      }
+    }
+  }
+
   Future<void> _updateBookingStatus(
     String bookingId,
     BookingStatus newStatus,
   ) async {
-    if (!mounted || _isBookingProcessing(bookingId)) return;
+    if (!mounted || _isBookingProcessing(bookingId)) {
+      debugPrint('⚠️ Update blocked - already processing');
+      return;
+    }
 
     final authProvider = context.read<AuthProvider>();
     final bookingProvider = context.read<BookingProvider>();
@@ -1266,32 +1490,56 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       return;
     }
 
+    debugPrint('🎯 [PROVIDER DASHBOARD] Starting status update');
+    debugPrint('   - Booking ID: $bookingId');
+    debugPrint('   - New Status: $newStatus');
+
+    // ✅ CRITICAL: Set flags BEFORE any async operations
     _setBookingProcessing(bookingId, true);
+    _isUpdatingStatus = true;
 
     try {
-      bookingProvider.debugCurrentState('Before update');
-      showDialog(
-        context: context,
-        barrierDismissible: false,
-        builder: (context) => PopScope(
-          canPop: false, // ✅ Updated from WillPopScope
-          child: const AlertDialog(
-            content: Row(
-              children: [
-                CircularProgressIndicator(),
-                SizedBox(width: 20),
-                Text('Updating booking status...'),
-              ],
+      // Show loading dialog
+      if (mounted) {
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => PopScope(
+            canPop: false,
+            child: AlertDialog(
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(),
+                  const SizedBox(height: 20),
+                  Text('${_getActionText(newStatus)}...'),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Please wait while we sync the changes...',
+                    style: TextStyle(fontSize: 12, color: Colors.grey),
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
+        );
+      }
+
+      debugPrint(
+        '🔄 [STATUS UPDATE] Calling BookingProvider.updateBookingStatus',
       );
 
+      // ✅ CRITICAL: Wait for the update to complete
       final success = await bookingProvider.updateBookingStatus(
         bookingId,
         newStatus,
         currentUserId,
       );
+
+      debugPrint('✅ [STATUS UPDATE] BookingProvider returned: $success');
+
+      // ✅ ENHANCED: Add extra delay to ensure Firestore consistency
+      await Future.delayed(const Duration(milliseconds: 1500));
 
       // Close loading dialog
       if (mounted) {
@@ -1301,95 +1549,92 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       if (!mounted) return;
 
       if (success) {
-        bookingProvider.debugCurrentState('After Update');
+        debugPrint('✅ [PROVIDER DASHBOARD] Status updated successfully');
+
+        // ✅ NEW: Manually refresh the specific booking to ensure consistency
+        await bookingProvider.refreshSpecificBooking(bookingId);
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Booking ${newStatus.statusDisplay.toLowerCase()} successfully',
+              'Booking ${_getActionText(newStatus).toLowerCase()} successfully!',
             ),
             backgroundColor: AppColors.success,
             duration: const Duration(seconds: 2),
           ),
         );
 
-        // ✅ Navigate to appropriate tab IMMEDIATELY
-        _navigateToAppropriateTab(newStatus);
+        // ✅ ENHANCED: Wait longer before navigating
+        await Future.delayed(const Duration(milliseconds: 2500));
 
         if (mounted) {
-          setState(() {});
-        }
-
-        // ✅ Refresh data after a short delay
-        await Future.delayed(const Duration(milliseconds: 1000));
-        if (mounted) {
-          bookingProvider.debugCurrentState('After refresh');
-          await bookingProvider.loadProviderBookings(
-            currentUserId,
-          ); // Use existing method
+          _navigateToAppropriateTab(newStatus);
         }
       } else {
-        final errorMessage =
-            bookingProvider.errorMessage ?? 'Failed to update booking status';
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(errorMessage),
+          const SnackBar(
+            content: Text('Failed to update booking status'),
             backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (error) {
+      debugPrint('❌ [PROVIDER DASHBOARD] Error: $error');
+
       if (mounted) {
-        Navigator.of(context).pop(); // Close loading dialog
+        Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: $error'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
+          SnackBar(content: Text('Error: $error'), backgroundColor: Colors.red),
         );
       }
     } finally {
+      // ✅ CRITICAL: Reset flags with additional delay
+      await Future.delayed(const Duration(milliseconds: 1000));
+
       if (mounted) {
+        _isUpdatingStatus = false;
         _setBookingProcessing(bookingId, false);
       }
+
+      debugPrint('🏁 [STATUS UPDATE] Cleanup completed');
     }
   }
 
-  // ✅ Add this helper method for tab navigation
   void _navigateToAppropriateTab(BookingStatus newStatus) {
     int targetTabIndex;
+    String statusName;
 
     switch (newStatus) {
+      case BookingStatus.pending:
+        targetTabIndex = 2; // Pending tab
+        statusName = 'Pending';
+        break;
       case BookingStatus.confirmed:
         targetTabIndex = 3; // Active tab
-        debugPrint('📍 Navigating to Active tab (confirmed booking)');
+        statusName = 'Active';
         break;
-      case BookingStatus.inProgress:
-        targetTabIndex = 3; // Active tab
-        debugPrint('📍 Staying in Active tab (in progress booking)');
-        break;
+      // ✅ REMOVED: No more inProgress case
       case BookingStatus.completed:
-        targetTabIndex = 4; // History tab
-        debugPrint('📍 Navigating to History tab (completed booking)');
-        break;
       case BookingStatus.cancelled:
         targetTabIndex = 4; // History tab
-        debugPrint('📍 Navigating to History tab (cancelled booking)');
+        statusName = 'History';
         break;
       default:
-        debugPrint('📍 No tab navigation needed for status: $newStatus');
+        debugPrint('⚠️ No tab navigation for status: $newStatus');
         return;
     }
 
-    // Animate to target tab with smooth transition
-    _tabController.animateTo(
-      targetTabIndex,
-      duration: const Duration(milliseconds: 400),
-      curve: Curves.easeInOut,
+    debugPrint(
+      '📍 [TAB NAVIGATION] Moving to $statusName (index: $targetTabIndex)',
     );
 
-    debugPrint('📍 Tab animation initiated to index: $targetTabIndex');
+    if (_tabController.index != targetTabIndex) {
+      _tabController.animateTo(
+        targetTabIndex,
+        duration: const Duration(milliseconds: 400),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   IconData _getStatusIcon(BookingStatus status) {
@@ -1398,8 +1643,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         return Icons.schedule;
       case BookingStatus.confirmed:
         return Icons.check_circle;
-      case BookingStatus.inProgress:
-        return Icons.construction;
       case BookingStatus.completed:
         return Icons.check_circle;
       case BookingStatus.cancelled:
@@ -1493,7 +1736,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           );
         }
 
-        final services = serviceProvider.services;
+        final services =
+            serviceProvider.providerServices; // ✅ FIXED: Use correct getter
 
         if (services.isEmpty) {
           return _buildEmptyServicesState();
@@ -1728,8 +1972,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         return 'pending';
       case BookingStatus.confirmed:
         return 'confirmed';
-      case BookingStatus.inProgress:
-        return 'active';
       case BookingStatus.completed:
         return 'completed';
       case BookingStatus.cancelled:
@@ -1741,11 +1983,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   @override
   void dispose() {
+    _realTimeUpdateTimer?.cancel(); // ✅ NEW: Cancel timer
+    _bookingProvider?.disposeProviderListener();
+    _providerBookingsSubscription?.cancel();
     _processingBookings.clear();
-    // ✅ Use stored reference instead of accessing context
-    if (_bookingProvider != null) {
-      _bookingProvider!.stopListeningToProviderBookings();
-    }
+    _updatingBookings.clear(); // ✅ NEW: Clear updating set
     _tabController.dispose();
     super.dispose();
   }

@@ -36,11 +36,9 @@ class AuthProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  String? getCurrentUserId() {
-    return _user?.uid;
-  }
-
   Future<bool> ensureUserAuthenticated() async {
+    debugPrint('🔍 Checking user authentication status...');
+
     if (_user == null) {
       // Wait a bit for auth state to restore
       await Future.delayed(const Duration(milliseconds: 500));
@@ -49,12 +47,23 @@ class AuthProvider extends ChangeNotifier {
       await FirebaseAuth.instance.currentUser?.reload();
       _user = FirebaseAuth.instance.currentUser;
 
-      if (_user != null && _userModel == null) {
-        await _loadUserModel();
-      }
+      debugPrint('🔄 Current user after reload: ${_user?.uid}');
     }
 
-    return _user != null;
+    if (_user != null && _userModel == null) {
+      debugPrint('🔄 Loading user model...');
+      await _loadUserModel();
+    }
+
+    final isAuth = _user != null;
+    debugPrint('✅ User authentication status: $isAuth');
+    return isAuth;
+  }
+
+  String? getCurrentUserId() {
+    final userId = _user?.uid;
+    debugPrint('🔍 Getting current user ID: $userId');
+    return userId;
   }
 
   void _setSignUpLoading(bool loading) {

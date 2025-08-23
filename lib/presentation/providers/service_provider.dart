@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
@@ -97,11 +98,25 @@ class ServiceProvider extends ChangeNotifier {
         },
       );
 
-      // Save to Firestore
-      await FirebaseFirestore.instance
+      // ✅ BATCH WRITE: Create service and update provider services list
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Add service
+      final serviceRef = FirebaseFirestore.instance
           .collection('services')
-          .doc(serviceId)
-          .set(newService.toFireStore());
+          .doc(serviceId);
+      batch.set(serviceRef, newService.toFireStore());
+
+      // Update provider's services list
+      final providerRef = FirebaseFirestore.instance
+          .collection('providers')
+          .doc(currentUser.uid);
+      batch.update(providerRef, {
+        'services': FieldValue.arrayUnion([serviceId]),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      await batch.commit();
 
       // Add to local lists
       _services.add(newService);
@@ -720,6 +735,113 @@ class ServiceProvider extends ChangeNotifier {
     } catch (e) {
       debugPrint('❌ Error refreshing service: $e');
       return null;
+    }
+  }
+
+  // Add this method to ServiceProvider class
+  Future<void> migrateExistingServicesToProviders() async {
+    try {
+      debugPrint('🔄 Starting migration of existing services...');
+
+      // Get all services
+      final servicesSnapshot = await FirebaseFirestore.instance
+          .collection('services')
+          .get();
+
+      final batch = FirebaseFirestore.instance.batch();
+      final processedProviders = <String>{};
+
+      for (var serviceDoc in servicesSnapshot.docs) {
+        final service = ServiceModel.fromFireStore(serviceDoc);
+        final providerId = service.providerId;
+
+        // Skip if we've already processed this provider
+        if (processedProviders.contains(providerId)) {
+          continue;
+        }
+
+        processedProviders.add(providerId);
+
+        // Check if provider document already exists
+        final providerDoc = await FirebaseFirestore.instance
+            .collection('providers')
+            .doc(providerId)
+            .get();
+
+        if (!providerDoc.exists) {
+          // Get user data from Realtime Database
+          final userSnapshot = await FirebaseDatabase.instance
+              .ref('users')
+              .child(providerId)
+              .get();
+
+          if (userSnapshot.exists && userSnapshot.value != null) {
+            final userData = Map<String, dynamic>.from(
+              userSnapshot.value as Map,
+            );
+
+            // Create provider document
+            final providerData = {
+              'userId': providerId,
+              'businessName':
+                  userData['businessName'] ??
+                  userData['name'] ??
+                  'Service Provider',
+              'description':
+                  userData['description'] ?? 'Professional service provider',
+              'services': [],
+              'rating': 0.0,
+              'totalReviews': 0,
+              'certifications': [],
+              'latitude': service.latitude ?? 0.0,
+              'longitude': service.longitude ?? 0.0,
+              'address': service.address ?? userData['address'] ?? '',
+              'availability': {
+                'monday': true,
+                'tuesday': true,
+                'wednesday': true,
+                'thursday': true,
+                'friday': true,
+                'saturday': true,
+                'sunday': true,
+              },
+              'isVerified': false,
+              'isActive': true,
+              'createdAt': Timestamp.fromDate(DateTime.now()),
+              'portfolioImages': [],
+              'mobileNumber': service.mobileNumber,
+              'experience': userData['experience'] ?? '1+ years',
+              'updatedAt': Timestamp.fromDate(DateTime.now()),
+            };
+
+            final providerRef = FirebaseFirestore.instance
+                .collection('providers')
+                .doc(providerId);
+            batch.set(providerRef, providerData);
+          }
+        }
+      }
+
+      // Now update all provider documents with their service IDs
+      for (var serviceDoc in servicesSnapshot.docs) {
+        final service = ServiceModel.fromFireStore(serviceDoc);
+        final providerId = service.providerId;
+
+        final providerRef = FirebaseFirestore.instance
+            .collection('providers')
+            .doc(providerId);
+
+        batch.update(providerRef, {
+          'services': FieldValue.arrayUnion([service.id]),
+          'updatedAt': Timestamp.fromDate(DateTime.now()),
+        });
+      }
+
+      await batch.commit();
+      debugPrint('✅ Migration completed successfully!');
+    } catch (e) {
+      debugPrint('❌ Migration failed: $e');
+      rethrow;
     }
   }
 }

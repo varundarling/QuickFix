@@ -6,7 +6,7 @@ import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/data/models/provider_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
-import 'package:quickfix/presentation/screens/provider/favourites_provider.dart';
+import 'package:quickfix/presentation/providers/favourites_provider.dart';
 import 'package:quickfix/presentation/screens/service/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/dialogs/profile_completion_dialog.dart';
 

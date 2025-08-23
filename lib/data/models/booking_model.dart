@@ -3,8 +3,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 enum BookingStatus {
   pending,
   confirmed,
-  inProgress,
+  paymentPending,
   completed,
+  paid,
   cancelled,
   refunded,
 }
@@ -20,6 +21,10 @@ BookingStatus? bookingStatusFromString(String value) {
 }
 
 class BookingModel {
+  final DateTime? paymentInitiatedAt;
+  final DateTime? paymentVerifiedAt;
+  final bool isPaymentVerified;
+  final String? paymentVerificationId;
   final String id;
   final String customerId;
   final String providerId;
@@ -40,8 +45,15 @@ class BookingModel {
   final String? customerName;
   final String? customerPhone;
   final String? customerEmail;
+  final String? providerName;
+  final String? providerPhone;
+  final String? providerEmail;
 
   BookingModel({
+    this.paymentInitiatedAt,
+    this.paymentVerifiedAt,
+    this.isPaymentVerified = false,
+    this.paymentVerificationId,
     required this.id,
     required this.customerId,
     required this.providerId,
@@ -62,6 +74,9 @@ class BookingModel {
     this.customerName,
     this.customerPhone,
     this.customerEmail,
+    this.providerName,
+    this.providerPhone,
+    this.providerEmail,
   });
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
@@ -72,16 +87,16 @@ class BookingModel {
       providerId: data['providerId'] ?? '',
       serviceId: data['serviceId'] ?? '',
       serviceName: data['serviceName'] ?? '',
-      scheduledDateTime: (data['scheduledDateTime'] as Timestamp).toDate(),
+      scheduledDateTime: _parseDateTime(data['scheduledDateTime']),
       description: data['description'] ?? '',
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
       status: bookingStatusFromString(data['status']) ?? BookingStatus.pending,
       customerAddress: data['customerAddress'] ?? '',
       customerLatitude: (data['customerLatitude'] ?? 0.0).toDouble(),
       customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      createdAt: _parseDateTime(data['createdAt']),
       completedAt: data['completedAt'] != null
-          ? (data['completedAt'] as Timestamp).toDate()
+          ? _parseDateTime(data['completedAt'])
           : null,
       paymentId: data['paymentId'],
       cancellationReason: data['cancellationReason'],
@@ -90,6 +105,20 @@ class BookingModel {
       customerEmail: data['customerEmail'],
       customerPhone: data['customerPhone'],
     );
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    } else if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+
+    return DateTime.now();
   }
 
   Map<String, dynamic> toFireStore() {
@@ -140,28 +169,8 @@ class BookingModel {
       case BookingStatus.pending:
         return 'Pending';
       case BookingStatus.confirmed:
-        return 'Confirmed';
-      case BookingStatus.inProgress:
-        return 'inProgress';
-      case BookingStatus.completed:
-        return 'Completed';
-      case BookingStatus.cancelled:
-        return 'Cancelled';
-      case BookingStatus.refunded:
-        return 'Refunded';
-    }
-  }
-}
-
-extension BookingStatusExtension on BookingStatus {
-  String get statusDisplay {
-    switch (this) {
-      case BookingStatus.pending:
-        return 'Pending';
-      case BookingStatus.confirmed:
-        return 'Confirmed';
-      case BookingStatus.inProgress: // ✅ Fixed: was "inProgresss"
-        return 'In Progress';
+        return 'Confirmed'; // ✅ This is now "Active" for both customer and provider
+      // ✅ REMOVED: inProgress case
       case BookingStatus.completed:
         return 'Completed';
       case BookingStatus.cancelled:
@@ -174,8 +183,35 @@ extension BookingStatusExtension on BookingStatus {
   }
 }
 
+extension BookingStatusExtension on BookingStatus {
+  String get statusDisplay {
+    switch (this) {
+      case BookingStatus.pending:
+        return 'Pending';
+      case BookingStatus.confirmed:
+        return 'Confirmed';
+      case BookingStatus.completed:
+        return 'Completed - Payment Required';
+      case BookingStatus.paymentPending:
+        return 'Payment Verification Pending';
+      case BookingStatus.paid:
+        return 'Paid';
+      case BookingStatus.cancelled:
+        return 'Cancelled';
+      case BookingStatus.refunded:
+        return 'Refunded';
+      default:
+        return 'Unknown';
+    }
+  }
+}
+
 extension BookingModelCopyWith on BookingModel {
   BookingModel copyWith({
+    DateTime? paymentInitiatedAt,
+    DateTime? paymentVerifiedAt,
+    bool? isPaymentVerified,
+    String? paymentVerificationId,
     String? id,
     String? customerId,
     String? providerId,
@@ -196,8 +232,16 @@ extension BookingModelCopyWith on BookingModel {
     String? customerName,
     String? customerPhone,
     String? customerEmail,
+    String? providerName,
+    String? providerPhone,
+    String? providerEmail,
   }) {
     return BookingModel(
+      paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
+      paymentVerifiedAt: paymentVerifiedAt ?? this.paymentVerifiedAt,
+      isPaymentVerified: isPaymentVerified ?? this.isPaymentVerified,
+      paymentVerificationId:
+          paymentVerificationId ?? this.paymentVerificationId,
       id: id ?? this.id,
       customerId: customerId ?? this.customerId,
       providerId: providerId ?? this.providerId,
@@ -215,6 +259,12 @@ extension BookingModelCopyWith on BookingModel {
       paymentId: paymentId ?? this.paymentId,
       cancellationReason: cancellationReason ?? this.cancellationReason,
       metadata: metadata ?? this.metadata,
+      customerName: customerName ?? this.customerName,
+      customerPhone: customerPhone ?? this.customerPhone,
+      customerEmail: customerEmail ?? this.customerEmail,
+      providerName: providerName ?? this.providerName,
+      providerPhone: providerPhone ?? this.providerPhone,
+      providerEmail: providerEmail ?? this.providerEmail,
     );
   }
 }
