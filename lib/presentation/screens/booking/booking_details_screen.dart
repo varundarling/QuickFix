@@ -51,11 +51,9 @@ class _CustomerBookingDetailScreenState
       BookingModel? bookingToProcess = existingBooking;
 
       // If not found, fetch from database
-      if (bookingToProcess == null) {
-        bookingToProcess = await bookingProvider.getBookingById(
-          widget.bookingId,
-        );
-      }
+      bookingToProcess ??= await bookingProvider.getBookingById(
+        widget.bookingId,
+      );
 
       if (bookingToProcess == null) {
         setState(() {
@@ -294,6 +292,32 @@ class _CustomerBookingDetailScreenState
                   Icons.check_circle,
                   AppColors.success,
                 ),
+              // Payment Completed - Show if payment date exists
+              if (booking.paymentDate != null)
+                _buildTimelineItem(
+                  'Payment Completed',
+                  Helpers.formatDateTime(booking.paymentDate!),
+                  Icons.payment,
+                  Colors.amber[700]!,
+                ),
+
+              // For confirmed bookings, show scheduled date
+              if (booking.status == BookingStatus.confirmed)
+                _buildTimelineItem(
+                  'Service Scheduled',
+                  Helpers.formatDateTime(booking.scheduledDateTime),
+                  Icons.schedule,
+                  Colors.orange,
+                ),
+              // For cancelled bookings
+              if (booking.status == BookingStatus.cancelled &&
+                  booking.completedAt != null)
+                _buildTimelineItem(
+                  'Booking Cancelled',
+                  Helpers.formatDateTime(booking.completedAt!),
+                  Icons.cancel,
+                  AppColors.error,
+                ),
             ],
           ),
           const SizedBox(height: 20),
@@ -521,15 +545,20 @@ class _CustomerBookingDetailScreenState
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
         children: [
+          // Timeline indicator with enhanced styling
           Container(
-            padding: const EdgeInsets.all(8),
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: color, width: 2),
             ),
             child: Icon(icon, size: 20, color: color),
           ),
           const SizedBox(width: 16),
+
+          // Timeline content
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -537,12 +566,12 @@ class _CustomerBookingDetailScreenState
                 Text(
                   title,
                   style: TextStyle(
-                    fontSize: 14,
+                    fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: color,
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 4),
                 Text(
                   time,
                   style: const TextStyle(
@@ -553,53 +582,124 @@ class _CustomerBookingDetailScreenState
               ],
             ),
           ),
+
+          // Status indicator for completed events
+          if (title.contains('Completed'))
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                'Completed',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                  color: color,
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
-  Future<void> _markAsCompleted(BookingModel booking) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Confirm Completion'),
-        content: const Text(
-          'Are you sure the service has been completed to your satisfaction?',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(false),
-            child: const Text('Cancel'),
+  // After successful payment completion
+  Future<void> _onPaymentCompleted(BookingModel booking) async {
+    final bookingProvider = context.read<BookingProvider>();
+
+    // Update booking with payment date
+    final success = await bookingProvider.updateBookingStatus(
+      booking.id,
+      BookingStatus.paid,
+      booking.customerId,
+    );
+
+    if (success) {
+      // Update payment date in Firestore
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(booking.id)
+          .update({
+            'paymentDate': Timestamp.fromDate(DateTime.now()),
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+
+      // Refresh booking details to show updated timeline
+      await _loadBooking();
+    }
+  }
+
+  Widget _buildTimelineItemWithConnector(
+    String title,
+    String time,
+    IconData icon,
+    Color color,
+    bool isLast,
+  ) {
+    return IntrinsicHeight(
+      child: Row(
+        children: [
+          // Timeline column with connector
+          Column(
+            children: [
+              // Main indicator
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: color, width: 2),
+                ),
+                child: Icon(icon, size: 20, color: color),
+              ),
+
+              // Connector line (if not last item)
+              if (!isLast)
+                Expanded(
+                  child: Container(
+                    width: 2,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    color: Colors.grey[300],
+                  ),
+                ),
+            ],
           ),
-          ElevatedButton(
-            onPressed: () => Navigator.of(context).pop(true),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
-            child: const Text('Confirm'),
+
+          const SizedBox(width: 16),
+
+          // Content
+          Expanded(
+            child: Padding(
+              padding: const EdgeInsets.only(bottom: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    time,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
         ],
       ),
     );
-
-    if (confirmed == true && context.mounted) {
-      final bookingProvider = context.read<BookingProvider>();
-      final success = await bookingProvider.updateBookingStatus(
-        booking.id,
-        BookingStatus.completed,
-        booking.providerId,
-      );
-
-      if (success && context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Service marked as completed!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-
-        // Refresh the booking data after marking as completed
-        await _loadBooking();
-      }
-    }
   }
 
   Future<void> _cancelBooking(BookingModel booking) async {

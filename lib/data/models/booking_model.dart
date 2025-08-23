@@ -48,8 +48,10 @@ class BookingModel {
   final String? providerName;
   final String? providerPhone;
   final String? providerEmail;
+  final DateTime? paymentDate;
 
   BookingModel({
+    this.paymentDate,
     this.paymentInitiatedAt,
     this.paymentVerifiedAt,
     this.isPaymentVerified = false,
@@ -235,6 +237,7 @@ extension BookingModelCopyWith on BookingModel {
     String? providerName,
     String? providerPhone,
     String? providerEmail,
+    DateTime? paymentDate,
   }) {
     return BookingModel(
       paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
@@ -265,6 +268,7 @@ extension BookingModelCopyWith on BookingModel {
       providerName: providerName ?? this.providerName,
       providerPhone: providerPhone ?? this.providerPhone,
       providerEmail: providerEmail ?? this.providerEmail,
+      paymentDate: paymentDate ?? this.paymentDate,
     );
   }
 }

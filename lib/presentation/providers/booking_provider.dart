@@ -264,6 +264,116 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // Add this method to BookingProvider class
+  Future<void> loadProviderBookingsWithCustomerData(String providerId) async {
+    try {
+      _setLoading(true);
+      _setError(null);
+
+      debugPrint('🔄 Loading provider bookings with customer data...');
+
+      final querySnapshot = await FirebaseFirestore.instance
+          .collection('bookings')
+          .where('providerId', isEqualTo: providerId)
+          .orderBy('createdAt', descending: true)
+          .get();
+
+      // ✅ CRITICAL: Load customer data for each booking immediately
+      List<BookingModel> bookingsWithCustomerDetails = [];
+
+      for (var doc in querySnapshot.docs) {
+        BookingModel booking = BookingModel.fromFireStore(doc);
+
+        // Fetch customer details for each booking
+        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+
+        if (customerDetails != null) {
+          booking = booking.copyWith(
+            customerName: customerDetails['customerName'],
+            customerPhone: customerDetails['customerPhone'],
+            customerEmail: customerDetails['customerEmail'],
+          );
+        }
+
+        bookingsWithCustomerDetails.add(booking);
+      }
+
+      _providerBookings = bookingsWithCustomerDetails;
+
+      debugPrint(
+        '✅ Loaded ${bookingsWithCustomerDetails.length} bookings with customer data',
+      );
+
+      // Debug customer data status
+      for (var booking in bookingsWithCustomerDetails) {
+        debugPrint(
+          '   - ${booking.serviceName}: Customer = ${booking.customerName ?? "NULL"}',
+        );
+      }
+    } catch (error) {
+      debugPrint('❌ Error loading provider bookings: $error');
+      _setError('Failed to load bookings: $error');
+    } finally {
+      _setLoading(false);
+    }
+  }
+
+  // ✅ ENHANCED: Update existing _fetchCustomerDetails to handle Firestore better
+  Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
+    try {
+      debugPrint('🔍 [PROVIDER] Fetching customer details for: $customerId');
+
+      // Try Firestore users collection directly
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(customerId)
+          .get();
+
+      if (userDoc.exists && userDoc.data() != null) {
+        final userData = userDoc.data()!;
+        debugPrint('✅ [PROVIDER] Customer found: ${userData['name']}');
+
+        return {
+          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
+          'customerPhone':
+              userData['phone']?.toString() ??
+              userData['mobile']?.toString() ??
+              '',
+          'customerEmail': userData['email']?.toString() ?? '',
+        };
+      }
+
+      // Fallback to Firebase Realtime Database if needed
+      try {
+        final userDoc = await _firebaseService.getUserData(customerId);
+        if (userDoc.exists) {
+          final userData = userDoc.value as Map<dynamic, dynamic>;
+          return {
+            'customerName': userData['name']?.toString() ?? 'Unknown Customer',
+            'customerPhone': userData['phone']?.toString() ?? '',
+            'customerEmail': userData['email']?.toString() ?? '',
+          };
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PROVIDER] Fallback fetch failed: $e');
+      }
+
+      debugPrint('❌ [PROVIDER] Customer not found: $customerId');
+      return {
+        'customerName': 'Customer Not Found',
+        'customerPhone': '',
+        'customerEmail': '',
+      };
+    } catch (e) {
+      debugPrint('❌ [PROVIDER] Error fetching customer: $e');
+      return {
+        'customerName': 'Error Loading Customer',
+        'customerPhone': '',
+        'customerEmail': '',
+      };
+    }
+  }
+
   Future<void> loadServiceBookings(String serviceId) async {
     try {
       debugPrint('🔄 Loading bookings for service: $serviceId');
@@ -348,16 +458,25 @@ class BookingProvider extends ChangeNotifier {
           throw Exception('Invalid transition: $currentStatus → $newStatus');
         }
 
-        final timestamp = DateTime.now();
+        // ✅ CRITICAL: Use live date/time for all updates
+        final DateTime liveDateTime = DateTime.now();
+
         final updateData = {
           'status': newStatus.toString().split('.').last,
           'lastUpdatedBy': 'provider_$currentUserId',
-          'updatedAt': Timestamp.fromDate(timestamp),
-          'lastStatusChange': Timestamp.fromDate(timestamp),
+          'updatedAt': Timestamp.fromDate(liveDateTime),
+          'lastStatusChange': Timestamp.fromDate(liveDateTime),
         };
 
+        // ✅ ENHANCED: Set completion date to exact live date/time
         if (newStatus == BookingStatus.completed) {
-          updateData['completedAt'] = Timestamp.fromDate(timestamp);
+          final DateTime completionDateTime =
+              DateTime.now(); // Live completion time
+          updateData['completedAt'] = Timestamp.fromDate(completionDateTime);
+
+          debugPrint(
+            '✅ Setting completion date to live time: $completionDateTime',
+          );
         }
 
         debugPrint('   - Update Data: $updateData');
@@ -376,7 +495,7 @@ class BookingProvider extends ChangeNotifier {
           final updatedBooking = _providerBookings[bookingIndex].copyWith(
             status: newStatus,
             completedAt: newStatus == BookingStatus.completed
-                ? DateTime.now()
+                ? DateTime.now() // ✅ Live completion date in local state
                 : null,
           );
 
@@ -409,16 +528,30 @@ class BookingProvider extends ChangeNotifier {
     try {
       debugPrint('🔄 [CUSTOMER] Updating booking status to: $newStatus');
 
+      // ✅ CRITICAL: Use live date/time
+      final DateTime liveDateTime = DateTime.now();
+
+      final updateData = {
+        'status': newStatus.toString().split('.').last,
+        'lastUpdatedBy': 'customer_$customerId',
+        'updatedAt': Timestamp.fromDate(liveDateTime),
+      };
+
+      // ✅ ENHANCED: Set completion date to live time for customer updates
+      if (newStatus == BookingStatus.completed) {
+        final DateTime completionDateTime =
+            DateTime.now(); // Live completion time
+        updateData['completedAt'] = Timestamp.fromDate(completionDateTime);
+
+        debugPrint(
+          '✅ [CUSTOMER] Setting completion date to live time: $completionDateTime',
+        );
+      }
+
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
-          .update({
-            'status': newStatus.toString().split('.').last,
-            'lastUpdatedBy': 'customer_$customerId',
-            'updatedAt': Timestamp.fromDate(DateTime.now()),
-            if (newStatus == BookingStatus.completed)
-              'completedAt': Timestamp.fromDate(DateTime.now()),
-          });
+          .update(updateData);
 
       // Update local state
       final bookingIndex = _userBookings.indexWhere((b) => b.id == bookingId);
@@ -426,7 +559,7 @@ class BookingProvider extends ChangeNotifier {
         _userBookings[bookingIndex] = _userBookings[bookingIndex].copyWith(
           status: newStatus,
           completedAt: newStatus == BookingStatus.completed
-              ? DateTime.now()
+              ? DateTime.now() // ✅ Live completion date in local state
               : null,
         );
         notifyListeners();
@@ -451,7 +584,11 @@ class BookingProvider extends ChangeNotifier {
     _currentProviderId = providerId;
 
     await _cancelAllListeners();
-    await loadProviderBookings(providerId);
+
+    // ✅ Use the new method that loads customer data
+    await loadProviderBookingsWithCustomerData(providerId);
+
+    // ✅ Setup real-time listener (this method should now exist)
     _setupSingleRealTimeListener(providerId);
   }
 
@@ -474,9 +611,13 @@ class BookingProvider extends ChangeNotifier {
               '🔔 [REAL-TIME] Processing ${snapshot.docs.length} updates',
             );
 
+            // ✅ ENHANCED: Load customer details for all bookings in real-time
             List<BookingModel> bookingsWithCustomerDetails = [];
+
             for (var doc in snapshot.docs) {
               BookingModel booking = BookingModel.fromFireStore(doc);
+
+              // ✅ CRITICAL: Fetch customer details for each booking
               final customerDetails = await _fetchCustomerDetails(
                 booking.customerId,
               );
@@ -494,29 +635,15 @@ class BookingProvider extends ChangeNotifier {
 
             _providerBookings = bookingsWithCustomerDetails;
             notifyListeners();
+
+            debugPrint(
+              '✅ [REAL-TIME] Updated ${bookingsWithCustomerDetails.length} bookings with customer data',
+            );
           },
           onError: (error) {
             debugPrint('❌ [REAL-TIME] Error: $error');
           },
         );
-  }
-
-  Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
-    try {
-      final userDoc = await _firebaseService.getUserData(customerId);
-      if (userDoc.exists) {
-        final userData = userDoc.value as Map<dynamic, dynamic>;
-        return {
-          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone': userData['phone']?.toString() ?? 'No Phone',
-          'customerEmail': userData['email']?.toString() ?? 'No Email',
-        };
-      }
-      return null;
-    } catch (e) {
-      debugPrint('❌ Error fetching customer details: $e');
-      return null;
-    }
   }
 
   Future<void> loadProviderBookings(String providerId) async {

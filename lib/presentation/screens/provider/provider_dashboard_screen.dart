@@ -163,192 +163,94 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   // ✅ FIXED: Added missing _fetchCustomerDetails method
   Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
     try {
-      context.read<BookingProvider>();
-      // Use the method from BookingProvider if it exists
-      // Otherwise implement the logic here
+      debugPrint('🔍 [DEBUG] Starting customer fetch for ID: $customerId');
+      debugPrint('🔍 [DEBUG] Customer ID length: ${customerId.length}');
+      debugPrint('🔍 [DEBUG] Customer ID type: ${customerId.runtimeType}');
+
+      // Check if customerId is valid
+      if (customerId.isEmpty) {
+        debugPrint('❌ [ERROR] Customer ID is empty');
+        return {
+          'customerName': 'Invalid Customer ID',
+          'customerPhone': '',
+          'customerEmail': '',
+        };
+      }
+
+      // Try users collection first
+      debugPrint('🔍 [DEBUG] Checking users collection...');
       final userDoc = await FirebaseFirestore.instance
           .collection('users')
           .doc(customerId)
           .get();
 
-      if (userDoc.exists) {
+      debugPrint('🔍 [DEBUG] Users query completed. Exists: ${userDoc.exists}');
+
+      if (userDoc.exists && userDoc.data() != null) {
         final userData = userDoc.data()!;
+        debugPrint('✅ [SUCCESS] Customer found in users collection:');
+        debugPrint('   - Name: ${userData['name']}');
+        debugPrint('   - Phone: ${userData['phone'] ?? userData['mobile']}');
+        debugPrint('   - Email: ${userData['email']}');
+
         return {
           'customerName': userData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone': userData['phone']?.toString() ?? 'No Phone',
-          'customerEmail': userData['email']?.toString() ?? 'No Email',
+          'customerPhone':
+              userData['phone']?.toString() ??
+              userData['mobile']?.toString() ??
+              '',
+          'customerEmail': userData['email']?.toString() ?? '',
         };
-      } else {
-        debugPrint('❌ Customer not found in Firestore');
-        return null;
-      }
-    } catch (e) {
-      debugPrint('❌ Error fetching customer details: $e');
-      return null;
-    }
-  }
-
-  // ✅ FIXED: Properly implemented _setupRealTimeListening method
-  void _setupRealTimeListening(String providerId) {
-    debugPrint('🔄 Setting up SINGLE real-time listener for: $providerId');
-
-    // Cancel existing subscription
-    _providerBookingsSubscription?.cancel();
-
-    _providerBookingsSubscription = FirebaseFirestore.instance
-        .collection('bookings')
-        .where('providerId', isEqualTo: providerId)
-        .orderBy('createdAt', descending: true)
-        .snapshots()
-        .listen(
-          (snapshot) async {
-            // ✅ CRITICAL: Enhanced conflict prevention
-            if (_isUpdatingStatus || _updatingBookings.isNotEmpty) {
-              debugPrint('⏭️ [PROVIDER] Skipping update during status change');
-              debugPrint('   - _isUpdatingStatus: $_isUpdatingStatus');
-              debugPrint('   - _updatingBookings: $_updatingBookings');
-              return;
-            }
-
-            debugPrint(
-              '🔔 [REAL-TIME] Received ${snapshot.docs.length} booking updates',
-            );
-
-            // ✅ NEW: Add a small delay to allow Firestore to settle
-            _realTimeUpdateTimer?.cancel();
-            _realTimeUpdateTimer = Timer(Duration(milliseconds: 500), () async {
-              await _processRealTimeUpdate(snapshot);
-            });
-          },
-          onError: (error) {
-            debugPrint('❌ [REAL-TIME] Error: $error');
-          },
-        );
-  }
-
-  // ✅ NEW: Separate method for processing real-time updates
-  Future<void> _processRealTimeUpdate(QuerySnapshot snapshot) async {
-    if (!mounted || _isUpdatingStatus || _updatingBookings.isNotEmpty) {
-      debugPrint('⏭️ [REAL-TIME] Skipping delayed update - still updating');
-      return;
-    }
-
-    try {
-      List<BookingModel> bookingsWithCustomerDetails = [];
-
-      for (var doc in snapshot.docs) {
-        BookingModel booking = BookingModel.fromFireStore(doc);
-
-        // ✅ CRITICAL: Skip bookings that are currently being updated
-        if (_updatingBookings.contains(booking.id)) {
-          debugPrint(
-            '⏭️ [REAL-TIME] Skipping booking ${booking.id} - currently updating',
-          );
-          continue;
-        }
-
-        // Fetch customer details
-        final customerDetails = await _fetchCustomerDetails(booking.customerId);
-
-        if (customerDetails != null) {
-          booking = booking.copyWith(
-            customerName: customerDetails['customerName'],
-            customerPhone: customerDetails['customerPhone'],
-            customerEmail: customerDetails['customerEmail'],
-          );
-        }
-
-        bookingsWithCustomerDetails.add(booking);
       }
 
-      // ✅ ENHANCED: Only update if we have valid bookings and no conflicts
-      if (mounted && !_isUpdatingStatus && _updatingBookings.isEmpty) {
-        final bookingProvider = context.read<BookingProvider>();
-        bookingProvider.setProviderBookings(bookingsWithCustomerDetails);
+      // Try customers collection as fallback
+      debugPrint('🔍 [DEBUG] Checking customers collection...');
+      final customerDoc = await FirebaseFirestore.instance
+          .collection('customers')
+          .doc(customerId)
+          .get();
 
-        debugPrint('📊 [REAL-TIME] Updated booking counts:');
+      debugPrint(
+        '🔍 [DEBUG] Customers query completed. Exists: ${customerDoc.exists}',
+      );
+
+      if (customerDoc.exists && customerDoc.data() != null) {
+        final customerData = customerDoc.data()!;
+        debugPrint('✅ [SUCCESS] Customer found in customers collection:');
+        debugPrint('   - Name: ${customerData['name']}');
         debugPrint(
-          '   - Total processed: ${bookingsWithCustomerDetails.length}',
+          '   - Phone: ${customerData['phone'] ?? customerData['mobile']}',
         );
-        debugPrint(
-          '   - Pending: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.pending).length}',
-        );
-        debugPrint(
-          '   - Confirmed: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.confirmed).length}',
-        );
-        debugPrint(
-          '   - Completed: ${bookingsWithCustomerDetails.where((b) => b.status == BookingStatus.completed).length}',
-        );
-      }
-    } catch (error) {
-      debugPrint('❌ [REAL-TIME] Error processing update: $error');
-    }
-  }
 
-  Future<void> _loadData() async {
-    if (!mounted) return;
-
-    try {
-      final authProvider = context.read<AuthProvider>();
-      final bookingProvider = context.read<BookingProvider>();
-      final serviceProvider = context.read<ServiceProvider>();
-
-      debugPrint('🏗️ Loading provider dashboard data...');
-
-      final isAuthenticated = await authProvider.ensureUserAuthenticated();
-      if (!isAuthenticated) {
-        debugPrint('❌ User not authenticated, cannot load services');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Authentication required. Please log in again.'),
-              backgroundColor: Colors.red,
-            ),
-          );
-        }
-        return;
+        return {
+          'customerName':
+              customerData['name']?.toString() ?? 'Unknown Customer',
+          'customerPhone':
+              customerData['phone']?.toString() ??
+              customerData['mobile']?.toString() ??
+              '',
+          'customerEmail': customerData['email']?.toString() ?? '',
+        };
       }
 
-      if (authProvider.userModel == null) {
-        debugPrint('🔄 User model not loaded, reloading...');
-        await authProvider.reloadUserData();
-      }
+      // If not found in either collection
+      debugPrint('❌ [ERROR] Customer not found in any collection');
+      debugPrint('   - Checked users/$customerId: ${userDoc.exists}');
+      debugPrint('   - Checked customers/$customerId: ${customerDoc.exists}');
 
-      final userId = authProvider.getCurrentUserId();
-      if (userId == null) {
-        debugPrint('❌ No user ID available');
-        return;
-      }
-
-      debugPrint('✅ Loading data for user: $userId');
-
-      await Future.wait([
-        bookingProvider.loadProviderBookings(userId),
-        serviceProvider.loadMyServices(),
-      ]);
-
-      debugPrint('✅ Data loading completed');
-    } catch (error, stackTrace) {
-      debugPrint('❌ Error loading provider data: $error');
-      debugPrint('Stack trace: $stackTrace');
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to load dashboard: ${error.toString()}'),
-            backgroundColor: Colors.red,
-            action: SnackBarAction(
-              label: 'Retry',
-              onPressed: () {
-                if (_currentUserId != null) {
-                  _setupRealTimeListening(_currentUserId!);
-                }
-              },
-              textColor: Colors.white,
-            ),
-          ),
-        );
-      }
+      return {
+        'customerName': 'Customer Not Found',
+        'customerPhone': '',
+        'customerEmail': '',
+      };
+    } catch (e, stackTrace) {
+      debugPrint('❌ [ERROR] Exception fetching customer details: $e');
+      debugPrint('❌ [STACK] $stackTrace');
+      return {
+        'customerName': 'Error Loading Customer',
+        'customerPhone': '',
+        'customerEmail': '',
+      };
     }
   }
 
@@ -465,11 +367,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           _buildBookingsTab(BookingStatus.completed), // Tab 4: History
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => context.go('/create-service'),
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
     );
   }
 
@@ -481,7 +378,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             onRefresh: () async {
               if (_currentUserId != null) {
                 await Future.wait([
-                  bookingProvider.loadProviderBookings(_currentUserId!),
+                  bookingProvider.loadProviderBookingsWithCustomerData(
+                    _currentUserId!,
+                  ),
                   serviceProvider.loadMyServices(),
                 ]);
               }
@@ -522,7 +421,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           onRefresh: () async {
             if (_currentUserId != null) {
               await Future.wait([
-                bookingProvider.loadProviderBookings(_currentUserId!),
+                bookingProvider.loadProviderBookingsWithCustomerData(
+                  _currentUserId!,
+                ),
                 serviceProvider.loadMyServices(),
               ]);
             }
@@ -699,7 +600,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       builder: (context, bookingProvider, child) {
         List<BookingModel> bookings;
 
-        // ✅ FIXED: Removed inProgress reference, simplified logic
         switch (status) {
           case BookingStatus.pending:
             bookings = bookingProvider.providerbookings
@@ -707,14 +607,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 .toList();
             break;
 
-          case BookingStatus.confirmed: // ✅ This is the "Active" tab
+          case BookingStatus.confirmed: // Active tab
             bookings = bookingProvider.providerbookings
                 .where((b) => b.status == BookingStatus.confirmed)
                 .toList();
-            debugPrint('🔍 Provider Active tab bookings: ${bookings.length}');
             break;
 
-          case BookingStatus.completed: // ✅ This is the "History" tab
+          case BookingStatus.completed: // History tab
             bookings = bookingProvider.providerbookings
                 .where(
                   (b) =>
@@ -724,17 +623,28 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 )
                 .toList();
             break;
+
           default:
             bookings = bookingProvider.providerbookings
                 .where((b) => b.status == status)
                 .toList();
         }
 
+        // ✅ DEBUG: Log customer data status for each tab
+        debugPrint('🔍 [$status] Tab has ${bookings.length} bookings:');
+        for (var booking in bookings) {
+          debugPrint(
+            '   - ${booking.serviceName}: ${booking.customerName ?? "NO_NAME"}',
+          );
+        }
+
         if (bookings.isEmpty) {
           return RefreshIndicator(
             onRefresh: () async {
               if (_currentUserId != null) {
-                await bookingProvider.loadProviderBookings(_currentUserId!);
+                await bookingProvider.loadProviderBookingsWithCustomerData(
+                  _currentUserId!,
+                );
               }
             },
             child: SingleChildScrollView(
@@ -752,7 +662,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       ),
                       const SizedBox(height: 16),
                       Text(
-                        _getEmptyStateMessage(status), // ✅ Updated method call
+                        _getEmptyStateMessage(status),
                         style: const TextStyle(
                           fontSize: 16,
                           color: AppColors.textSecondary,
@@ -762,9 +672,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       TextButton(
                         onPressed: () {
                           if (_currentUserId != null) {
-                            bookingProvider.loadProviderBookings(
-                              _currentUserId!,
-                            );
+                            bookingProvider
+                                .loadProviderBookingsWithCustomerData(
+                                  _currentUserId!,
+                                );
                           }
                         },
                         child: const Text('Tap to refresh'),
@@ -780,7 +691,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         return RefreshIndicator(
           onRefresh: () async {
             if (_currentUserId != null) {
-              await bookingProvider.loadProviderBookings(_currentUserId!);
+              await bookingProvider.loadProviderBookingsWithCustomerData(
+                _currentUserId!,
+              );
             }
           },
           child: ListView.builder(
@@ -788,7 +701,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             padding: const EdgeInsets.all(16),
             itemCount: bookings.length,
             itemBuilder: (context, index) {
-              return _buildBookingCard(bookings[index]);
+              final booking = bookings[index];
+
+              // ✅ SIMPLIFIED: Just build the card - no async loading needed
+              return _buildBookingCard(booking);
             },
           ),
         );
@@ -810,124 +726,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       default:
         return 'No ${_getStatusDisplayName(status)} bookings';
     }
-  }
-
-  Widget _buildHistoryTab() {
-    return Consumer<BookingProvider>(
-      builder: (context, bookingProvider, child) {
-        final bookings = bookingProvider.providerbookings
-            .where(
-              (b) =>
-                  b.status == BookingStatus.completed ||
-                  b.status == BookingStatus.cancelled,
-            )
-            .toList();
-
-        if (bookings.isEmpty) {
-          return RefreshIndicator(
-            onRefresh: () async {
-              await _loadData();
-            },
-            child: const SingleChildScrollView(
-              physics: AlwaysScrollableScrollPhysics(),
-              child: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.history,
-                      size: 64,
-                      color: AppColors.textSecondary,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'No booking history',
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            await _loadData();
-          },
-          child: Column(
-            children: [
-              // Summary header for history
-              Container(
-                padding: const EdgeInsets.all(8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    Column(
-                      children: [
-                        Text(
-                          bookings
-                              .where((b) => b.status == BookingStatus.completed)
-                              .length
-                              .toString(),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.success,
-                          ),
-                        ),
-                        const Text(
-                          'Completed',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    Column(
-                      children: [
-                        Text(
-                          bookings
-                              .where((b) => b.status == BookingStatus.cancelled)
-                              .length
-                              .toString(),
-                          style: const TextStyle(
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.error,
-                          ),
-                        ),
-                        const Text(
-                          'Cancelled',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const Divider(),
-              Expanded(
-                child: ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: bookings.length,
-                  itemBuilder: (context, index) {
-                    return _buildBookingCard(bookings[index]);
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
   }
 
   Widget _buildStatCard(
@@ -975,6 +773,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     final bool showAddress =
         (booking.status == BookingStatus.confirmed) &&
         booking.customerAddress.isNotEmpty;
+
+    final bool shouldShowCustomerContact = _shouldShowCustomerContactInfo(
+      booking.status!,
+    );
 
     return InkWell(
       onTap: () {
@@ -1084,7 +886,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     ),
 
                     // Customer phone (only show if not null and not 'No Phone')
-                    if (booking.customerPhone != null &&
+                    if (shouldShowCustomerContact &&
+                        booking.customerPhone != null &&
                         booking.customerPhone != 'No Phone' &&
                         booking.customerPhone!.isNotEmpty) ...[
                       const SizedBox(height: 6),
@@ -1247,6 +1050,23 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     );
   }
 
+  bool _shouldShowCustomerContactInfo(BookingStatus status) {
+    // Hide contact info for completed services and final statuses
+    switch (status) {
+      case BookingStatus.completed:
+      case BookingStatus.paid:
+      case BookingStatus.cancelled:
+      case BookingStatus.refunded:
+        return false; // Hide contact info
+      case BookingStatus.pending:
+      case BookingStatus.confirmed:
+      case BookingStatus.paymentPending:
+        return true; // Show contact info
+      default:
+        return true;
+    }
+  }
+
   Widget _buildDateDisplay(BookingModel booking) {
     String dateLabel;
     DateTime dateToShow;
@@ -1254,22 +1074,45 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
     switch (booking.status) {
       case BookingStatus.pending:
+        dateLabel = 'Scheduled Date:';
+        dateToShow = booking.scheduledDateTime;
+        dateColor = AppColors.textSecondary;
+        break;
+
       case BookingStatus.confirmed:
+        dateLabel = 'Scheduled Date:';
+        dateToShow = booking.scheduledDateTime;
+        dateColor = AppColors.primary;
+        break;
+
       case BookingStatus.completed:
-        dateLabel = 'Completed Date:';
-        dateToShow = booking.completedAt ?? booking.scheduledDateTime;
+        // ✅ CRITICAL: Use the actual completion date from when it was marked complete
+        dateLabel = 'Completed On:';
+        dateToShow =
+            booking.completedAt ?? DateTime.now(); // Use actual completion time
         dateColor = AppColors.success;
         break;
+
       case BookingStatus.cancelled:
-        dateLabel = 'Cancelled Date:';
+        dateLabel = 'Cancelled On:';
         dateToShow = booking.completedAt ?? booking.scheduledDateTime;
         dateColor = AppColors.error;
         break;
+
       default:
         dateLabel = 'Date:';
         dateToShow = booking.scheduledDateTime;
         dateColor = AppColors.textSecondary;
     }
+
+    // ✅ DEBUG: Log what date is being shown
+    debugPrint(
+      '🔍 [CARD] Showing ${booking.status} booking ${booking.id.substring(0, 8)}:',
+    );
+    debugPrint('   - Label: $dateLabel');
+    debugPrint('   - Date: $dateToShow');
+    debugPrint('   - CompletedAt: ${booking.completedAt}');
+    debugPrint('   - ScheduledAt: ${booking.scheduledDateTime}');
 
     return Row(
       children: [
@@ -1286,7 +1129,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         Text(
           '$dateLabel ${Helpers.formatDateTime(dateToShow)}',
           style: TextStyle(
-            fontSize: 16,
+            fontSize: 14,
             color: dateColor,
             fontWeight: booking.status == BookingStatus.completed
                 ? FontWeight.w600
@@ -1444,6 +1287,12 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
 
         if (success && mounted) {
+          await Future.delayed(const Duration(milliseconds: 500));
+
+          // Force refresh to ensure UI shows updated data
+          setState(() {
+            // This will rebuild the widget tree with fresh data
+          });
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('✅ Service marked as completed!'),
