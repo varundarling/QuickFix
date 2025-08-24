@@ -579,7 +579,7 @@ class ServiceProvider extends ChangeNotifier {
               service.latitude!,
               service.longitude!,
             );
-            return distance <= 20.0; // Within 20km
+            return distance <= 10.0; // Within 10km
           }
           return true; // Include services without location data
         }).toList();

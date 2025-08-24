@@ -122,6 +122,7 @@ class BookingProvider extends ChangeNotifier {
   List<BookingModel> get providerbookings => _providerBookings;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
+  List<BookingModel> get providerBookings => _providerBookings;
 
   // ✅ UPDATED: Status-specific getters (removed inProgress from active)
   List<BookingModel> get pendingBookings => _providerBookings
@@ -266,53 +267,61 @@ class BookingProvider extends ChangeNotifier {
 
   // Add this method to BookingProvider class
   Future<void> loadProviderBookingsWithCustomerData(String providerId) async {
+    _setLoading(true);
+    _setError(null);
+
     try {
-      _setLoading(true);
-      _setError(null);
-
-      debugPrint('🔄 Loading provider bookings with customer data...');
-
-      final querySnapshot = await FirebaseFirestore.instance
+      // Fetch bookings for this provider
+      final bookingQuerySnapshot = await FirebaseFirestore.instance
           .collection('bookings')
           .where('providerId', isEqualTo: providerId)
           .orderBy('createdAt', descending: true)
           .get();
 
-      // ✅ CRITICAL: Load customer data for each booking immediately
-      List<BookingModel> bookingsWithCustomerDetails = [];
+      final bookings = bookingQuerySnapshot.docs
+          .map(
+            (doc) => BookingModel.fromFireStore(
+              doc.data() as DocumentSnapshot<Object?>,
+            ),
+          )
+          .toList();
 
-      for (var doc in querySnapshot.docs) {
-        BookingModel booking = BookingModel.fromFireStore(doc);
+      // Extract unique customer IDs from bookings
+      final customerIds = bookings.map((b) => b.customerId).toSet();
 
-        // Fetch customer details for each booking
-        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+      // Batch fetch customer profiles
+      final Map<String, Map<String, dynamic>> customerProfiles = {};
 
-        if (customerDetails != null) {
-          booking = booking.copyWith(
-            customerName: customerDetails['customerName'],
-            customerPhone: customerDetails['customerPhone'],
-            customerEmail: customerDetails['customerEmail'],
+      final futures = customerIds.map((id) async {
+        final doc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(id)
+            .get();
+        if (doc.exists) {
+          customerProfiles[id] = doc.data()!;
+        }
+      }).toList();
+
+      await Future.wait(futures);
+
+      // Merge customer data into bookings
+      final mergedBookings = bookings.map((booking) {
+        final customerData = customerProfiles[booking.customerId];
+        if (customerData != null) {
+          return booking.copyWith(
+            customerName: customerData['name'] as String?,
+            customerPhone: customerData['phone'] as String?,
+            customerEmail: customerData['email'] as String?,
+            customerAddressFromProfile: customerData['address'],
           );
         }
+        return booking;
+      }).toList();
 
-        bookingsWithCustomerDetails.add(booking);
-      }
-
-      _providerBookings = bookingsWithCustomerDetails;
-
-      debugPrint(
-        '✅ Loaded ${bookingsWithCustomerDetails.length} bookings with customer data',
-      );
-
-      // Debug customer data status
-      for (var booking in bookingsWithCustomerDetails) {
-        debugPrint(
-          '   - ${booking.serviceName}: Customer = ${booking.customerName ?? "NULL"}',
-        );
-      }
-    } catch (error) {
-      debugPrint('❌ Error loading provider bookings: $error');
-      _setError('Failed to load bookings: $error');
+      _providerBookings = mergedBookings;
+      notifyListeners();
+    } catch (e) {
+      _setError('Failed to load bookings: $e');
     } finally {
       _setLoading(false);
     }
@@ -741,6 +750,7 @@ class BookingProvider extends ChangeNotifier {
     required double customerLatitude,
     required double customerLongitude,
     required double totalAmount,
+    DateTime? selectedDate,
   }) async {
     try {
       _setLoading(true);
@@ -760,6 +770,7 @@ class BookingProvider extends ChangeNotifier {
         totalAmount: totalAmount,
         status: BookingStatus.pending,
         createdAt: DateTime.now(),
+        selectedDate: selectedDate,
       );
 
       final docRef = await FirebaseFirestore.instance

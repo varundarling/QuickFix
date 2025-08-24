@@ -6,7 +6,7 @@ import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 
 class BookingDetailForProvider extends StatefulWidget {
-  final String bookingId; // ✅ Pass booking ID instead of booking object
+  final String bookingId;
 
   const BookingDetailForProvider({super.key, required this.bookingId});
 
@@ -17,11 +17,6 @@ class BookingDetailForProvider extends StatefulWidget {
 
 class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
   @override
-  void initState() {
-    super.initState();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -31,15 +26,10 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
       ),
       body: Consumer<BookingProvider>(
         builder: (context, bookingProvider, child) {
-          // ✅ Find the current booking from provider's state
-          final BookingModel? currentBooking =
-              bookingProvider.providerbookings
-                  .where((b) => b.id == widget.bookingId)
-                  .isNotEmpty
-              ? bookingProvider.providerbookings.firstWhere(
-                  (b) => b.id == widget.bookingId,
-                )
-              : null;
+          final BookingModel? currentBooking = bookingProvider.providerbookings
+              .where((b) => b.id == widget.bookingId)
+              .cast<BookingModel?>()
+              .firstOrNull;
 
           if (currentBooking == null) {
             return const Center(
@@ -59,7 +49,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Service Information Card
+                // Service Information
                 Card(
                   elevation: 4,
                   shape: RoundedRectangleBorder(
@@ -95,7 +85,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           currentBooking.serviceName,
                         ),
                         _buildDetailRow(
-                          Icons.attach_money,
+                          Icons.monetization_on,
                           'Amount',
                           Helpers.formatCurrency(currentBooking.totalAmount),
                         ),
@@ -135,67 +125,69 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                 const SizedBox(height: 16),
 
                 // Customer Information Card
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.person,
-                              color: AppColors.primary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Customer Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
+                if (currentBooking.status != BookingStatus.completed)
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person,
                                 color: AppColors.primary,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Customer Information',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // Name
+                          _buildDetailRow(
+                            Icons.account_circle,
+                            'Customer Name',
+                            currentBooking.customerName ?? 'Loading...',
+                          ),
+
+                          // Phone if valid and present
+                          if (currentBooking.customerPhone != null &&
+                              currentBooking.customerPhone!.isNotEmpty &&
+                              currentBooking.customerPhone != 'No Phone')
+                            _buildDetailRowWithAction(
+                              Icons.phone,
+                              'Phone Number',
+                              currentBooking.customerPhone!,
+                              onTap: () => Helpers.launchPhone(
+                                currentBooking.customerPhone!,
                               ),
                             ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
 
-                        _buildDetailRow(
-                          Icons.account_circle,
-                          'Customer Name',
-                          currentBooking.customerName ?? 'Loading...',
-                        ),
-
-                        // if (currentBooking.customerPhone != null &&
-                        //     currentBooking.customerPhone != 'No Phone')
-                        //   _buildDetailRowWithAction(
-                        //     Icons.phone,
-                        //     'Phone Number',
-                        //     currentBooking.customerPhone!,
-                        //     onTap: () => Helpers.launchPhone(
-                        //       currentBooking.customerPhone!,
-                        //     ),
-                        //   ),
-
-                        // if (currentBooking.customerEmail != null &&
-                        //     currentBooking.customerEmail != 'No Email')
-                        //   _buildDetailRowWithAction(
-                        //     Icons.email,
-                        //     'Email Address',
-                        //     currentBooking.customerEmail!,
-                        //     onTap: () => Helpers.launchEmail(
-                        //       currentBooking.customerEmail!,
-                        //     ),
-                        //   ),
-                      ],
+                          // Address if valid and present
+                          if ((currentBooking.customerAddressFromProfile ?? '')
+                              .isNotEmpty)
+                            _buildDetailRow(
+                              Icons.location_on,
+                              'Address',
+                              currentBooking.customerAddressFromProfile!,
+                            ),
+                        ],
+                      ),
                     ),
                   ),
-                ),
 
                 const SizedBox(height: 16),
 
@@ -229,20 +221,24 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           ],
                         ),
                         const SizedBox(height: 16),
+
+                        // Booked Date (replacing booking created)
                         _buildTimelineRow(
-                          Icons.add_circle_outline,
-                          'Booking Created',
+                          Icons.calendar_today,
+                          'Created On',
                           Helpers.formatDateTime(currentBooking.createdAt),
                           Colors.blue,
                         ),
-                        // _buildTimelineRow(
-                        //   Icons.schedule,
-                        //   'Scheduled Date',
-                        //   Helpers.formatDateTime(
-                        //     currentBooking.scheduledDateTime,
-                        //   ),
-                        //   Colors.orange,
-                        // ),
+
+                        _buildTimelineRow(
+                          Icons.schedule,
+                          'Scheduled Date',
+                          Helpers.formatDateTime(
+                            currentBooking.scheduledDateTime,
+                          ),
+                          Colors.orange,
+                        ),
+
                         if (currentBooking.completedAt != null)
                           _buildTimelineRow(
                             Icons.check_circle,
@@ -290,11 +286,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            icon,
-            size: 20,
-            color: Colors.grey[600],
-          ), // ✅ Fixed Colors.grey to Colors.grey[1]
+          Icon(icon, size: 20, color: Colors.grey[600]),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
@@ -304,8 +296,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                   label,
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors
-                        .grey[600], // ✅ Fixed Colors.grey to Colors.grey[1]
+                    color: Colors.grey[600],
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -322,6 +313,52 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildDetailRowWithAction(
+    IconData icon,
+    String label,
+    String value, {
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: InkWell(
+        onTap: onTap,
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: Colors.grey[600]),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.w500,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }

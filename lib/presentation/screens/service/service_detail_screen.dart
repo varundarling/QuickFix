@@ -1,10 +1,12 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -26,6 +28,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   bool _isBooking = false;
   ProviderModel? _provider;
   bool _isLoadingProvider = false;
+  DateTime? _selectedDate;
 
   @override
   void initState() {
@@ -53,21 +56,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     _loadBookingData();
 
     // Debug initial state
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _debugProviderState();
-    });
-  }
-
-  void _debugProviderState() {
-    debugPrint('=== PROVIDER STATE DEBUG ===');
-    debugPrint('Service Provider ID: ${widget.service.providerId}');
-    debugPrint('Is Loading Provider: $_isLoadingProvider');
-    debugPrint('Provider Object: $_provider');
-    debugPrint('Provider Business Name: ${_provider?.businessName}');
-    debugPrint('Provider Address: ${_provider?.address}');
-    debugPrint('Provider Experience: ${_provider?.experience}');
-    debugPrint('Widget Mounted: $mounted');
-    debugPrint('===========================');
+    WidgetsBinding.instance.addPostFrameCallback((_) {});
   }
 
   Future<void> _fetchProviderData() async {
@@ -256,11 +245,99 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   _buildServiceDescription(),
                   const SizedBox(height: 24),
 
-                  // Sub-services
-                  if (widget.service.subServices.isNotEmpty) ...[
-                    _buildSubServices(),
-                    const SizedBox(height: 24),
-                  ],
+                  Card(
+                    elevation: 4,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(14),
+                    ),
+                    child: ListTile(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      tileColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      title: Text(
+                        _selectedDate == null
+                            ? 'Select desired date & time'
+                            : 'Selected: ${Helpers.formatDateTime(_selectedDate!)}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      trailing: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(
+                          Icons.event,
+                          color: Colors.blue,
+                          size: 28,
+                        ),
+                      ),
+                      onTap: () async {
+                        // Pick Date
+                        final pickedDate = await showDatePicker(
+                          context: context,
+                          initialDate:
+                              _selectedDate ??
+                              DateTime.now().add(const Duration(hours: 1)),
+                          firstDate: DateTime.now(),
+                          lastDate: DateTime.now().add(
+                            const Duration(days: 365),
+                          ),
+                        );
+
+                        if (pickedDate != null) {
+                          // Pick Time
+                          final pickedTime = await showTimePicker(
+                            context: context,
+                            initialTime: TimeOfDay.fromDateTime(
+                              _selectedDate ?? DateTime.now(),
+                            ),
+                          );
+
+                          if (pickedTime != null) {
+                            final selectedDateTime = DateTime(
+                              pickedDate.year,
+                              pickedDate.month,
+                              pickedDate.day,
+                              pickedTime.hour,
+                              pickedTime.minute,
+                            );
+
+                            setState(() {
+                              _selectedDate = selectedDateTime;
+                            });
+                          } else {
+                            // User canceled time picker, still update date only with zero time or keep existing time
+                            setState(() {
+                              _selectedDate = DateTime(
+                                pickedDate.year,
+                                pickedDate.month,
+                                pickedDate.day,
+                                _selectedDate?.hour ?? 0,
+                                _selectedDate?.minute ?? 0,
+                              );
+                            });
+                          }
+                        }
+                      },
+                    ),
+                  ),
+
+                  // // Sub-services
+                  // if (widget.service.subServices.isNotEmpty) ...[
+                  //   _buildSubServices(),
+                  //   const SizedBox(height: 24),
+                  // ],
 
                   // Book Service Button
                   _buildBookServiceButton(context),
@@ -620,74 +697,74 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                   ],
 
-                  // Address with Maps Integration
-                  if (_provider!.address.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(Icons.location_on, size: 14, color: Colors.grey),
-                        const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            _provider!.address,
-                            style: TextStyle(fontSize: 12, color: Colors.grey),
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+                  // // Address with Maps Integration
+                  // if (_provider!.address.isNotEmpty) ...[
+                  //   const SizedBox(height: 4),
+                  //   Row(
+                  //     children: [
+                  //       Icon(Icons.location_on, size: 14, color: Colors.grey),
+                  //       const SizedBox(width: 4),
+                  //       Expanded(
+                  //         child: Text(
+                  //           _provider!.address,
+                  //           style: TextStyle(fontSize: 12, color: Colors.grey),
+                  //           maxLines: 2,
+                  //           overflow: TextOverflow.ellipsis,
+                  //         ),
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ],
 
-                  // Rating
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      RatingBarIndicator(
-                        rating: _provider!.raitng,
-                        itemBuilder: (context, index) =>
-                            const Icon(Icons.star, color: Colors.amber),
-                        itemCount: 5,
-                        itemSize: 16,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '${_provider!.raitng.toStringAsFixed(1)} (${_provider!.totalReviews} reviews)',
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ],
-                  ),
+                  // // Rating
+                  // const SizedBox(height: 8),
+                  // Row(
+                  //   children: [
+                  //     RatingBarIndicator(
+                  //       rating: _provider!.raitng,
+                  //       itemBuilder: (context, index) =>
+                  //           const Icon(Icons.star, color: Colors.amber),
+                  //       itemCount: 5,
+                  //       itemSize: 16,
+                  //     ),
+                  //     const SizedBox(width: 8),
+                  //     Text(
+                  //       '${_provider!.raitng.toStringAsFixed(1)} (${_provider!.totalReviews} reviews)',
+                  //       style: const TextStyle(
+                  //         fontSize: 14,
+                  //         color: AppColors.textSecondary,
+                  //       ),
+                  //     ),
+                  //   ],
+                  // ),
                 ],
               ),
             ),
 
-            // Verification Badge
-            if (_provider!.isVerified)
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: AppColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(Icons.verified, size: 14, color: AppColors.success),
-                    const SizedBox(width: 4),
-                    Text(
-                      'Verified',
-                      style: TextStyle(
-                        fontSize: 10,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
+            // // Verification Badge
+            // if (_provider!.isVerified)
+            //   Container(
+            //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            //     decoration: BoxDecoration(
+            //       color: AppColors.success.withValues(alpha: 0.1),
+            //       borderRadius: BorderRadius.circular(12),
+            //     ),
+            //     child: Row(
+            //       mainAxisSize: MainAxisSize.min,
+            //       children: [
+            //         Icon(Icons.verified, size: 14, color: AppColors.success),
+            //         const SizedBox(width: 4),
+            //         Text(
+            //           'Verified',
+            //           style: TextStyle(
+            //             fontSize: 10,
+            //             fontWeight: FontWeight.w600,
+            //             color: AppColors.success,
+            //           ),
+            //         ),
+            //       ],
+            //     ),
+            //   ),
           ],
         ),
       ],
@@ -900,7 +977,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                       const SizedBox(height: 8),
                       Text(
-                        'Booked on: ${_formatDateTime(booking.createdAt)}',
+                        'Booked on: ${Helpers.formatDate(booking.createdAt)}',
                         style: const TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,
@@ -909,7 +986,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Scheduled for: ${_formatDateTime(booking.scheduledDateTime)}',
+                          'Scheduled for: ${Helpers.formatDate(booking.scheduledDateTime)}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -920,7 +997,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       if (booking.description.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
-                          'Notes: ${booking.description}',
+                          'Description: ${booking.description}',
                           style: const TextStyle(
                             fontSize: 14,
                             color: AppColors.textSecondary,
@@ -972,60 +1049,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 height: 1.5,
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSubServices() {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.checklist, color: AppColors.primary, size: 24),
-                const SizedBox(width: 8),
-                const Text(
-                  'What\'s Included',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.textPrimary,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            ...widget.service.subServices.map((subService) {
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  children: [
-                    Icon(
-                      Icons.check_circle,
-                      color: AppColors.success,
-                      size: 20,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Text(
-                        subService,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: AppColors.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
           ],
         ),
       ),
@@ -1154,10 +1177,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     }
   }
 
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.day}/${dateTime.month}/${dateTime.year} at ${dateTime.hour}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
-
   void _makePhoneCall(String phoneNumber) async {
     final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
     try {
@@ -1171,6 +1190,16 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   void _bookService(BuildContext context) async {
     if (_isBooking || !mounted) return;
+
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a desired date before booking'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
     final bool? confirmed = await _showBookingConfirmationDialog(context);
     if (confirmed != true || !mounted) return;
@@ -1196,7 +1225,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         customerId: user.uid,
         providerId: widget.service.providerId,
         service: widget.service,
-        scheduledDateTime: DateTime.now().add(const Duration(days: 1)),
+        scheduledDateTime: _selectedDate!,
         description: widget.service.description.isNotEmpty
             ? widget.service.description
             : 'Service booking',
@@ -1204,6 +1233,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         customerLatitude: 0.0,
         customerLongitude: 0.0,
         totalAmount: widget.service.basePrice,
+        selectedDate: _selectedDate,
       );
 
       if (!mounted) return;
@@ -1316,6 +1346,18 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ],
                   ),
+                  // Add selected date display here
+                  if (_selectedDate != null) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Desired Date: ${Helpers.formatDateTime(_selectedDate!)}',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textPrimary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                   if (_provider != null) ...[
                     const SizedBox(height: 4),
                     Text(

@@ -681,6 +681,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     final bool shouldShowCustomerContact = _shouldShowCustomerContactInfo(
       booking.status,
     );
+    String addressToShow =
+        (booking.customerAddressFromProfile?.isNotEmpty ?? false)
+        ? booking.customerAddressFromProfile!
+        : booking.customerAddress;
 
     return InkWell(
       onTap: () {
@@ -727,7 +731,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Text(
-                      booking.statusDisplay,
+                      _bookingStatusToString(booking.status),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
@@ -790,9 +794,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     ),
 
                     // Customer phone (only show if not null and not 'No Phone')
-                    if (shouldShowCustomerContact &&
-                        booking.customerPhone != null &&
-                        booking.customerPhone != 'No Phone' &&
+                    if (booking.customerPhone != null &&
                         booking.customerPhone!.isNotEmpty) ...[
                       const SizedBox(height: 6),
                       Row(
@@ -837,100 +839,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
               const SizedBox(height: 4),
 
-              if (showAddress) ...[
-                const SizedBox(height: 12),
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        AppColors.primary.withValues(alpha: 0.1),
-                        AppColors.primary.withValues(alpha: 0.05),
-                      ],
-                    ),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppColors.primary.withValues(alpha: 0.3),
-                    ),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            size: 16,
-                            color: AppColors.primary,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            'Customer Location',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppColors.primary,
-                            ),
-                          ),
-                          const Spacer(),
-                          Text(
-                            'Tap to navigate',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: AppColors.primary,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 8),
-                      Padding(
-                        padding: const EdgeInsets.all(4),
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.place,
-                              size: 16,
-                              color: Colors.grey[700],
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                booking.customerAddress.isNotEmpty
-                                    ? booking.customerAddress
-                                    : 'Address not provided',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: AppColors.textPrimary,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Icon(
-                                Icons.directions,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-
-              const SizedBox(height: 4),
-
               _buildDateDisplay(booking),
 
               const SizedBox(height: 4),
@@ -952,6 +860,25 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         ),
       ),
     );
+  }
+
+  String _bookingStatusToString(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return 'Pending';
+      case BookingStatus.confirmed:
+        return 'Confirmed';
+      case BookingStatus.completed:
+        return 'Completed'; // fix here
+      case BookingStatus.cancelled:
+        return 'Cancelled';
+      case BookingStatus.paymentPending:
+        return 'Payment Pending';
+      case BookingStatus.paid:
+        return 'Paid';
+      case BookingStatus.refunded:
+        return 'Refunded';
+    }
   }
 
   bool _shouldShowCustomerContactInfo(BookingStatus status) {

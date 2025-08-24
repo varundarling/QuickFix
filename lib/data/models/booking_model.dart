@@ -49,6 +49,9 @@ class BookingModel {
   final String? providerPhone;
   final String? providerEmail;
   final DateTime? paymentDate;
+  final DateTime? selectedDate;
+  DateTime? acceptedAt;
+  final String? customerAddressFromProfile;
 
   BookingModel({
     this.paymentDate,
@@ -79,6 +82,9 @@ class BookingModel {
     this.providerName,
     this.providerPhone,
     this.providerEmail,
+    this.selectedDate,
+    this.acceptedAt,
+    this.customerAddressFromProfile,
   });
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
@@ -98,7 +104,7 @@ class BookingModel {
       customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
       createdAt: _parseDateTime(data['createdAt']),
       completedAt: data['completedAt'] != null
-          ? _parseDateTime(data['completedAt'])
+          ? (data['completedAt'] as Timestamp).toDate()
           : null,
       paymentId: data['paymentId'],
       cancellationReason: data['cancellationReason'],
@@ -106,6 +112,13 @@ class BookingModel {
       customerName: data['customerName'],
       customerEmail: data['customerEmail'],
       customerPhone: data['customerPhone'],
+      selectedDate: data['selectedDate'] != null
+          ? (data['selectedDate'] as Timestamp).toDate()
+          : null,
+      acceptedAt: data['acceptedAt'] != null
+          ? (data['acceptedAt'] as Timestamp).toDate()
+          : null,
+      customerAddressFromProfile: data['customerAddressFromProfile'],
     );
   }
 
@@ -146,23 +159,13 @@ class BookingModel {
       'customerName': customerName ?? customerName,
       'customerPhone': customerPhone ?? customerPhone,
       'customerEmail': customerEmail ?? customerEmail,
-    };
-  }
-
-  Map<String, dynamic> toMap() {
-    return {
-      'customerId': customerId,
-      'providerId': providerId,
-      'serviceId': serviceId,
-      'serviceName': serviceName,
-      'description': description,
-      'scheduledDateTime': scheduledDateTime.millisecondsSinceEpoch,
-      'customerAddress': customerAddress,
-      'customerLatitude': customerLatitude,
-      'customerLongitude': customerLongitude,
-      'totalAmount': totalAmount,
-      'status': status.toString().split('.').last,
-      'createdAt': createdAt.millisecondsSinceEpoch,
+      'selectedDate': selectedDate != null
+          ? Timestamp.fromDate(selectedDate!)
+          : null,
+      'acceptedAt': acceptedAt != null
+          ? Timestamp.fromDate(acceptedAt!)
+          : null,
+      'customerAddressFromProfile': customerAddressFromProfile,
     };
   }
 
@@ -202,7 +205,7 @@ extension BookingStatusExtension on BookingStatus {
         return 'Cancelled';
       case BookingStatus.refunded:
         return 'Refunded';
-      }
+    }
   }
 }
 
@@ -236,6 +239,9 @@ extension BookingModelCopyWith on BookingModel {
     String? providerPhone,
     String? providerEmail,
     DateTime? paymentDate,
+    DateTime? selectedDate,
+    DateTime? acceptedAt,
+    String? customerAddressFromProfile,
   }) {
     return BookingModel(
       paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
@@ -267,6 +273,9 @@ extension BookingModelCopyWith on BookingModel {
       providerPhone: providerPhone ?? this.providerPhone,
       providerEmail: providerEmail ?? this.providerEmail,
       paymentDate: paymentDate ?? this.paymentDate,
+      selectedDate: selectedDate ?? this.selectedDate,
+      acceptedAt: acceptedAt ?? this.acceptedAt,
+      customerAddressFromProfile: customerAddressFromProfile ?? this.customerAddressFromProfile,
     );
   }
 }

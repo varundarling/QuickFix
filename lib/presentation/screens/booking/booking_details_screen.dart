@@ -156,6 +156,24 @@ class _CustomerBookingDetailScreenState
     );
   }
 
+  Future<BookingModel> getBookingWithProfileAddress(String bookingId) async {
+    var bookingDoc = await FirebaseFirestore.instance
+        .collection('bookings')
+        .doc(bookingId)
+        .get();
+    var booking = BookingModel.fromFireStore(
+      bookingDoc.data()! as DocumentSnapshot<Object?>,
+    );
+
+    var userDoc = await FirebaseFirestore.instance
+        .collection('users')
+        .doc(booking.customerId)
+        .get();
+    var customerProfileAddress = userDoc.data()?['address'] ?? '';
+
+    return booking.copyWith(customerAddressFromProfile: customerProfileAddress);
+  }
+
   Widget _buildBookingDetails(BookingModel booking) {
     final statusColor = Helpers.getStatusColor(booking.status.toString());
 
@@ -219,6 +237,10 @@ class _CustomerBookingDetailScreenState
                     : 'No description provided',
               ),
               _buildDetailRow(
+                'Booked Date',
+                Helpers.formatDateTime(booking.createdAt),
+              ), // New row added
+              _buildDetailRow(
                 'Scheduled Date',
                 Helpers.formatDateTime(booking.scheduledDateTime),
               ),
@@ -228,6 +250,7 @@ class _CustomerBookingDetailScreenState
               ),
             ],
           ),
+
           const SizedBox(height: 16),
 
           // Provider Details
@@ -260,49 +283,39 @@ class _CustomerBookingDetailScreenState
           ),
           const SizedBox(height: 16),
 
-          // Location Details
-          if (booking.customerAddress.isNotEmpty)
-            _buildDetailCard(
-              title: 'Service Location',
-              icon: Icons.location_on,
-              children: [_buildDetailRow('Address', booking.customerAddress)],
-            ),
-          const SizedBox(height: 16),
-
           // Timeline
           _buildDetailCard(
             title: 'Booking Timeline',
             icon: Icons.timeline,
             children: [
               _buildTimelineItem(
-                'Booking Created',
-                Helpers.formatDateTime(booking.createdAt),
-                Icons.add_circle_outline,
+                'Booked For',
+                booking.selectedDate != null
+                    ? Helpers.formatDateTime(booking.selectedDate!)
+                    : 'Not available',
+                Icons.calendar_today,
                 Colors.blue,
               ),
-              if (booking.status == BookingStatus.completed &&
-                  booking.completedAt != null)
+              if (booking.status == BookingStatus.confirmed &&
+                  booking.acceptedAt != null)
                 _buildTimelineItem(
-                  'Service Completed',
+                  'Accepted on',
+                  Helpers.formatDateTime(booking.acceptedAt!),
+                  Icons.thumb_up,
+                  Colors.green,
+                ),
+              if (booking.completedAt != null)
+                _buildTimelineItem(
+                  'Completion Date',
                   Helpers.formatDateTime(booking.completedAt!),
                   Icons.check_circle,
                   AppColors.success,
                 ),
-              // Payment Completed - Show if payment date exists
               if (booking.paymentDate != null)
                 _buildTimelineItem(
-                  'Payment Completed',
-                  Helpers.formatDateTime(booking.paymentDate!),
-                  Icons.payment,
-                  Colors.amber[700]!,
-                ),
-
-              // For confirmed bookings, show scheduled date
-              if (booking.status == BookingStatus.confirmed)
-                _buildTimelineItem(
-                  'Service Scheduled',
+                  'Payment Completion On',
                   Helpers.formatDateTime(booking.scheduledDateTime),
-                  Icons.schedule,
+                  Icons.payment,
                   Colors.orange,
                 ),
               // For cancelled bookings
@@ -370,7 +383,8 @@ class _CustomerBookingDetailScreenState
       case BookingStatus.pending:
       case BookingStatus.confirmed:
       case BookingStatus.paymentPending:
-        return true; }
+        return true;
+    }
   }
 
   // ✅ ADD: Method to fetch provider details from Firestore
@@ -655,7 +669,7 @@ class _CustomerBookingDetailScreenState
       case BookingStatus.paymentPending:
         return Icons.pending; // Alternative: Icons.access_time, Icons.timer
       case BookingStatus.paid:
-        return Icons
-            .verified; }
+        return Icons.verified;
+    }
   }
 }

@@ -443,13 +443,14 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                 ),
               const SizedBox(height: 8),
 
-              // ✅ NULL-SAFE: Date display
               Row(
                 children: [
                   Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
                   const SizedBox(width: 8),
                   Text(
-                    Helpers.formatDateTime(booking.scheduledDateTime),
+                    booking.selectedDate != null
+                        ? Helpers.formatDateTime(booking.selectedDate!)
+                        : 'No date selected',
                     style: const TextStyle(fontSize: 14, color: Colors.grey),
                   ),
                 ],
