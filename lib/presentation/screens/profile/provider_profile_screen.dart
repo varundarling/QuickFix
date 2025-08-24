@@ -663,7 +663,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
                     : _cancelEditing,
                 style: OutlinedButton.styleFrom(
                   foregroundColor: Colors.grey[700],
-                  side: BorderSide(color: Colors.grey!),
+                  side: BorderSide(color: Colors.grey),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(12),
                   ),

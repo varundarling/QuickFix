@@ -149,7 +149,6 @@ class AppRouter {
         path: '/payment/:bookingId',
         name: 'payment',
         builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
           // You'll need to pass the booking object or fetch it
           // For now, returning a placeholder
           return const Scaffold(body: Center(child: Text('Payment Screen')));
@@ -160,7 +159,6 @@ class AppRouter {
         path: '/customer-payment/:bookingId',
         name: 'customer-payment',
         builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
           // You'll need to pass the booking object or fetch it
           return const Scaffold(
             body: Center(child: Text('Customer Payment Screen')),

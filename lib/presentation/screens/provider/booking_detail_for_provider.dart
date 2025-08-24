@@ -11,7 +11,8 @@ class BookingDetailForProvider extends StatefulWidget {
   const BookingDetailForProvider({super.key, required this.bookingId});
 
   @override
-  State<BookingDetailForProvider> createState() => _BookingDetailForProviderState();
+  State<BookingDetailForProvider> createState() =>
+      _BookingDetailForProviderState();
 }
 
 class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
@@ -91,7 +92,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                         _buildDetailRow(
                           Icons.business_center,
                           'Service Name',
-                          currentBooking.serviceName ?? 'Unknown Service',
+                          currentBooking.serviceName,
                         ),
                         _buildDetailRow(
                           Icons.attach_money,
@@ -318,68 +319,6 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                   ),
                 ),
               ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildDetailRowWithAction(
-    IconData icon,
-    String label,
-    String value, {
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, size: 20, color: Colors.grey[600]),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: Colors
-                        .grey[600], // ✅ Fixed Colors.grey to Colors.grey[1]
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                GestureDetector(
-                  onTap: onTap,
-                  child: Text(
-                    value,
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          InkWell(
-            onTap: onTap,
-            child: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: Icon(
-                icon == Icons.phone ? Icons.call : Icons.email,
-                size: 16,
-                color: Colors.white,
-              ),
             ),
           ),
         ],

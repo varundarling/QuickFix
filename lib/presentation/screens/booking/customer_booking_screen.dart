@@ -237,7 +237,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   Widget _buildBookingsList(BookingStatus status) {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
-        final allBookings = bookingProvider.userBookings ?? <BookingModel>[];
+        final allBookings = bookingProvider.userBookings;
         List<BookingModel> bookings = [];
 
         try {
@@ -350,10 +350,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   // ✅ NULL-SAFE: Build booking card
   Widget _buildBookingCard(BookingModel booking) {
     // ✅ NULL-SAFE: Handle null booking or status
-    if (booking.status == null) {
-      return const SizedBox.shrink();
-    }
-
     final statusColor = Helpers.getStatusColor(booking.status.toString());
 
     return Card(
@@ -372,7 +368,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                 children: [
                   Expanded(
                     child: Text(
-                      booking.serviceName ?? 'Unknown Service', // ✅ NULL-SAFE
+                      booking.serviceName, // ✅ NULL-SAFE
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -390,7 +386,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                     ),
                     child: Text(
                       _getCustomerStatusDisplay(
-                        booking.status!,
+                        booking.status,
                       ), // ✅ Safe after null check
                       style: TextStyle(
                         fontSize: 12,
@@ -537,9 +533,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   }
 
   Widget _buildCustomerActionButtons(BookingModel booking) {
-    if (booking.status == null) return const SizedBox.shrink();
-
-    switch (booking.status!) {
+    switch (booking.status) {
       case BookingStatus.pending:
         return SizedBox(
           width: double.infinity,

@@ -169,7 +169,6 @@ class PaymentOptionsScreen extends StatelessWidget {
                   const Text(
                     '• Cash payment is currently the only available method\n'
                     '• Other payment methods will be available soon\n'
-                    '• Make sure to get a receipt from the service provider\n'
                     '• Contact support if you have any payment issues',
                     style: TextStyle(
                       fontSize: 14,

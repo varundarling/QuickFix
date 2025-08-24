@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -86,12 +88,6 @@ class _CustomerBookingDetailScreenState
         booking = updatedBooking;
         isLoading = false;
       });
-
-      if (updatedBooking == null) {
-        setState(() {
-          errorMessage = 'Booking not found';
-        });
-      }
     } catch (e) {
       setState(() {
         isLoading = false;
@@ -374,10 +370,7 @@ class _CustomerBookingDetailScreenState
       case BookingStatus.pending:
       case BookingStatus.confirmed:
       case BookingStatus.paymentPending:
-        return true; // Show contact info
-      default:
-        return true;
-    }
+        return true; }
   }
 
   // ✅ ADD: Method to fetch provider details from Firestore
@@ -605,103 +598,6 @@ class _CustomerBookingDetailScreenState
     );
   }
 
-  // After successful payment completion
-  Future<void> _onPaymentCompleted(BookingModel booking) async {
-    final bookingProvider = context.read<BookingProvider>();
-
-    // Update booking with payment date
-    final success = await bookingProvider.updateBookingStatus(
-      booking.id,
-      BookingStatus.paid,
-      booking.customerId,
-    );
-
-    if (success) {
-      // Update payment date in Firestore
-      await FirebaseFirestore.instance
-          .collection('bookings')
-          .doc(booking.id)
-          .update({
-            'paymentDate': Timestamp.fromDate(DateTime.now()),
-            'updatedAt': Timestamp.fromDate(DateTime.now()),
-          });
-
-      // Refresh booking details to show updated timeline
-      await _loadBooking();
-    }
-  }
-
-  Widget _buildTimelineItemWithConnector(
-    String title,
-    String time,
-    IconData icon,
-    Color color,
-    bool isLast,
-  ) {
-    return IntrinsicHeight(
-      child: Row(
-        children: [
-          // Timeline column with connector
-          Column(
-            children: [
-              // Main indicator
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: color.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: color, width: 2),
-                ),
-                child: Icon(icon, size: 20, color: color),
-              ),
-
-              // Connector line (if not last item)
-              if (!isLast)
-                Expanded(
-                  child: Container(
-                    width: 2,
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    color: Colors.grey[300],
-                  ),
-                ),
-            ],
-          ),
-
-          const SizedBox(width: 16),
-
-          // Content
-          Expanded(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    time,
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _cancelBooking(BookingModel booking) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -760,9 +656,6 @@ class _CustomerBookingDetailScreenState
         return Icons.pending; // Alternative: Icons.access_time, Icons.timer
       case BookingStatus.paid:
         return Icons
-            .verified; // Alternative: Icons.paid, Icons.check_circle_outline
-      default:
-        return Icons.help_outline;
-    }
+            .verified; }
   }
 }

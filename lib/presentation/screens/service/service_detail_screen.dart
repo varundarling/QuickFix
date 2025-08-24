@@ -488,9 +488,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   Widget _buildProviderSection() {
     // Use ValueKey to force rebuild when provider data changes
     return Card(
-      key: ValueKey(
-        'provider_${_provider?.id ?? 'null'}_${_isLoadingProvider}',
-      ),
+      key: ValueKey('provider_${_provider?.id ?? 'null'}_$_isLoadingProvider'),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       child: Padding(
@@ -908,10 +906,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      if (booking.scheduledDateTime != null) ...[
+                      ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Scheduled for: ${_formatDateTime(booking.scheduledDateTime!)}',
+                          'Scheduled for: ${_formatDateTime(booking.scheduledDateTime)}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,
@@ -1027,7 +1025,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ],
                 ),
               );
-            }).toList(),
+            }),
           ],
         ),
       ),
@@ -1378,14 +1376,11 @@ Color _getStatusColor(BookingStatus status) {
     case BookingStatus.refunded:
       return AppColors.error;
     case BookingStatus.paymentPending:
-      // TODO: Handle this case.
-      throw UnimplementedError();
+      return AppColors.error;
     case BookingStatus.paid:
-      // TODO: Handle this case.
-      throw UnimplementedError();
+      return AppColors.success;
   }
 }
-
 
 IconData _getStatusIcon(BookingStatus status) {
   switch (status) {
@@ -1400,10 +1395,8 @@ IconData _getStatusIcon(BookingStatus status) {
     case BookingStatus.refunded:
       return Icons.money_off;
     case BookingStatus.paymentPending:
-      // TODO: Handle this case.
-      throw UnimplementedError();
+      return Icons.payments;
     case BookingStatus.paid:
-      // TODO: Handle this case.
-      throw UnimplementedError();
+      return Icons.verified;
   }
 }

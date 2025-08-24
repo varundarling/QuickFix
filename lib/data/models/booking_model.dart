@@ -202,9 +202,7 @@ extension BookingStatusExtension on BookingStatus {
         return 'Cancelled';
       case BookingStatus.refunded:
         return 'Refunded';
-      default:
-        return 'Unknown';
-    }
+      }
   }
 }
 

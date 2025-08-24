@@ -1,10 +1,11 @@
+// ignore_for_file: prefer_final_fields
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/data/models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -265,39 +266,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ✅ Add this method to validate user data
-  Future<bool> _validateUserData() async {
-    if (_user == null || _userModel == null) return false;
-
-    try {
-      // Get fresh data from Firebase
-      final doc = await _firebaseService.getUserData(_user!.uid);
-      if (doc.exists) {
-        final freshUserModel = UserModel.fromRealtimeDatabase(
-          doc.value as Map<dynamic, dynamic>,
-        );
-
-        // Check if cached data matches Firebase data
-        final isSameUserType = _userModel!.userType == freshUserModel.userType;
-        if (!isSameUserType) {
-          debugPrint(
-            '⚠️ User type mismatch detected! Cached: ${_userModel!.userType}, Firebase: ${freshUserModel.userType}',
-          );
-          // Update with fresh data
-          _userModel = freshUserModel;
-          await _saveUserType(freshUserModel.userType);
-          notifyListeners();
-        }
-
-        return true;
-      }
-    } catch (e) {
-      debugPrint('❌ Error validating user data: $e');
-    }
-
-    return false;
-  }
-
   Future<String> getUserType() async {
     debugPrint('🔍 Getting user type for user: ${_user?.uid}');
 
@@ -429,22 +397,6 @@ class AuthProvider extends ChangeNotifier {
       }
     }
     return 'An expected error has occurred. Please try again.';
-  }
-
-  // Add this method that was missing
-  Future<UserModel?> _loadUserFromDatabase(String uid) async {
-    try {
-      final doc = await _firebaseService.getUserData(uid);
-      if (doc.exists) {
-        return UserModel.fromRealtimeDatabase(
-          doc.value as Map<dynamic, dynamic>,
-        );
-      }
-      return null;
-    } catch (e) {
-      debugPrint('Error loading user from database: $e');
-      return null;
-    }
   }
 
   Future<void> reloadUserData() async {

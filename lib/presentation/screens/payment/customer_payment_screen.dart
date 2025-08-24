@@ -289,7 +289,7 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
     setState(() => _isProcessing = true);
 
     try {
-      final bookingProvider = context.read<BookingProvider>();
+      context.read<BookingProvider>();
       final authProvider = context.read<AuthProvider>();
 
       final currentUserId = authProvider.getCurrentUserId();

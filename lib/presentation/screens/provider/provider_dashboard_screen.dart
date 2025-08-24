@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -158,100 +160,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     // ✅ Save provider references early to avoid context access in dispose
     _bookingProvider = Provider.of<BookingProvider>(context, listen: false);
     _authProvider = Provider.of<AuthProvider>(context, listen: false);
-  }
-
-  // ✅ FIXED: Added missing _fetchCustomerDetails method
-  Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
-    try {
-      debugPrint('🔍 [DEBUG] Starting customer fetch for ID: $customerId');
-      debugPrint('🔍 [DEBUG] Customer ID length: ${customerId.length}');
-      debugPrint('🔍 [DEBUG] Customer ID type: ${customerId.runtimeType}');
-
-      // Check if customerId is valid
-      if (customerId.isEmpty) {
-        debugPrint('❌ [ERROR] Customer ID is empty');
-        return {
-          'customerName': 'Invalid Customer ID',
-          'customerPhone': '',
-          'customerEmail': '',
-        };
-      }
-
-      // Try users collection first
-      debugPrint('🔍 [DEBUG] Checking users collection...');
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(customerId)
-          .get();
-
-      debugPrint('🔍 [DEBUG] Users query completed. Exists: ${userDoc.exists}');
-
-      if (userDoc.exists && userDoc.data() != null) {
-        final userData = userDoc.data()!;
-        debugPrint('✅ [SUCCESS] Customer found in users collection:');
-        debugPrint('   - Name: ${userData['name']}');
-        debugPrint('   - Phone: ${userData['phone'] ?? userData['mobile']}');
-        debugPrint('   - Email: ${userData['email']}');
-
-        return {
-          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone':
-              userData['phone']?.toString() ??
-              userData['mobile']?.toString() ??
-              '',
-          'customerEmail': userData['email']?.toString() ?? '',
-        };
-      }
-
-      // Try customers collection as fallback
-      debugPrint('🔍 [DEBUG] Checking customers collection...');
-      final customerDoc = await FirebaseFirestore.instance
-          .collection('customers')
-          .doc(customerId)
-          .get();
-
-      debugPrint(
-        '🔍 [DEBUG] Customers query completed. Exists: ${customerDoc.exists}',
-      );
-
-      if (customerDoc.exists && customerDoc.data() != null) {
-        final customerData = customerDoc.data()!;
-        debugPrint('✅ [SUCCESS] Customer found in customers collection:');
-        debugPrint('   - Name: ${customerData['name']}');
-        debugPrint(
-          '   - Phone: ${customerData['phone'] ?? customerData['mobile']}',
-        );
-
-        return {
-          'customerName':
-              customerData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone':
-              customerData['phone']?.toString() ??
-              customerData['mobile']?.toString() ??
-              '',
-          'customerEmail': customerData['email']?.toString() ?? '',
-        };
-      }
-
-      // If not found in either collection
-      debugPrint('❌ [ERROR] Customer not found in any collection');
-      debugPrint('   - Checked users/$customerId: ${userDoc.exists}');
-      debugPrint('   - Checked customers/$customerId: ${customerDoc.exists}');
-
-      return {
-        'customerName': 'Customer Not Found',
-        'customerPhone': '',
-        'customerEmail': '',
-      };
-    } catch (e, stackTrace) {
-      debugPrint('❌ [ERROR] Exception fetching customer details: $e');
-      debugPrint('❌ [STACK] $stackTrace');
-      return {
-        'customerName': 'Error Loading Customer',
-        'customerPhone': '',
-        'customerEmail': '',
-      };
-    }
   }
 
   Future<void> _loadProviderServices() async {
@@ -765,17 +673,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   }
 
   Widget _buildBookingCard(BookingModel booking) {
-    if (booking.status == null) {
-      return const SizedBox.shrink();
-    }
-
     final statusColor = Helpers.getStatusColor(booking.status.toString());
     final bool showAddress =
         (booking.status == BookingStatus.confirmed) &&
         booking.customerAddress.isNotEmpty;
 
     final bool shouldShowCustomerContact = _shouldShowCustomerContactInfo(
-      booking.status!,
+      booking.status,
     );
 
     return InkWell(
@@ -805,7 +709,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 children: [
                   Expanded(
                     child: Text(
-                      booking.serviceName ?? 'Unknown Service',
+                      booking.serviceName,
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1061,8 +965,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       case BookingStatus.pending:
       case BookingStatus.confirmed:
       case BookingStatus.paymentPending:
-        return true; // Show contact info
-      default:
         return true;
     }
   }
