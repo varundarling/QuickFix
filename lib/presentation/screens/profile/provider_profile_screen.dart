@@ -3,7 +3,6 @@ import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
-import 'package:quickfix/core/utils/navigation_helper.dart';
 
 class ProviderProfileScreen extends StatefulWidget {
   const ProviderProfileScreen({super.key});
@@ -82,7 +81,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
       _isEditing = false;
     });
 
-    // ✅ Reset form validation state to prevent showing validators
+    // Reset form validation state to prevent showing validators
     _formKey.currentState?.reset();
 
     // Reload data to revert any unsaved changes
@@ -102,7 +101,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
         foregroundColor: Colors.white,
         elevation: 0,
         leading: IconButton(
-          onPressed: () => context.go('/provider-dashboard'),
+          onPressed: () {
+            context.pop();
+          },
           icon: const Icon(Icons.arrow_back_rounded),
         ),
         actions: [
@@ -129,11 +130,10 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
 
   Widget _buildProfileContent() {
     return Consumer<AuthProvider>(
-      // ✅ FIXED: Use Consumer to access AuthProvider
       builder: (context, authProvider, child) {
         final user = authProvider.userModel;
 
-        // ✅ FIX: Update controllers when provider data changes
+        // Update controllers when provider data changes
         if (user != null && !_isEditing) {
           // Use post-frame callback to avoid setState during build
           WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -159,7 +159,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
             key: _formKey,
             child: Column(
               children: [
-                // ✅ FIXED: Now authProvider is available through Consumer
+                // Profile completion banner
                 if (!authProvider.isProviderProfileComplete)
                   _buildCompletionBanner(authProvider.missingProviderFields),
 
@@ -171,15 +171,10 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
                 _buildProfileForm(),
                 const SizedBox(height: 20),
 
-                // Action Buttons
+                // Action Buttons (only when editing)
                 if (_isEditing) _buildActionButtons(),
 
-                // Add some spacing before logout button
-                if (!_isEditing) const SizedBox(height: 40),
-
-                // Logout Button (only show when not editing)
-                if (!_isEditing) _buildLogoutButton(),
-
+                // ✅ REMOVED: Logout button and spacing
                 const SizedBox(height: 20),
               ],
             ),
@@ -248,7 +243,6 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        // ✅ Use gradient background to make white text visible
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
@@ -326,7 +320,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
           ),
           const SizedBox(height: 12),
 
-          // ✅ Provider Name (in white)
+          // Provider Name
           Text(
             providerName,
             style: const TextStyle(
@@ -338,7 +332,7 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
           ),
           const SizedBox(height: 4),
 
-          // ✅ Business Name (in white, smaller)
+          // Business Name
           Text(
             businessName,
             style: const TextStyle(
@@ -548,7 +542,6 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
           decoration: InputDecoration(
             hintText: isFieldEnabled ? hint : null,
             hintStyle: TextStyle(
-              // ✅ Changed hint text color to darker/more normal
               color: Colors.grey[700],
               fontSize: 14,
               fontWeight: FontWeight.w400,
@@ -680,80 +673,12 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
     );
   }
 
-  // ✅ Simplified Logout Button (removed "Account" section)
-  Widget _buildLogoutButton() {
-    return SizedBox(
-      width: double.infinity,
-      height: 48,
-      child: OutlinedButton(
-        onPressed: () => _showLogoutConfirmation(),
-        style: OutlinedButton.styleFrom(
-          foregroundColor: Colors.red,
-          side: const BorderSide(color: Colors.red),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
-          ),
-        ),
-        child: const Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.logout_rounded, size: 18),
-            SizedBox(width: 8),
-            Text(
-              'Logout',
-              style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showLogoutConfirmation() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-          title: const Row(
-            children: [
-              Icon(Icons.logout_rounded, color: Colors.red),
-              SizedBox(width: 8),
-              Text('Logout'),
-            ],
-          ),
-          content: const Text('Are you sure you want to logout?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(),
-              child: const Text('Cancel'),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                NavigationHelper.handleLogout(context);
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red,
-                foregroundColor: Colors.white,
-              ),
-              child: const Text('Logout'),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = context.read<AuthProvider>();
 
     try {
-      // ✅ Use individual parameters for clarity
       final success = await authProvider.updateProfile(
         name: authProvider.userModel?.name ?? '',
         businessName: _businessNameController.text.trim(),

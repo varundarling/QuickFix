@@ -6,7 +6,9 @@ import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
+import 'package:quickfix/presentation/screens/provider/analytics_screen.dart';
 import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
+import 'package:quickfix/presentation/screens/provider/provider_settings_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
 import 'package:quickfix/presentation/widgets/dialogs/profile_completion_dialog.dart';
@@ -230,46 +232,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
                   ),
-                ),
-                Row(
-                  children: [
-                    const SizedBox(width: 8),
-                    InkWell(
-                      onTap: () => context.go('/provider-profile'),
-                      borderRadius: BorderRadius.circular(8),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: Colors.white.withValues(
-                                alpha: 0.2,
-                              ),
-                              child: Icon(
-                                Icons.person_rounded,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            const Text(
-                              'Profile',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
@@ -730,26 +692,36 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 title: 'View Analytics',
                 subtitle: 'See detailed business insights',
                 onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Analytics coming soon!')),
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const AnalyticsScreen(),
+                    ),
                   );
                 },
               ),
-              _buildActionTile(
-                icon: Icons.help_outline,
-                title: 'Help & Support',
-                subtitle: 'Get help with your account',
-                onTap: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Support coming soon!')),
-                  );
-                },
-              ),
+              // _buildActionTile(
+              //   icon: Icons.help_outline,
+              //   title: 'Help & Support',
+              //   subtitle: 'Get help with your account',
+              //   onTap: () {
+              //     ScaffoldMessenger.of(context).showSnackBar(
+              //       const SnackBar(content: Text('Support coming soon!')),
+              //     );
+              //   },
+              // ),
               _buildActionTile(
                 icon: Icons.settings_outlined,
                 title: 'Settings',
                 subtitle: 'Manage app preferences',
-                onTap: () => context.go('/provider-profile'),
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => const ProviderSettingsScreen(),
+                    ),
+                  );
+                },
               ),
             ],
           ),
@@ -1372,9 +1344,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                           subtitle: 'View business insights',
                           onTap: () {
                             Navigator.pop(context);
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Analytics coming soon!'),
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const AnalyticsScreen(),
                               ),
                             );
                           },
@@ -1884,7 +1857,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         return 'Refunded';
     }
   }
-
 
   Widget _buildDateDisplay(BookingModel booking) {
     String dateLabel;

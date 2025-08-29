@@ -11,9 +11,11 @@ import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/profile/profile_screen.dart';
 import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
+import 'package:quickfix/presentation/screens/provider/analytics_screen.dart';
 import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
 import 'package:quickfix/presentation/screens/provider/create_service_screen.dart';
 import 'package:quickfix/presentation/screens/provider/provider_dashboard_screen.dart';
+import 'package:quickfix/presentation/screens/provider/provider_settings_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
 import 'package:quickfix/quickFix.dart';
 
@@ -156,6 +158,15 @@ class AppRouter {
             body: Center(child: Text('Customer Payment Screen')),
           );
         },
+      ),
+
+      GoRoute(
+        path: '/provider-analytics',
+        builder: (context, state) => const AnalyticsScreen(),
+      ),
+      GoRoute(
+        path: '/provider-settings',
+        builder: (context, state) => const ProviderSettingsScreen(),
       ),
     ],
   );
