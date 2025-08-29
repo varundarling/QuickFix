@@ -7,6 +7,7 @@ import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
+import 'package:quickfix/presentation/screens/home/customer_settings-screen.dart';
 import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/profile/profile_screen.dart';
@@ -167,6 +168,11 @@ class AppRouter {
       GoRoute(
         path: '/provider-settings',
         builder: (context, state) => const ProviderSettingsScreen(),
+      ),
+
+      GoRoute(
+        path: '/customer-settings',
+        builder: (context, state) => const CustomerSettingsScreen(),
       ),
     ],
   );
