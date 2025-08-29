@@ -33,6 +33,20 @@ firebase-adminsdk-*.json
 echo "assets/*.json" >> .gitignore
 echo ".env" >> .gitignore
 
+# Firebase Service Accounts (NEVER COMMIT)
+assets/quickfix-d41ac-firebase-adminsdk-fbsvc-c126a61f84.json
+assets/quickfix-d41ac-firebase-adminsdk-fbsvc-f7bdf98788.json
+assets/service-account.json
+assets/*firebase*adminsdk*.json
+
+# Environment files
+.env
+*.env
+
+# Any Firebase admin SDK files
+**/*firebase*adminsdk*.json
+
+
 # Environment variables with sensitive data
 .env
 .env.local
