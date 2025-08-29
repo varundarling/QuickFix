@@ -8,10 +8,20 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
+  debugPrint('📱 Background message: ${message.notification?.title}');
+  final prefs = await SharedPreferences.getInstance();
+  final enabled = prefs.getBool('notifications_enabled') ?? true;
+
+  if (!enabled) {
+    debugPrint('🔕 Background notifications disabled - ignoring message');
+    return;
+  }
+
   debugPrint('📱 Background message: ${message.notification?.title}');
 }
 
@@ -19,6 +29,7 @@ class NotificationService {
   static NotificationService? _instance;
   static NotificationService get instance =>
       _instance ??= NotificationService._();
+  static final FirebaseMessaging _messaging = FirebaseMessaging.instance;
 
   NotificationService._();
 
@@ -370,6 +381,14 @@ class NotificationService {
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
     debugPrint('📱 Foreground message: ${message.notification?.title}');
 
+    // ✅ STEP 3: Check if notifications are enabled before showing
+    final enabled = await areNotificationsEnabled();
+
+    if (!enabled) {
+      debugPrint('🔕 Notifications disabled - ignoring foreground message');
+      return;
+    }
+
     if (message.notification != null) {
       await _showLocalNotification(
         title: message.notification!.title ?? 'QuickFix',
@@ -506,6 +525,12 @@ class NotificationService {
     String notificationId,
   ) async {
     try {
+      final enabled = await areNotificationsEnabled();
+      if (!enabled) {
+        debugPrint('🔕 Notifications disabled - skipping processing');
+        return;
+      }
+
       final currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser == null) return;
 
@@ -513,6 +538,7 @@ class NotificationService {
       final targetTopic = notification['targetTopic'] as String?;
       final title = notification['title'] as String? ?? 'Notification';
       final body = notification['body'] as String? ?? '';
+      
 
       // Check if this notification is for the current user
       bool isForThisUser = false;
@@ -814,6 +840,51 @@ class NotificationService {
       debugPrint('❌ Error getting provider FCM token: $e');
       return null;
     }
+  }
+
+  static Future<void> disableNotifications() async {
+    try {
+      // 1. Unsubscribe from ALL topics
+      await _messaging.unsubscribeFromTopic('customers');
+      await _messaging.unsubscribeFromTopic('promotions');
+      await _messaging.unsubscribeFromTopic('all');
+
+      // 2. Delete the FCM token (this is crucial!)
+      await _messaging.deleteToken();
+
+      // 3. Save preference locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notifications_enabled', false);
+
+      print('✅ Notifications completely disabled');
+    } catch (e) {
+      print('❌ Error disabling notifications: $e');
+    }
+  }
+
+  static Future<void> enableNotifications() async {
+    try {
+      // 1. Generate new FCM token
+      final token = await _messaging.getToken();
+      print('🔑 New FCM token: $token');
+
+      // 2. Re-subscribe to topics
+      await _messaging.subscribeToTopic('customers');
+
+      // 3. Save preference locally
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('notifications_enabled', true);
+
+      print('✅ Notifications enabled');
+    } catch (e) {
+      print('❌ Error enabling notifications: $e');
+    }
+  }
+
+  /// Check if notifications are enabled
+  static Future<bool> areNotificationsEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool('notifications_enabled') ?? true;
   }
 
   void dispose() {

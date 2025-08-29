@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -67,16 +68,15 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
         _promotionalNotifications = false;
       }
     });
-    await _saveSettings();
 
     if (!value) {
       // Unsubscribe from all topics
-      await NotificationService.instance.unsubscribeFrom('customers');
-      await NotificationService.instance.unsubscribeFrom('promotions');
+      await NotificationService.disableNotifications();
     } else {
       // Re-subscribe to customer notifications
-      await NotificationService.instance.subscribeTo('customers');
+      await NotificationService.enableNotifications();
     }
+    await _saveSettings();
 
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -87,6 +87,33 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
           backgroundColor: value ? AppColors.success : Colors.orange,
         ),
       );
+    }
+  }
+
+  Future<void> _updateServerNotificationPreference(bool enabled) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.user;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'notificationsEnabled': enabled,
+              'notificationSettings': {
+                'allNotifications': enabled,
+                'bookingNotifications': _bookingNotifications,
+                'serviceUpdates': _serviceUpdates,
+                'promotionalNotifications': _promotionalNotifications,
+              },
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+
+        debugPrint('✅ Server notification preference updated: $enabled');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating server preference: $e');
     }
   }
 
@@ -301,6 +328,9 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   _bookingNotifications = value;
                 });
                 await _saveSettings();
+                await _updateServerNotificationPreference(
+                  _notificationsEnabled,
+                );
               },
               secondary: Container(
                 padding: const EdgeInsets.all(8),
@@ -321,6 +351,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   _serviceUpdates = value;
                 });
                 await _saveSettings();
+                await _updateServerNotificationPreference(_notificationsEnabled);
               },
               secondary: Container(
                 padding: const EdgeInsets.all(8),
@@ -341,6 +372,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                   _promotionalNotifications = value;
                 });
                 await _saveSettings();
+                await _updateServerNotificationPreference(_notificationsEnabled);
               },
               secondary: Container(
                 padding: const EdgeInsets.all(8),
