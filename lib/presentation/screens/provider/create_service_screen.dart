@@ -32,7 +32,11 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   bool _isLoadingLocation = false;
 
   String _selectedCategory = 'Plumbing';
-  final List<String> _categories = [
+  bool _showOtherCategoryField = false;
+  final _otherCategoryController = TextEditingController();
+
+  // ✅ UPDATED: Predefined categories list
+  final List<String> _predefinedCategories = [
     'Plumbing',
     'Electrical',
     'Cleaning',
@@ -41,6 +45,23 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     'Carpentry',
     'Other',
   ];
+
+  // ✅ NEW: Dynamic getter for available categories that includes custom ones
+  List<String> get _availableCategories {
+    List<String> categories = List.from(_predefinedCategories);
+
+    // Add custom category if it exists and isn't already in predefined list
+    if (!_predefinedCategories.contains(_selectedCategory) &&
+        _selectedCategory.isNotEmpty &&
+        _selectedCategory != 'Other') {
+      categories.insert(
+        categories.length - 1,
+        _selectedCategory,
+      ); // Insert before "Other"
+    }
+
+    return categories;
+  }
 
   final List<String> _subServices = [];
   final _subServiceController = TextEditingController();
@@ -144,15 +165,16 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Category Dropdown
+              // ✅ FIXED: Category Dropdown with dynamic items
               DropdownButtonFormField<String>(
                 dropdownColor: Colors.white,
-                initialValue: _selectedCategory,
+                value: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
                 ),
-                items: _categories.map((category) {
+                // ✅ Use dynamic list that includes custom categories
+                items: _availableCategories.map((category) {
                   return DropdownMenuItem(
                     value: category,
                     child: Text(category),
@@ -161,10 +183,165 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 onChanged: (value) {
                   setState(() {
                     _selectedCategory = value!;
+                    // Show text field when "Other" is selected
+                    _showOtherCategoryField = (value == 'Other');
+                    if (!_showOtherCategoryField) {
+                      _otherCategoryController.clear();
+                    }
                   });
+                },
+                validator: (value) {
+                  if (value == null || value.isEmpty) {
+                    return 'Please select a category';
+                  }
+                  return null;
                 },
               ),
               const SizedBox(height: 16),
+
+              // ✅ Custom category text field (only shown when "Other" is selected)
+              if (_showOtherCategoryField) ...[
+                CustomTextField(
+                  controller: _otherCategoryController,
+                  label: 'Enter Custom Category',
+                  hintText: 'e.g., Gardening, Pet Care, Tutoring, etc.',
+                  validator: (value) {
+                    if (_showOtherCategoryField &&
+                        (value == null || value.isEmpty)) {
+                      return 'Please enter custom category';
+                    }
+                    return null;
+                  },
+                ),
+                const SizedBox(height: 12),
+
+                // Confirm custom category button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () {
+                      final customCategory = _otherCategoryController.text
+                          .trim();
+                      if (customCategory.isNotEmpty) {
+                        setState(() {
+                          _selectedCategory = customCategory;
+                          _showOtherCategoryField = false;
+                        });
+
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Category set to: $customCategory'),
+                            backgroundColor: AppColors.success,
+                            duration: const Duration(seconds: 2),
+                          ),
+                        );
+                      }
+                    },
+                    icon: const Icon(Icons.check),
+                    label: const Text('Set Custom Category'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
+
+              // ✅ Display current custom category (if it's not predefined)
+              if (!_showOtherCategoryField &&
+                  !_predefinedCategories.contains(_selectedCategory)) ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: [
+                        AppColors.primary.withOpacity(0.1),
+                        AppColors.primary.withOpacity(0.05),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: AppColors.primary.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.category,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Custom Category',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w600,
+                                color: Colors.grey,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              _selectedCategory,
+                              style: TextStyle(
+                                color: AppColors.primary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            _showOtherCategoryField = true;
+                            _otherCategoryController.text = _selectedCategory;
+                          });
+                        },
+                        icon: const Icon(Icons.edit, size: 16),
+                        label: const Text('Edit'),
+                        style: TextButton.styleFrom(
+                          foregroundColor: AppColors.primary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Option to reset to predefined categories
+                Center(
+                  child: TextButton.icon(
+                    onPressed: () {
+                      setState(() {
+                        _selectedCategory = 'Plumbing'; // Reset to default
+                      });
+                    },
+                    icon: const Icon(Icons.refresh, size: 16),
+                    label: const Text('Choose from Predefined Categories'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: Colors.grey[600],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+              ],
 
               // Mobile Number
               CustomTextField(
@@ -431,8 +608,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         await NotificationService.instance.notifyAllCustomersOfNewService(
           serviceName: _nameController.text.trim(),
           category: _selectedCategory,
-          serviceId:
-              'new_service', // You might want to get the actual service ID from serviceProvider
+          serviceId: 'new_service',
           location: _addressController.text.trim(),
         );
 
@@ -572,6 +748,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     _subServiceController.dispose();
     _mobileNumberController.dispose();
     _addressController.dispose();
+    _otherCategoryController.dispose(); // ✅ Added
     super.dispose();
   }
 }

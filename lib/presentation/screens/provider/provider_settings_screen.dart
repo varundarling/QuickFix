@@ -351,24 +351,24 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
             },
           ),
           const Divider(height: 1),
-          ListTile(
-            leading: Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: const Icon(Icons.help, color: Colors.green),
-            ),
-            title: const Text('Help & Support'),
-            subtitle: const Text('Get help or contact support'),
-            trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-            onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('Support feature coming soon!')),
-              );
-            },
-          ),
+          // ListTile(
+          //   leading: Container(
+          //     padding: const EdgeInsets.all(8),
+          //     decoration: BoxDecoration(
+          //       color: Colors.green.withOpacity(0.1),
+          //       borderRadius: BorderRadius.circular(8),
+          //     ),
+          //     child: const Icon(Icons.help, color: Colors.green),
+          //   ),
+          //   title: const Text('Help & Support'),
+          //   subtitle: const Text('Get help or contact support'),
+          //   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+          //   onTap: () {
+          //     ScaffoldMessenger.of(context).showSnackBar(
+          //       const SnackBar(content: Text('Support feature coming soon!')),
+          //     );
+          //   },
+          // ),
         ],
       ),
     );
