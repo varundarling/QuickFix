@@ -1,13 +1,9 @@
-import 'dart:convert';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quickfix/core/notifications/notification_channel.dart';
-import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/quickFix.dart';

@@ -5,7 +5,7 @@ buildscript {
     }
     dependencies {
         // AGP
-        classpath("com.android.tools.build:gradle:8.2.0")
+        classpath("com.android.tools.build:gradle:8.1.0")
         // Kotlin Gradle plugin (match your Kotlin version)
         classpath("org.jetbrains.kotlin:kotlin-gradle-plugin:1.9.24")
     }
@@ -14,14 +14,6 @@ buildscript {
 plugins {
     // Add the dependency for the Google services Gradle plugin
     id("com.google.gms.google-services") version "4.4.3" apply false
-}
-
-// ✅ Import must be at the top after plugins
-import org.gradle.api.tasks.compile.JavaCompile
-
-// ✅ Correct Kotlin DSL syntax
-tasks.withType<JavaCompile> {
-    options.compilerArgs.addAll(listOf("-Xlint:-options"))
 }
 
 val newBuildDir: Directory = rootProject.layout.buildDirectory.dir("../../build").get()

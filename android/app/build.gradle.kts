@@ -14,8 +14,8 @@ android {
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_17  // ✅ Removed underscore
-        targetCompatibility = JavaVersion.VERSION_17  // ✅ Removed underscore
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     kotlinOptions {
@@ -28,18 +28,40 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0"
         multiDexEnabled = true
         resValue("string", "admob_app_id", "ca-app-pub-3940256099942544~3347511713")
     }
 
+    // ✅ FIXED: Add signingConfigs block (optional - only if you have release signing)
+    signingConfigs {
+        create("release") {
+            // Uncomment and configure these if you have a release keystore
+            // storeFile = file("../keystore.jks")
+            // storePassword = "your_store_password"
+            // keyAlias = "your_key_alias"
+            // keyPassword = "your_key_password"
+        }
+    }
+
     buildTypes {
-        release {
+        getByName("release") {
             // TODO: Add your own signing config for the release build.
             // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            // ✅ FIXED: Use Kotlin DSL syntax for signingConfig assignment
+            // signingConfig = signingConfigs["release"]  // Uncomment if you have release signing
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro"
+            )
+        }
+        getByName("debug") {
+            isMinifyEnabled = false
+            isShrinkResources = false
         }
     }
 }
@@ -48,11 +70,8 @@ flutter {
     source = "../.."
 }
 
-// ✅ Add compiler args for Java tasks
-tasks.withType<JavaCompile> {
-    options.compilerArgs.addAll(listOf("-Xlint:-options", "-Xlint:-deprecation"))
-    sourceCompatibility = JavaVersion.VERSION_17.toString()
-        targetCompatibility = JavaVersion.VERSION_17.toString()
+tasks.withType<org.gradle.api.tasks.compile.JavaCompile> {
+    options.compilerArgs.add("-Xlint:deprecation")
 }
 
 dependencies {
