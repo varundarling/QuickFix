@@ -147,7 +147,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               'Hi, ${authProvider.userModel?.name ?? 'there'}',
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 18,
+                                fontSize: 24,
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
@@ -156,19 +156,11 @@ class _HomeScreenState extends State<HomeScreen> {
                               AppStrings.findServices,
                               style: TextStyle(
                                 color: Colors.white70,
-                                fontSize: 12,
+                                fontSize: 16,
                               ),
                             ),
                           ],
                         ),
-                      ),
-                      IconButton(
-                        icon: const Icon(
-                          Icons.person_outline,
-                          color: Colors.white,
-                          size: 22,
-                        ),
-                        onPressed: () => context.push('/profile'),
                       ),
                     ],
                   );
@@ -262,7 +254,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _quickAccessButton(
                   icon: Icons.settings,
                   label: 'Settings',
-                  onTap: () => context.push('/settings'),
+                  onTap: () => context.push('/customer-settings'), // ✅ UPDATED
                 ),
               ),
             ],

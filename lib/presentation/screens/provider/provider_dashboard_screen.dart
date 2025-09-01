@@ -308,7 +308,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     child: Icon(
                       isActive ? tab['activeIcon'] : tab['icon'],
                       size: 20,
-                      key: ValueKey(isActive),
+                      key: ValueKey('${tab['label']}_$isActive'),
                     ),
                   ),
                   text: tab['label'],

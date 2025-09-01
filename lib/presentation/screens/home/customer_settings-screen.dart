@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -6,17 +7,18 @@ import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 
-class ProviderSettingsScreen extends StatefulWidget {
-  const ProviderSettingsScreen({super.key});
+class CustomerSettingsScreen extends StatefulWidget {
+  const CustomerSettingsScreen({super.key});
 
   @override
-  State<ProviderSettingsScreen> createState() => _ProviderSettingsScreenState();
+  State<CustomerSettingsScreen> createState() => _CustomerSettingsScreenState();
 }
 
-class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
+class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
   bool _notificationsEnabled = true;
   bool _bookingNotifications = true;
-  bool _paymentNotifications = true;
+  bool _serviceUpdates = true;
+  bool _promotionalNotifications = true;
   bool _isLoading = true;
 
   @override
@@ -31,7 +33,9 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
       setState(() {
         _notificationsEnabled = prefs.getBool('notifications_enabled') ?? true;
         _bookingNotifications = prefs.getBool('booking_notifications') ?? true;
-        _paymentNotifications = prefs.getBool('payment_notifications') ?? true;
+        _serviceUpdates = prefs.getBool('service_updates') ?? true;
+        _promotionalNotifications =
+            prefs.getBool('promotional_notifications') ?? true;
         _isLoading = false;
       });
     } catch (e) {
@@ -45,7 +49,11 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notifications_enabled', _notificationsEnabled);
       await prefs.setBool('booking_notifications', _bookingNotifications);
-      await prefs.setBool('payment_notifications', _paymentNotifications);
+      await prefs.setBool('service_updates', _serviceUpdates);
+      await prefs.setBool(
+        'promotional_notifications',
+        _promotionalNotifications,
+      );
     } catch (e) {
       debugPrint('Error saving settings: $e');
     }
@@ -56,28 +64,57 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
       _notificationsEnabled = value;
       if (!value) {
         _bookingNotifications = false;
-        _paymentNotifications = false;
+        _serviceUpdates = false;
+        _promotionalNotifications = false;
       }
     });
-    await _saveSettings();
 
     if (!value) {
       // Unsubscribe from all topics
-      await NotificationService.instance.unsubscribeFrom('providers');
-      await NotificationService.instance.unsubscribeFrom('customers');
+      await NotificationService.disableNotifications();
     } else {
-      // Re-subscribe to provider notifications
-      await NotificationService.instance.subscribeTo('providers');
+      // Re-subscribe to customer notifications
+      await NotificationService.enableNotifications();
     }
+    await _saveSettings();
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          value ? 'Notifications enabled' : 'Notifications disabled',
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            value ? 'Notifications enabled' : 'Notifications disabled',
+          ),
+          backgroundColor: value ? AppColors.success : Colors.orange,
         ),
-        backgroundColor: value ? AppColors.success : Colors.orange,
-      ),
-    );
+      );
+    }
+  }
+
+  Future<void> _updateServerNotificationPreference(bool enabled) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      final user = authProvider.user;
+
+      if (user != null) {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(user.uid)
+            .update({
+              'notificationsEnabled': enabled,
+              'notificationSettings': {
+                'allNotifications': enabled,
+                'bookingNotifications': _bookingNotifications,
+                'serviceUpdates': _serviceUpdates,
+                'promotionalNotifications': _promotionalNotifications,
+              },
+              'updatedAt': FieldValue.serverTimestamp(),
+            });
+
+        debugPrint('✅ Server notification preference updated: $enabled');
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating server preference: $e');
+    }
   }
 
   Future<void> _signOut() async {
@@ -211,28 +248,41 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
                   ),
                   child: Icon(Icons.person, color: AppColors.primary),
                 ),
-                title: const Text('Profile Settings'),
-                subtitle: const Text('Manage your account details'),
+                title: const Text('My Profile '),
+                subtitle: const Text('Manage your personal information'),
                 trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-                onTap: () => context.push('/provider-profile'),
+                onTap: () => context.push('/profile'),
               ),
               const Divider(height: 1),
-              // ListTile(
-              //   leading: Container(
-              //     padding: const EdgeInsets.all(8),
-              //     decoration: BoxDecoration(
-              //       color: Colors.blue.withOpacity(0.1),
-              //       borderRadius: BorderRadius.circular(8),
-              //     ),
-              //     child: const Icon(Icons.business, color: Colors.blue),
-              //   ),
-              //   title: const Text('Business Information'),
-              //   subtitle: Text(
-              //     authProvider.userModel?.businessName ?? 'Not set',
-              //   ),
-              //   trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-              //   onTap: () => context.go('/provider-profile'),
-              // ),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.bookmark, color: Colors.blue),
+                ),
+                title: const Text('My Bookings'),
+                subtitle: const Text('View and manage your bookings'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => context.push('/customer-bookings'),
+              ),
+              const Divider(height: 1),
+              ListTile(
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.favorite, color: Colors.red),
+                ),
+                title: const Text('Favorites'),
+                subtitle: const Text('Your saved services'),
+                trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: () => context.push('/favorites'),
+              ),
             ],
           );
         },
@@ -271,13 +321,16 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
             const Divider(height: 1),
             SwitchListTile(
               title: const Text('Booking Notifications'),
-              subtitle: const Text('New booking requests and updates'),
+              subtitle: const Text('Updates about your bookings'),
               value: _bookingNotifications,
               onChanged: (value) async {
                 setState(() {
                   _bookingNotifications = value;
                 });
                 await _saveSettings();
+                await _updateServerNotificationPreference(
+                  _notificationsEnabled,
+                );
               },
               secondary: Container(
                 padding: const EdgeInsets.all(8),
@@ -285,27 +338,49 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
                   color: Colors.blue.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.book_online, color: Colors.blue),
+                child: const Icon(Icons.calendar_today, color: Colors.blue),
               ),
             ),
             const Divider(height: 1),
             SwitchListTile(
-              title: const Text('Payment Notifications'),
-              subtitle: const Text('Payment received confirmations'),
-              value: _paymentNotifications,
+              title: const Text('Service Updates'),
+              subtitle: const Text('New services and availability'),
+              value: _serviceUpdates,
               onChanged: (value) async {
                 setState(() {
-                  _paymentNotifications = value;
+                  _serviceUpdates = value;
                 });
                 await _saveSettings();
+                await _updateServerNotificationPreference(_notificationsEnabled);
               },
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
+                  color: Colors.green.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Icon(Icons.payment, color: Colors.purple),
+                child: const Icon(Icons.update, color: Colors.green),
+              ),
+            ),
+            const Divider(height: 1),
+            SwitchListTile(
+              title: const Text('Promotional Notifications'),
+              subtitle: const Text('Special offers and discounts'),
+              value: _promotionalNotifications,
+              onChanged: (value) async {
+                setState(() {
+                  _promotionalNotifications = value;
+                });
+                await _saveSettings();
+                await _updateServerNotificationPreference(_notificationsEnabled);
+              },
+              secondary: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(Icons.local_offer, color: Colors.orange),
               ),
             ),
           ],
@@ -338,7 +413,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
                 builder: (context) => AlertDialog(
                   title: const Text('About QuickFix'),
                   content: const Text(
-                    'QuickFix Provider\nVersion 1.0.0\n\nConnect with customers and grow your business.',
+                    'QuickFix Customer\nVersion 1.0.0\n\nFind and book quality services from trusted providers.',
                   ),
                   actions: [
                     TextButton(
@@ -350,7 +425,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
               );
             },
           ),
-          const Divider(height: 1),
+          // const Divider(height: 1),
           // ListTile(
           //   leading: Container(
           //     padding: const EdgeInsets.all(8),
