@@ -31,6 +31,7 @@ Future<void> main() async {
   await AdService.instance.initialize();
   await NotificationService.instance.initialize();
   await NotificationChannels.createChannels();
+  
 
   FCMTokenManager.initializeTokenListener();
 

@@ -6,6 +6,7 @@ import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
+import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/core/services/realtime_notification_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
@@ -136,7 +137,11 @@ class BookingProvider extends ChangeNotifier {
 
   // ✅ CHANGED: Active bookings only include confirmed (no inProgress)
   List<BookingModel> get activeBookings => _providerBookings
-      .where((booking) => booking.status == BookingStatus.confirmed)
+      .where(
+        (booking) =>
+            booking.status == BookingStatus.confirmed ||
+            booking.status == BookingStatus.inProgress,
+      )
       .toList();
 
   List<BookingModel> get completedBookings => _providerBookings
@@ -157,11 +162,16 @@ class BookingProvider extends ChangeNotifier {
     const validTransitions = {
       BookingStatus.pending: [BookingStatus.confirmed, BookingStatus.cancelled],
       BookingStatus.confirmed: [
+        BookingStatus.inProgress, // ✅ Add this back
+        BookingStatus.cancelled,
+      ],
+      BookingStatus.inProgress: [
         BookingStatus.completed,
         BookingStatus.cancelled,
-      ], // ✅ Direct to completed
-      BookingStatus.completed: [], // Final state
+      ],
+      BookingStatus.completed: [BookingStatus.paid], // ✅ Allow paid transition
       BookingStatus.cancelled: [], // Final state
+      BookingStatus.paid: [], // Final state
     };
 
     final allowed =
@@ -633,6 +643,13 @@ class BookingProvider extends ChangeNotifier {
     BookingStatus newStatus,
     String currentUserId,
   ) async {
+    if (isBookingLocked(bookingId)) {
+      debugPrint(
+        '🔒 [CONFLICT PREVENTION] Booking locked for OTP verification: $bookingId',
+      );
+      return false;
+    }
+
     if (_isUpdatingStatus) {
       debugPrint('⚠️ [CONFLICT PREVENTION] Update already in progress');
       return false;
@@ -771,6 +788,29 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // Add these fields to the top of BookingProvider class
+  final Set<String> _systemUpdatedBookings = {};
+
+  // Add these methods to BookingProvider
+  void markBookingAsSystemUpdated(String bookingId) {
+    _systemUpdatedBookings.add(bookingId);
+    debugPrint(
+      '🔒 [SYSTEM PROTECTION] Marking booking as system updated: $bookingId',
+    );
+
+    // Auto-remove after 30 seconds
+    Timer(const Duration(seconds: 30), () {
+      _systemUpdatedBookings.remove(bookingId);
+      debugPrint(
+        '🔓 [SYSTEM PROTECTION] Auto-removed system protection: $bookingId',
+      );
+    });
+  }
+
+  bool isBookingSystemUpdated(String bookingId) {
+    return _systemUpdatedBookings.contains(bookingId);
+  }
+
   Future<bool> bookServiceWithNotification({
     required String serviceId,
     required String providerId,
@@ -902,26 +942,76 @@ class BookingProvider extends ChangeNotifier {
         .snapshots()
         .listen(
           (snapshot) async {
-            if (_isUpdatingStatus) {
-              debugPrint('⏭️ [CONFLICT PREVENTION] Ignoring real-time update');
-              return;
-            }
-
             debugPrint(
-              '🔔 [REAL-TIME] Processing ${snapshot.docs.length} updates with customer data',
+              '🔔 [REAL-TIME] Received snapshot with ${snapshot.docs.length} documents',
             );
 
+            // ✅ CRITICAL: Check for system-protected bookings
             List<BookingModel> bookingsWithCustomerDetails = [];
 
             for (var doc in snapshot.docs) {
               try {
-                BookingModel booking = BookingModel.fromFireStore(doc);
+                final data = doc.data();
+                final bookingId = doc.id;
+                final status = data['status']?.toString() ?? 'pending';
+                final lastUpdatedBy = data['lastUpdatedBy']?.toString() ?? '';
+                final systemProtected = data['systemProtected'] ?? false;
+                final systemProtectedUntil =
+                    data['systemProtectedUntil'] as Timestamp?;
 
-                // Fetch customer details for each booking in real-time
+                debugPrint('🔍 [REAL-TIME] Processing booking $bookingId:');
+                debugPrint('   - Status: $status');
+                debugPrint('   - LastUpdatedBy: $lastUpdatedBy');
+                debugPrint('   - SystemProtected: $systemProtected');
+
+                // ✅ CRITICAL: Skip processing if system protected and still valid
+                if (systemProtected && systemProtectedUntil != null) {
+                  final protectedUntil = systemProtectedUntil.toDate();
+                  if (DateTime.now().isBefore(protectedUntil)) {
+                    debugPrint(
+                      '🛡️ [REAL-TIME] Skipping system-protected booking: $bookingId',
+                    );
+
+                    // Create booking model from existing data without overwriting
+                    BookingModel booking = BookingModel.fromFireStore(doc);
+                    final customerDetails = await _fetchCustomerDetails(
+                      booking.customerId,
+                    );
+                    if (customerDetails != null) {
+                      booking = booking.copyWith(
+                        customerName: customerDetails['customerName'],
+                        customerPhone: customerDetails['customerPhone'],
+                        customerEmail: customerDetails['customerEmail'],
+                        customerAddressFromProfile:
+                            customerDetails['customerAddress'],
+                      );
+                    }
+                    bookingsWithCustomerDetails.add(booking);
+                    continue;
+                  }
+                }
+
+                // ✅ CRITICAL: Also check local protection
+                if (isBookingSystemUpdated(bookingId)) {
+                  debugPrint(
+                    '🛡️ [REAL-TIME] Skipping locally protected booking: $bookingId',
+                  );
+
+                  // Use existing local data instead of snapshot data
+                  final existingBooking = _providerBookings
+                      .where((b) => b.id == bookingId)
+                      .firstOrNull;
+                  if (existingBooking != null) {
+                    bookingsWithCustomerDetails.add(existingBooking);
+                    continue;
+                  }
+                }
+
+                // Normal processing for non-protected bookings
+                BookingModel booking = BookingModel.fromFireStore(doc);
                 final customerDetails = await _fetchCustomerDetails(
                   booking.customerId,
                 );
-
                 if (customerDetails != null) {
                   booking = booking.copyWith(
                     customerName: customerDetails['customerName'],
@@ -931,7 +1021,6 @@ class BookingProvider extends ChangeNotifier {
                         customerDetails['customerAddress'],
                   );
                 }
-
                 bookingsWithCustomerDetails.add(booking);
               } catch (e) {
                 debugPrint('❌ [REAL-TIME] Error processing booking: $e');
@@ -941,14 +1030,92 @@ class BookingProvider extends ChangeNotifier {
             _providerBookings = bookingsWithCustomerDetails;
             notifyListeners();
 
-            debugPrint(
-              '✅ [REAL-TIME] Updated ${bookingsWithCustomerDetails.length} bookings with customer data',
-            );
+            // ✅ DEBUG: Log final status distribution
+            debugPrint('✅ [REAL-TIME] Final booking states:');
+            for (var booking in bookingsWithCustomerDetails.take(5)) {
+              debugPrint('   - ${booking.serviceName}: ${booking.status}');
+            }
+
+            final inProgressCount = bookingsWithCustomerDetails
+                .where((b) => b.status == BookingStatus.inProgress)
+                .length;
+            debugPrint('📊 [REAL-TIME] InProgress bookings: $inProgressCount');
           },
           onError: (error) {
             debugPrint('❌ [REAL-TIME] Error: $error');
           },
         );
+  }
+
+  // Add this method to BookingProvider
+  Future<void> unlockBookingStatus(String bookingId) async {
+    try {
+      await Future.delayed(
+        const Duration(seconds: 5),
+      ); // Wait for OTP verification to settle
+
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+            'statusLocked': false,
+            'statusLockReason': null,
+            'statusLockedAt': null,
+            'updatedAt': FieldValue.serverTimestamp(),
+          });
+
+      debugPrint('✅ Booking status unlocked: $bookingId');
+    } catch (e) {
+      debugPrint('❌ Error unlocking booking status: $e');
+    }
+  }
+
+  // Add these fields to BookingProvider class
+  final Set<String> _lockedBookings = {};
+
+  // Add this method to BookingProvider
+  void lockBookingForOTP(String bookingId) {
+    _lockedBookings.add(bookingId);
+    debugPrint('🔒 [BOOKING LOCK] Locked booking for OTP: $bookingId');
+  }
+
+  void unlockBookingFromOTP(String bookingId) {
+    _lockedBookings.remove(bookingId);
+    debugPrint('🔓 [BOOKING LOCK] Unlocked booking from OTP: $bookingId');
+  }
+
+  bool isBookingLocked(String bookingId) {
+    return _lockedBookings.contains(bookingId);
+  }
+
+  // Add this method to BookingProvider
+  void pauseRealTimeListener() {
+    debugPrint(
+      '⏸️ [BOOKING PROVIDER] Pausing real-time listener for OTP verification',
+    );
+    _providerBookingsSubscription?.pause();
+  }
+
+  void resumeRealTimeListener() {
+    debugPrint('▶️ [BOOKING PROVIDER] Resuming real-time listener');
+    _providerBookingsSubscription?.resume();
+  }
+
+  void debugStatusAfterOTP(String operation) {
+    debugPrint('🔍 [$operation] Status check:');
+    debugPrint('   - _isUpdatingStatus: $_isUpdatingStatus');
+    debugPrint('   - Total bookings: ${_providerBookings.length}');
+
+    for (var booking in _providerBookings) {
+      debugPrint(
+        '   - ${booking.serviceName}: ${booking.status} (${booking.id.substring(0, 8)})',
+      );
+    }
+
+    debugPrint(
+      '   - InProgress count: ${_providerBookings.where((b) => b.status == BookingStatus.inProgress).length}',
+    );
+    debugPrint('   - Active tab count: ${activeBookings.length}');
   }
 
   Future<void> loadProviderBookings(String providerId) async {
@@ -1050,10 +1217,13 @@ class BookingProvider extends ChangeNotifier {
     required String customerPhone, // ✅ NEW: Required parameter
     required String customerEmail, // ✅ NEW: Required parameter
     DateTime? selectedDate,
+    DateTime? bookedDate,
   }) async {
     try {
       _setLoading(true);
       _setError(null);
+
+      await OTPService.instance.createCustomerOTP(customerId);
 
       final booking = BookingModel(
         id: '',
@@ -1165,6 +1335,96 @@ class BookingProvider extends ChangeNotifier {
       }
     } catch (e) {
       debugPrint('❌ Error ensuring provider FCM token: $e');
+    }
+  }
+
+  Future<bool> updateBookingStatusWithProgress(
+    String bookingId,
+    BookingStatus newStatus,
+    String providerId, {
+    DateTime? workStartTime,
+    DateTime? workEndTime,
+    double? workProgress,
+  }) async {
+    try {
+      debugPrint('🔄 Updating booking with progress: $bookingId');
+
+      final updateData = <String, dynamic>{
+        'status': newStatus.toString().split('.').last,
+        'lastUpdatedBy': 'provider_$providerId',
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      };
+
+      if (workStartTime != null) {
+        updateData['workStartTime'] = Timestamp.fromDate(workStartTime);
+        updateData['isWorkInProgress'] = true;
+        updateData['workProgress'] = 0.1; // Initial progress
+      }
+
+      if (workEndTime != null) {
+        updateData['workEndTime'] = Timestamp.fromDate(workEndTime);
+        updateData['isWorkInProgress'] = false;
+        updateData['workProgress'] = 1.0; // Complete progress
+      }
+
+      if (workProgress != null) {
+        updateData['workProgress'] = workProgress;
+      }
+
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update(updateData);
+
+      await refreshSpecificBooking(bookingId);
+
+      await loadProviderBookingsWithCustomerData(providerId);
+
+      // Update local state
+      final bookingIndex = _providerBookings.indexWhere(
+        (b) => b.id == bookingId,
+      );
+      if (bookingIndex != -1) {
+        _providerBookings[bookingIndex] = _providerBookings[bookingIndex]
+            .copyWith(
+              status: newStatus,
+              workStartTime: workStartTime,
+              workEndTime: workEndTime,
+              workProgress: workProgress,
+              isWorkInProgress: workStartTime != null && workEndTime == null,
+            );
+        notifyListeners();
+      }
+
+      return true;
+    } catch (e) {
+      debugPrint('❌ Error updating booking with progress: $e');
+      return false;
+    }
+  }
+
+  // ✅ NEW: Update work progress
+  Future<void> updateWorkProgress(String bookingId, double progress) async {
+    try {
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .update({
+            'workProgress': progress,
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+          });
+
+      // Update local state
+      final bookingIndex = _providerBookings.indexWhere(
+        (b) => b.id == bookingId,
+      );
+      if (bookingIndex != -1) {
+        _providerBookings[bookingIndex] = _providerBookings[bookingIndex]
+            .copyWith(workProgress: progress);
+        notifyListeners();
+      }
+    } catch (e) {
+      debugPrint('❌ Error updating work progress: $e');
     }
   }
 }

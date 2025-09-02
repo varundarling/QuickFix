@@ -1,22 +1,55 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 
 enum BookingStatus {
   pending,
   confirmed,
   paymentPending,
   completed,
+  inProgress,
   paid,
   cancelled,
-  refunded, inProgress,
+  refunded,
 }
 
 BookingStatus? bookingStatusFromString(String value) {
   try {
-    return BookingStatus.values.firstWhere(
-      (e) => e.name == value.toLowerCase(),
-    );
+    final cleanValue = value.toLowerCase().trim();
+    debugPrint('🔍 [STATUS PARSING] Input: "$value" → Clean: "$cleanValue"');
+
+    // ✅ CRITICAL: Handle all possible status values
+    switch (cleanValue) {
+      case 'pending':
+        return BookingStatus.pending;
+      case 'confirmed':
+        return BookingStatus.confirmed;
+      case 'inprogress':
+      case 'in_progress':
+      case 'in-progress':
+        debugPrint('✅ [STATUS PARSING] Matched inProgress');
+        return BookingStatus.inProgress;
+      case 'completed':
+        return BookingStatus.completed;
+      case 'paid':
+        return BookingStatus.paid;
+      case 'cancelled':
+      case 'canceled':
+        return BookingStatus.cancelled;
+      case 'refunded':
+        return BookingStatus.refunded;
+      case 'paymentpending':
+      case 'payment_pending':
+      case 'payment-pending':
+        return BookingStatus.paymentPending;
+      default:
+        debugPrint(
+          '❌ [STATUS PARSING] Unknown status: "$cleanValue" - defaulting to pending',
+        );
+        return BookingStatus.pending;
+    }
   } catch (e) {
-    return null; // Return null if no match found
+    debugPrint('❌ [STATUS PARSING] Error parsing "$value": $e');
+    return BookingStatus.pending;
   }
 }
 
@@ -38,6 +71,7 @@ class BookingModel {
   final double customerLatitude;
   final double customerLongitude;
   final DateTime createdAt;
+  final DateTime? bookedDate;
   final DateTime? completedAt;
   final String? paymentId;
   final String? cancellationReason;
@@ -52,6 +86,18 @@ class BookingModel {
   final DateTime? selectedDate;
   DateTime? acceptedAt;
   final String? customerAddressFromProfile;
+  final bool otpVerified;
+  final DateTime? otpVerifiedAt;
+  final DateTime? serviceStartedAt;
+  final bool paymentConfirmed;
+  final String? paymentMethod;
+  final DateTime? paymentConfirmedAt;
+  final bool? realTimePayment;
+
+  final DateTime? workStartTime;
+  final DateTime? workEndTime;
+  final double workProgress; // 0.0 to 1.0
+  final bool isWorkInProgress;
 
   BookingModel({
     this.paymentDate,
@@ -71,6 +117,7 @@ class BookingModel {
     required this.customerAddress,
     required this.customerLatitude,
     required this.customerLongitude,
+    this.bookedDate,
     required this.createdAt,
     this.completedAt,
     this.paymentId,
@@ -85,10 +132,24 @@ class BookingModel {
     this.selectedDate,
     this.acceptedAt,
     this.customerAddressFromProfile,
+    this.paymentConfirmed = false,
+    this.paymentMethod,
+    this.paymentConfirmedAt,
+    this.realTimePayment,
+    this.otpVerified = false,
+    this.otpVerifiedAt,
+    this.serviceStartedAt,
+    this.workStartTime,
+    this.workEndTime,
+    this.workProgress = 0.0,
+    this.isWorkInProgress = false,
   });
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    final statusString = data['status']?.toString() ?? 'pending';
+    final parsedStatus = bookingStatusFromString(statusString);
     return BookingModel(
       id: doc.id,
       customerId: data['customerId'] ?? '',
@@ -98,10 +159,11 @@ class BookingModel {
       scheduledDateTime: _parseDateTime(data['scheduledDateTime']),
       description: data['description'] ?? '',
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
-      status: bookingStatusFromString(data['status']) ?? BookingStatus.pending,
+      status: parsedStatus ?? BookingStatus.pending,
       customerAddress: data['customerAddress'] ?? '',
       customerLatitude: (data['customerLatitude'] ?? 0.0).toDouble(),
       customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
+      bookedDate: (data['bookedDate'] as Timestamp?)?.toDate(),
       createdAt: _parseDateTime(data['createdAt']),
       completedAt: data['completedAt'] != null
           ? (data['completedAt'] as Timestamp).toDate()
@@ -123,6 +185,29 @@ class BookingModel {
       providerName: data['providerName']?.toString(),
       providerPhone: data['providerPhone']?.toString(),
       providerEmail: data['providerEmail']?.toString(),
+
+      // ✅ NEW: Real-time payment fields from Firestore
+      paymentConfirmed: data['paymentConfirmed'] ?? false,
+      paymentMethod: data['paymentMethod']?.toString(),
+      paymentConfirmedAt: data['paymentConfirmedAt'] != null
+          ? (data['paymentConfirmedAt'] as Timestamp).toDate()
+          : null,
+      realTimePayment: data['realTimePayment'],
+      otpVerified: data['otpVerified'] ?? false,
+      otpVerifiedAt: data['otpVerifiedAt'] != null
+          ? (data['otpVerifiedAt'] as Timestamp).toDate()
+          : null,
+      serviceStartedAt: data['serviceStartedAt'] != null
+          ? (data['serviceStartedAt'] as Timestamp).toDate()
+          : null,
+      workStartTime: data['workStartTime'] != null
+          ? (data['workStartTime'] as Timestamp).toDate()
+          : null,
+      workEndTime: data['workEndTime'] != null
+          ? (data['workEndTime'] as Timestamp).toDate()
+          : null,
+      workProgress: (data['workProgress'] ?? 0.0).toDouble(),
+      isWorkInProgress: data['isWorkInProgress'] ?? false,
     );
   }
 
@@ -153,6 +238,7 @@ class BookingModel {
       'customerAddress': customerAddress,
       'customerLatitude': customerLatitude,
       'customerLongitude': customerLongitude,
+      'bookedDate' : bookedDate != null ? Timestamp.fromDate(bookedDate!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
       'completedAt': completedAt != null
           ? Timestamp.fromDate(completedAt!)
@@ -171,6 +257,29 @@ class BookingModel {
       'providerName': providerName,
       'providerPhone': providerPhone,
       'providerEmail': providerEmail,
+
+      // ✅ NEW: Real-time payment fields to Firestore
+      'paymentConfirmed': paymentConfirmed,
+      'paymentMethod': paymentMethod,
+      'paymentConfirmedAt': paymentConfirmedAt != null
+          ? Timestamp.fromDate(paymentConfirmedAt!)
+          : null,
+      'realTimePayment': realTimePayment,
+      'otpVerified': otpVerified,
+      'otpVerifiedAt': otpVerifiedAt != null
+          ? Timestamp.fromDate(otpVerifiedAt!)
+          : null,
+      'serviceStartedAt': serviceStartedAt != null
+          ? Timestamp.fromDate(serviceStartedAt!)
+          : null,
+      'workStartTime': workStartTime != null
+          ? Timestamp.fromDate(workStartTime!)
+          : null,
+      'workEndTime': workEndTime != null
+          ? Timestamp.fromDate(workEndTime!)
+          : null,
+      'workProgress': workProgress,
+      'isWorkInProgress': isWorkInProgress,
     };
   }
 
@@ -234,6 +343,7 @@ extension BookingModelCopyWith on BookingModel {
     String? customerAddress,
     double? customerLatitude,
     double? customerLongitude,
+    DateTime? bookedDate,
     DateTime? createdAt,
     DateTime? completedAt,
     String? paymentId,
@@ -249,6 +359,17 @@ extension BookingModelCopyWith on BookingModel {
     DateTime? selectedDate,
     DateTime? acceptedAt,
     String? customerAddressFromProfile,
+    bool? paymentConfirmed,
+    String? paymentMethod,
+    DateTime? paymentConfirmedAt,
+    bool? realTimePayment,
+    bool? otpVerified,
+    DateTime? otpVerifiedAt,
+    DateTime? serviceStartedAt,
+    DateTime? workStartTime,
+    DateTime? workEndTime,
+    double? workProgress,
+    bool? isWorkInProgress,
   }) {
     return BookingModel(
       paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
@@ -268,6 +389,7 @@ extension BookingModelCopyWith on BookingModel {
       customerAddress: customerAddress ?? this.customerAddress,
       customerLatitude: customerLatitude ?? this.customerLatitude,
       customerLongitude: customerLongitude ?? this.customerLongitude,
+      bookedDate: bookedDate ?? this.bookedDate,
       createdAt: createdAt ?? this.createdAt,
       completedAt: completedAt ?? this.completedAt,
       paymentId: paymentId ?? this.paymentId,
@@ -284,6 +406,47 @@ extension BookingModelCopyWith on BookingModel {
       acceptedAt: acceptedAt ?? this.acceptedAt,
       customerAddressFromProfile:
           customerAddressFromProfile ?? this.customerAddressFromProfile,
+      // ✅ NEW: Real-time payment copyWith assignments
+      paymentConfirmed: paymentConfirmed ?? this.paymentConfirmed,
+      paymentMethod: paymentMethod ?? this.paymentMethod,
+      paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
+      realTimePayment: realTimePayment ?? this.realTimePayment,
+      otpVerified: otpVerified ?? this.otpVerified,
+      otpVerifiedAt: otpVerifiedAt ?? this.otpVerifiedAt,
+      serviceStartedAt: serviceStartedAt ?? this.serviceStartedAt,
+      workStartTime: workStartTime ?? this.workStartTime,
+      workEndTime: workEndTime ?? this.workEndTime,
+      workProgress: workProgress ?? this.workProgress,
+      isWorkInProgress: isWorkInProgress ?? this.isWorkInProgress,
     );
+  }
+}
+
+// ✅ OPTIONAL: Add helpful getters for payment logic
+extension BookingModelPaymentExtension on BookingModel {
+  /// Returns true if payment has been confirmed through real-time payment or status is paid
+  bool get isPaymentCompleted {
+    return paymentConfirmed || status == BookingStatus.paid;
+  }
+
+  /// Returns true if booking is completed but payment is still pending
+  bool get isPaymentPending {
+    return status == BookingStatus.completed && !isPaymentCompleted;
+  }
+
+  /// Returns true if real-time payment can be made
+  bool get canMakeRealTimePayment {
+    return status == BookingStatus.completed && !isPaymentCompleted;
+  }
+
+  /// Returns the appropriate payment status message
+  String get paymentStatusMessage {
+    if (isPaymentCompleted) {
+      return 'Payment Completed';
+    } else if (isPaymentPending) {
+      return 'Payment Required';
+    } else {
+      return 'Payment Not Required Yet';
+    }
   }
 }

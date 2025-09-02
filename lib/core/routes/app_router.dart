@@ -139,6 +139,17 @@ class AppRouter {
         },
       ),
 
+      // Add this to your GoRouter routes:
+      GoRoute(
+        path: '/provider-dashboard/:tab',
+        name: 'provider-dashboard-tab',
+        builder: (context, state) {
+          final tabIndex =
+              int.tryParse(state.pathParameters['tab'] ?? '0') ?? 0;
+          return ProviderDashboardScreen(initialTabIndex: tabIndex);
+        },
+      ),
+
       // In app_router.dart - ADD these routes
       GoRoute(
         path: '/payment/:bookingId',
@@ -173,6 +184,54 @@ class AppRouter {
       GoRoute(
         path: '/customer-settings',
         builder: (context, state) => const CustomerSettingsScreen(),
+      ),
+
+      GoRoute(
+        path: '/customer-otp/:bookingId',
+        name: 'customer-otp',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to fetch the booking or pass it through extra
+          return const Scaffold(
+            body: Center(child: Text('Customer OTP Screen')),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/otp-verification/:bookingId',
+        name: 'otp-verification',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to fetch the booking or pass it through extra
+          return const Scaffold(
+            body: Center(child: Text('OTP Verification Screen')),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/service-progress/:bookingId',
+        name: 'service-progress',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to fetch the booking or pass it through extra
+          return const Scaffold(
+            body: Center(child: Text('Service Progress Screen')),
+          );
+        },
+      ),
+
+      GoRoute(
+        path: '/real-time-payment/:bookingId',
+        name: 'real-time-payment',
+        builder: (context, state) {
+          final bookingId = state.pathParameters['bookingId']!;
+          // You'll need to fetch the booking or pass it through extra
+          return const Scaffold(
+            body: Center(child: Text('Real-time Payment Screen')),
+          );
+        },
       ),
     ],
   );

@@ -5,6 +5,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/core/services/otp_service.dart';
+import 'package:quickfix/core/services/progress_tracking_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/screens/provider/analytics_screen.dart';
 import 'package:quickfix/presentation/screens/provider/booking_detail_for_provider.dart';
@@ -19,7 +21,9 @@ import '../../../core/utils/helpers.dart';
 import '../../../data/models/booking_model.dart';
 
 class ProviderDashboardScreen extends StatefulWidget {
-  const ProviderDashboardScreen({super.key});
+  const ProviderDashboardScreen({super.key, this.initialTabIndex = 0});
+
+  final int initialTabIndex;
 
   @override
   State<ProviderDashboardScreen> createState() =>
@@ -111,11 +115,15 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   @override
   void initState() {
     super.initState();
-    _selectedIndex = 0;
-    _tabController = TabController(length: _tabs.length, vsync: this);
+    _selectedIndex = widget.initialTabIndex; // ✅ Use passed initial tab
+    _tabController = TabController(
+      length: _tabs.length,
+      vsync: this,
+      initialIndex: widget.initialTabIndex, // ✅ Set initial tab
+    );
     _pageController = PageController(
-      initialPage: 0,
-    ); // ✅ NEW: Initialize PageController
+      initialPage: widget.initialTabIndex, // ✅ Set initial page
+    );
 
     // ✅ CRITICAL: Sync TabController with PageController
     _tabController.addListener(() {
@@ -195,8 +203,15 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _bookingProvider = Provider.of<BookingProvider>(context, listen: false);
-    _authProvider = Provider.of<AuthProvider>(context, listen: false);
+
+    // Force refresh when returning to dashboard
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && _currentUserId != null) {
+        context.read<BookingProvider>().loadProviderBookingsWithCustomerData(
+          _currentUserId!,
+        );
+      }
+    });
   }
 
   void safeSetState(VoidCallback fn) {
@@ -611,16 +626,18 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   }
 
   void _navigateToTab(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
+    if (mounted) {
+      setState(() {
+        _selectedIndex = index;
+      });
 
-    _tabController.animateTo(index);
-    _pageController.animateToPage(
-      index,
-      duration: const Duration(milliseconds: 300),
-      curve: Curves.easeInOut,
-    );
+      _tabController.animateTo(index);
+      _pageController.animateToPage(
+        index,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeInOut,
+      );
+    }
   }
 
   Widget _buildMoreTab() {
@@ -1490,7 +1507,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
           case BookingStatus.confirmed: // Active tab
             bookings = bookingProvider.providerbookings
-                .where((b) => b.status == BookingStatus.confirmed)
+                .where(
+                  (b) =>
+                      b.status == BookingStatus.confirmed ||
+                      b.status == BookingStatus.inProgress,
+                )
                 .toList();
             break;
 
@@ -1814,6 +1835,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
               const SizedBox(height: 4),
 
+              _buildProviderNarrowProgressBar(booking),
+
+              const SizedBox(height: 4),
+
               _buildDateDisplay(booking),
 
               const SizedBox(height: 4),
@@ -1995,6 +2020,32 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
           child: ElevatedButton.icon(
             onPressed: isProcessing
                 ? null
+                : () => _showOTPVerificationDialog(booking),
+            icon: isProcessing
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  )
+                : const Icon(Icons.security, size: 16),
+            label: Text(isProcessing ? 'Processing...' : 'Enter Customer OTP'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.orange,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        );
+
+      // ✅ FIXED: Show progress for inProgress bookings
+      case BookingStatus.inProgress:
+        return SizedBox(
+          width: double.infinity,
+          child: ElevatedButton.icon(
+            onPressed: isProcessing
+                ? null
                 : () => _markServiceCompleted(booking),
             icon: isProcessing
                 ? const SizedBox(
@@ -2006,13 +2057,164 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     ),
                   )
                 : const Icon(Icons.check_circle, size: 16),
-            label: Text(isProcessing ? 'Completing...' : 'Mark as Completed'),
+            label: Text(isProcessing ? 'Completing...' : 'Work Completed'),
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.success),
           ),
         );
 
       default:
         return const SizedBox.shrink();
+    }
+  }
+
+  Future<void> _showOTPVerificationDialog(BookingModel booking) async {
+    final TextEditingController otpController = TextEditingController();
+    String? errorMessage;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Row(
+            children: [
+              Icon(Icons.security, color: Colors.orange),
+              SizedBox(width: 8),
+              Text('Enter Customer OTP'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text('Service: ${booking.serviceName}'),
+              Text('Customer: ${booking.customerName ?? "Customer"}'),
+              const SizedBox(height: 16),
+              const Text(
+                'Ask the customer for their 4-digit verification code:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 16),
+              TextField(
+                controller: otpController,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  letterSpacing: 8,
+                ),
+                decoration: InputDecoration(
+                  hintText: '1234',
+                  border: const OutlineInputBorder(),
+                  errorText: errorMessage,
+                ),
+                keyboardType: TextInputType.number,
+                maxLength: 4,
+                onChanged: (value) {
+                  if (errorMessage != null) {
+                    setState(() => errorMessage = null);
+                  }
+                },
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            ElevatedButton(
+              onPressed: () async {
+                if (otpController.text.length != 4) {
+                  setState(() => errorMessage = 'Please enter 4 digits');
+                  return;
+                }
+
+                try {
+                  // ✅ CRITICAL: Pause real-time listener during OTP verification
+                  final bookingProvider = context.read<BookingProvider>();
+                  bookingProvider.lockBookingForOTP(booking.id);
+                  bookingProvider.pauseRealTimeListener();
+
+                  debugPrint(
+                    '🔐 [DASHBOARD] Starting OTP verification process',
+                  );
+
+                  // Verify OTP and start work
+                  final success = await OTPService.instance.verifyOTP(
+                    booking.id,
+                    otpController.text,
+                  );
+
+                  if (success) {
+                    debugPrint('✅ [DASHBOARD] OTP verification succeeded');
+                    Navigator.of(context).pop(true);
+                  } else {
+                    debugPrint('❌ [DASHBOARD] OTP verification failed');
+                    setState(
+                      () => errorMessage =
+                          'OTP verification failed. Check console for details.',
+                    );
+
+                    // Resume listener on failure
+                    bookingProvider.unlockBookingFromOTP(booking.id);
+                    bookingProvider.resumeRealTimeListener();
+                  }
+                } catch (e) {
+                  debugPrint('❌ [DASHBOARD] OTP verification error: $e');
+                  setState(() => errorMessage = 'Verification failed: $e');
+
+                  // Resume listener on error
+                  context.read<BookingProvider>().unlockBookingFromOTP(
+                    booking.id,
+                  );
+                  context.read<BookingProvider>().resumeRealTimeListener();
+                }
+              },
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+              child: const Text('Start Work'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (result == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ OTP verified! Work started successfully.'),
+          backgroundColor: AppColors.success,
+        ),
+      );
+
+      // ✅ CRITICAL: Wait longer and then resume listener
+      await Future.delayed(const Duration(seconds: 10));
+
+      if (_currentUserId != null && mounted) {
+        final bookingProvider = context.read<BookingProvider>();
+
+        // Resume real-time listener
+        bookingProvider.unlockBookingFromOTP(booking.id);
+        bookingProvider.resumeRealTimeListener();
+
+        // Force refresh to get latest data
+        await bookingProvider.loadProviderBookingsWithCustomerData(
+          _currentUserId!,
+        );
+
+        // Debug status
+        bookingProvider.debugStatusAfterOTP('FINAL_OTP_CHECK');
+
+        setState(() {});
+
+        debugPrint('✅ [DASHBOARD] OTP verification process completed');
+      }
+    } else {
+      // Resume listener if dialog was cancelled
+      if (mounted) {
+        final bookingProvider = context.read<BookingProvider>();
+        bookingProvider.unlockBookingFromOTP(booking.id);
+        bookingProvider.resumeRealTimeListener();
+      }
     }
   }
 
@@ -2070,6 +2272,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       _setBookingProcessing(booking.id, true);
 
       try {
+        await ProgressTrackingService.instance.completeWork(booking.id);
         // ✅ SIMPLIFIED: Direct update to completed status
         final success = await bookingProvider.updateBookingStatus(
           booking.id,
@@ -2091,7 +2294,11 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             ),
           );
 
-          _navigateToAppropriateTab(BookingStatus.completed);
+          Future.delayed(const Duration(milliseconds: 1000), () {
+            if (mounted) {
+              _navigateToTab(3); // Completed tab is index 3
+            }
+          });
         }
       } catch (error) {
         if (mounted) {
@@ -2113,7 +2320,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     BookingStatus newStatus,
   ) async {
     if (!mounted || _isBookingProcessing(bookingId)) {
-      debugPrint('⚠️ Update blocked - already processing');
       return;
     }
 
@@ -2121,22 +2327,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     final bookingProvider = context.read<BookingProvider>();
 
     final currentUserId = authProvider.getCurrentUserId();
-    if (currentUserId == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('User not authenticated')));
-      }
-      return;
-    }
+    if (currentUserId == null) return;
 
-    debugPrint('🎯 [PROVIDER DASHBOARD] Starting status update');
-    debugPrint('   - Booking ID: $bookingId');
-    debugPrint('   - New Status: $newStatus');
-
-    // ✅ CRITICAL: Set flags BEFORE any async operations
     _setBookingProcessing(bookingId, true);
-    _isUpdatingStatus = true;
 
     try {
       // Show loading dialog
@@ -2165,20 +2358,47 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       }
 
-      debugPrint(
-        '🔄 [STATUS UPDATE] Calling BookingProvider.updateBookingStatus',
-      );
-
-      // ✅ CRITICAL: Wait for the update to complete
+      // Update booking status
       final success = await bookingProvider.updateBookingStatus(
         bookingId,
         newStatus,
         currentUserId,
       );
 
-      debugPrint('✅ [STATUS UPDATE] BookingProvider returned: $success');
+      // ✅ CRITICAL: Generate OTP when accepting booking
+      if (success && newStatus == BookingStatus.confirmed) {
+        try {
+          debugPrint('🔑 Generating OTP for booking: $bookingId');
+          final otpCode = await OTPService.instance.createOTPForBooking(
+            bookingId,
+          );
+          debugPrint('✅ OTP generated successfully: $otpCode');
 
-      // ✅ ENHANCED: Add extra delay to ensure Firestore consistency
+          // ✅ Verify OTP was actually created
+          await Future.delayed(const Duration(seconds: 1));
+          final verifyOTP = await OTPService.instance.getOTPForBooking(
+            bookingId,
+          );
+          if (verifyOTP != null) {
+            debugPrint('✅ OTP verified in database: $verifyOTP');
+          } else {
+            debugPrint('❌ OTP verification failed - not found in database');
+          }
+        } catch (e) {
+          debugPrint('❌ Error generating OTP: $e');
+          // Show error but don't fail the booking acceptance
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('Booking accepted but OTP generation failed: $e'),
+                backgroundColor: Colors.orange,
+                duration: const Duration(seconds: 4),
+              ),
+            );
+          }
+        }
+      }
+
       await Future.delayed(const Duration(milliseconds: 1500));
 
       // Close loading dialog
@@ -2189,22 +2409,18 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       if (!mounted) return;
 
       if (success) {
-        debugPrint('✅ [PROVIDER DASHBOARD] Status updated successfully');
-
-        // ✅ NEW: Manually refresh the specific booking to ensure consistency
-        await bookingProvider.refreshSpecificBooking(bookingId);
-
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Booking ${_getActionText(newStatus).toLowerCase()} successfully!',
+              newStatus == BookingStatus.confirmed
+                  ? 'Booking accepted! OTP generated for customer.'
+                  : 'Booking ${_getActionText(newStatus).toLowerCase()} successfully!',
             ),
             backgroundColor: AppColors.success,
             duration: const Duration(seconds: 2),
           ),
         );
 
-        // ✅ ENHANCED: Wait longer before navigating
         await Future.delayed(const Duration(milliseconds: 2500));
 
         if (mounted) {
@@ -2219,7 +2435,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       }
     } catch (error) {
-      debugPrint('❌ [PROVIDER DASHBOARD] Error: $error');
+      debugPrint('❌ Error: $error');
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -2228,15 +2444,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       }
     } finally {
-      // ✅ CRITICAL: Reset flags with additional delay
       await Future.delayed(const Duration(milliseconds: 1000));
-
       if (mounted) {
-        _isUpdatingStatus = false;
         _setBookingProcessing(bookingId, false);
       }
-
-      debugPrint('🏁 [STATUS UPDATE] Cleanup completed');
     }
   }
 
@@ -2329,6 +2540,75 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       default:
         return 'unknown';
     }
+  }
+
+  Widget _buildProviderNarrowProgressBar(BookingModel booking) {
+    if (booking.status != BookingStatus.inProgress &&
+        !booking.isWorkInProgress) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(booking.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox.shrink();
+
+        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
+        final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
+
+        if (!isWorkInProgress) return const SizedBox.shrink();
+
+        return Container(
+          margin: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.work, size: 14, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Work Progress - ${(progress * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [Colors.blue, Colors.blueAccent],
+                      ),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   @override

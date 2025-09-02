@@ -6,10 +6,12 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
+import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
 import 'package:quickfix/presentation/screens/payment/payment_options_screen.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
 
@@ -288,7 +290,11 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
 
             case BookingStatus.confirmed:
               bookings = allBookings
-                  .where((booking) => booking.status == BookingStatus.confirmed)
+                  .where(
+                    (booking) =>
+                        booking.status == BookingStatus.confirmed ||
+                        booking.status == BookingStatus.inProgress,
+                  )
                   .toList();
               break;
 
@@ -558,6 +564,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                 ),
               ),
 
+              _buildNarrowProgressBar(booking),
+
               const SizedBox(height: 12),
 
               // Status-specific messages (your existing code)
@@ -661,6 +669,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
         return 'Pending';
       case BookingStatus.confirmed:
         return 'Accepted';
+      case BookingStatus.inProgress:
+        return 'Work in Progress';
       case BookingStatus.completed:
         return 'Completed - Payment Required';
       case BookingStatus.paid:
@@ -698,41 +708,33 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
         );
 
       case BookingStatus.confirmed:
-        return Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.blue.withValues(alpha: 0.1),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Column(
-            children: [
-              const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.construction, color: Colors.blue, size: 20),
-                  SizedBox(width: 8),
-                  Text(
-                    'Service in Progress',
-                    style: TextStyle(
-                      color: Colors.blue,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Provider is working on your service',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: Colors.blue.withValues(alpha: 0.8),
-                  fontSize: 12,
-                ),
-              ),
-            ],
-          ),
+        return StreamBuilder<DocumentSnapshot>(
+          stream: FirebaseFirestore.instance
+              .collection('bookings')
+              .doc(booking.id)
+              .snapshots(),
+          builder: (context, snapshot) {
+            if (!snapshot.hasData) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final data = snapshot.data!.data() as Map<String, dynamic>?;
+            final status = data?['status'] as String?;
+            final isWorkInProgress =
+                data?['isWorkInProgress'] as bool? ?? false;
+
+            // ✅ FIXED: Check for inProgress status
+            if (status == 'inProgress' || isWorkInProgress) {
+              return _buildWorkInProgressCard();
+            }
+
+            // Show OTP viewing option for confirmed bookings
+            return _buildOTPViewCard(booking);
+          },
         );
+
+      case BookingStatus.inProgress:
+        return _buildWorkInProgressCard();
 
       // ✅ FIXED: Completed status shows payment options
       case BookingStatus.completed:
@@ -868,6 +870,222 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
     }
   }
 
+  Widget _buildWorkInProgressCard() {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [
+              AppColors.primary.withOpacity(0.1),
+              AppColors.primary.withOpacity(0.05),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.construction,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Service In Progress',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Provider is working on your service',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: AppColors.primary.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOTPViewCard(BookingModel booking) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          gradient: LinearGradient(
+            colors: [
+              Colors.orange.withOpacity(0.1),
+              Colors.orange.withOpacity(0.05),
+            ],
+          ),
+        ),
+        child: Column(
+          children: [
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Icon(
+                    Icons.security,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  'Service Accepted!',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Provider needs your verification code',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.orange.withOpacity(0.8),
+                fontSize: 14,
+              ),
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => CustomerOTPScreen(booking: booking),
+                    ),
+                  );
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                icon: const Icon(Icons.code, size: 18),
+                label: const Text(
+                  'View Verification Code',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildNarrowProgressBar(BookingModel booking) {
+    if (booking.status != BookingStatus.inProgress) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(booking.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox.shrink();
+
+        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
+        final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
+        final status = data['status'] as String?;
+
+        if (!isWorkInProgress) return const SizedBox.shrink();
+
+        if (status != 'inProgress' && !isWorkInProgress) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          margin: const EdgeInsets.only(top: 8),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.construction, size: 14, color: Colors.blue),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Work in Progress - ${(progress * 100).toInt()}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Colors.blue,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Container(
+                width: double.infinity,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade300,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: progress,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void _showPaymentOptions(BookingModel booking) {
     Navigator.push(
       context,
@@ -952,6 +1170,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
         return Icons.schedule;
       case BookingStatus.confirmed:
         return Icons.construction;
+      case BookingStatus.inProgress:
+        return Icons.build;
       case BookingStatus.completed:
         return Icons.payment;
       case BookingStatus.paid:

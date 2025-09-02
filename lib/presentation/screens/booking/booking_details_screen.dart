@@ -1,12 +1,15 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/screens/payment/customer_payment_screen.dart';
+import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
+import 'package:quickfix/presentation/screens/payment/real_time_payment_screen.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
   final String bookingId;
@@ -187,15 +190,6 @@ class _CustomerBookingDetailScreenState
     return _buildBookingDetails(booking!);
   }
 
-  void _navigateToCustomerPayment(BookingModel booking) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CustomerPaymentScreen(booking: booking),
-      ),
-    );
-  }
-
   Future<BookingModel> getBookingWithProfileAddress(String bookingId) async {
     var bookingDoc = await FirebaseFirestore.instance
         .collection('bookings')
@@ -215,55 +209,13 @@ class _CustomerBookingDetailScreenState
   }
 
   Widget _buildBookingDetails(BookingModel booking) {
-    final statusColor = Helpers.getStatusColor(booking.status.toString());
+    Helpers.getStatusColor(booking.status.toString());
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status Card
-          Card(
-            color: statusColor.withValues(alpha: 0.1),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Icon(
-                    _getStatusIcon(booking.status),
-                    color: statusColor,
-                    size: 32,
-                  ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Booking ${booking.statusDisplay}',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: statusColor,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Booking ID: ${booking.id.substring(0, 8)}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            color: AppColors.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 20),
-
           // Service Details
           _buildDetailCard(
             title: 'Service Details',
@@ -279,7 +231,7 @@ class _CustomerBookingDetailScreenState
               _buildDetailRow(
                 'Booked Date',
                 Helpers.formatDateTime(booking.createdAt),
-              ), // New row added
+              ),
               _buildDetailRow(
                 'Scheduled Date',
                 Helpers.formatDateTime(booking.scheduledDateTime),
@@ -292,6 +244,14 @@ class _CustomerBookingDetailScreenState
           ),
 
           const SizedBox(height: 16),
+
+          // ✅ NEW: OTP Section (shows when confirmed and OTP not used)
+          _buildOTPSection(booking),
+
+          _buildProgressSection(booking),
+
+          // ✅ NEW: Real-time Payment Section (shows when completed)
+          // _buildRealTimePaymentSection(booking),
 
           // Provider Details
           _buildDetailCard(
@@ -426,64 +386,178 @@ class _CustomerBookingDetailScreenState
 
           const SizedBox(height: 16),
 
+          // Legacy OTP Card (keep for backward compatibility but hide if new OTP section is shown)
+          if (booking.status == BookingStatus.confirmed) ...[
+            const SizedBox(height: 16),
+            Card(
+              elevation: 2,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: Column(
+                  children: [
+                    const Icon(Icons.security, color: Colors.orange, size: 32),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Service Accepted!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Your service provider will ask for a verification code to start the work.',
+                      style: TextStyle(color: Colors.orange, fontSize: 14),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton.icon(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) =>
+                                CustomerOTPScreen(booking: booking),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.orange,
+                        foregroundColor: Colors.white,
+                      ),
+                      icon: const Icon(Icons.code),
+                      label: const Text('View Verification Code'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+
+          const SizedBox(height: 16),
+
           // Timeline
+          // Timeline - Simple like the image
           _buildDetailCard(
             title: 'Booking Timeline',
             icon: Icons.timeline,
             children: [
-              _buildTimelineItem(
-                'Booked For',
-                booking.selectedDate != null
-                    ? Helpers.formatDateTime(booking.selectedDate!)
-                    : 'Not available',
-                Icons.calendar_today,
-                Colors.blue,
+              StreamBuilder<DocumentSnapshot>(
+                stream: FirebaseFirestore.instance
+                    .collection('bookings')
+                    .doc(booking.id)
+                    .snapshots(),
+                builder: (context, snapshot) {
+                  // Use live data if available
+                  Map<String, dynamic>? liveData;
+                  if (snapshot.hasData && snapshot.data!.exists) {
+                    liveData = snapshot.data!.data() as Map<String, dynamic>?;
+                  }
+
+                  final currentStatus = liveData?['status'] as String?;
+                  final workStartTime =
+                      liveData?['workStartTime'] as Timestamp?;
+                  final completedAt = liveData?['completedAt'] as Timestamp?;
+                  final acceptedAt =
+                      liveData?['acceptedAt'] as Timestamp? ??
+                      (booking.acceptedAt != null
+                          ? Timestamp.fromDate(booking.acceptedAt!)
+                          : null);
+                  final paymentDate =
+                      liveData?['paymentConfirmedAt'] as Timestamp? ??
+                      liveData?['paymentDate'] as Timestamp?;
+
+                  return Column(
+                    children: [
+                      // Created On
+                      _buildSimpleTimelineRow(
+                        Icons.calendar_today,
+                        'Booked Date',
+                        Helpers.formatDateTime(booking.bookedDate ?? booking.createdAt),
+                        Colors.blue,
+                      ),
+
+                      // Scheduled Date
+                      _buildSimpleTimelineRow(
+                        Icons.access_time,
+                        'Scheduled Date',
+                        Helpers.formatDateTime(booking.scheduledDateTime),
+                        Colors.orange,
+                      ),
+
+                      // Accepted On (if accepted)
+                      if (acceptedAt != null)
+                        _buildSimpleTimelineRow(
+                          Icons.thumb_up,
+                          'Accepted On',
+                          Helpers.formatDateTime(acceptedAt.toDate()),
+                          Colors.green,
+                        ),
+
+                      // Work Started (if started)
+                      if (workStartTime != null)
+                        _buildSimpleTimelineRow(
+                          Icons.construction,
+                          'Work Started',
+                          Helpers.formatDateTime(workStartTime.toDate()),
+                          AppColors.primary,
+                        ),
+
+                      // Completed Date (if completed)
+                      if (completedAt != null)
+                        _buildSimpleTimelineRow(
+                          Icons.check_circle,
+                          'Completed On',
+                          Helpers.formatDateTime(completedAt.toDate()),
+                          Colors.green,
+                        ),
+
+                      if (paymentDate != null)
+                        _buildSimpleTimelineRow(
+                          Icons.payment,
+                          'Payment Completed',
+                          Helpers.formatDateTime(paymentDate.toDate()),
+                          Colors.purple,
+                        )
+                      else if (currentStatus == 'completed')
+                        _buildSimpleTimelineRow(
+                          Icons.payment,
+                          'Payment Status',
+                          'Payment required',
+                          Colors.orange,
+                        ),
+                    ],
+                  );
+                },
               ),
-              if (booking.status == BookingStatus.confirmed &&
-                  booking.acceptedAt != null)
-                _buildTimelineItem(
-                  'Accepted on',
-                  Helpers.formatDateTime(booking.acceptedAt!),
-                  Icons.thumb_up,
-                  Colors.green,
-                ),
-              if (booking.completedAt != null &&
-                  booking.status == BookingStatus.completed)
-                _buildTimelineItem(
-                  'Completion Date',
-                  Helpers.formatDateTime(booking.completedAt!),
-                  Icons.check_circle,
-                  AppColors.success,
-                ),
-              if (booking.paymentDate != null)
-                _buildTimelineItem(
-                  'Payment Completion On',
-                  Helpers.formatDateTime(booking.paymentDate!),
-                  Icons.payment,
-                  Colors.orange,
-                ),
-              // ✅ FIXED: For cancelled bookings
-              if (booking.status == BookingStatus.cancelled)
-                _buildTimelineItem(
-                  'Booking Cancelled',
-                  booking.completedAt != null
-                      ? Helpers.formatDateTime(booking.completedAt!)
-                      : Helpers.formatDateTime(
-                          booking.createdAt,
-                        ), // Fallback to creation date
-                  Icons.cancel,
-                  AppColors.error,
-                ),
             ],
           ),
+
           const SizedBox(height: 20),
 
-          // Action Buttons
-          if (booking.status == BookingStatus.completed)
+          // Action Buttons (Updated to handle real-time payment)
+          if (booking.status == BookingStatus.completed &&
+              !booking.paymentConfirmed)
             SizedBox(
               width: double.infinity,
               child: ElevatedButton.icon(
-                onPressed: () => _navigateToCustomerPayment(booking),
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) =>
+                        RealTimePaymentScreen(booking: booking),
+                  ),
+                ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.success,
                   foregroundColor: Colors.white,
@@ -491,9 +565,40 @@ class _CustomerBookingDetailScreenState
                 ),
                 icon: const Icon(Icons.payment, size: 20),
                 label: const Text(
-                  'Complete Payment',
+                  'Pay Now - Real Time',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
+              ),
+            )
+          else if (booking.status == BookingStatus.completed &&
+              booking.paymentConfirmed)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.withOpacity(0.3)),
+              ),
+              child: Column(
+                children: [
+                  const Icon(Icons.check_circle, color: Colors.green, size: 32),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Payment Completed!',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.green,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Thank you for using our service!',
+                    style: TextStyle(color: Colors.green, fontSize: 14),
+                    textAlign: TextAlign.center,
+                  ),
+                ],
               ),
             )
           else if (booking.status == BookingStatus.pending)
@@ -515,6 +620,434 @@ class _CustomerBookingDetailScreenState
         ],
       ),
     );
+  }
+
+  // ✅ Simple timeline row (matching the image design)
+  Widget _buildSimpleTimelineRow(
+    IconData icon,
+    String label,
+    String value,
+    Color color,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 20, color: color),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                    color: color,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: OTP Section Widget
+  Widget _buildOTPSection(BookingModel booking) {
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('otps')
+          .doc(booking.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final otpDoc = snapshot.data!;
+        if (!otpDoc.exists) return const SizedBox.shrink();
+
+        final otpData = otpDoc.data() as Map<String, dynamic>;
+        final String otpCode = otpData['code'] ?? '';
+        final bool isUsed = otpData['isUsed'] ?? false;
+
+        // Only show OTP if booking is confirmed and OTP hasn't been used
+        if (booking.status == BookingStatus.confirmed &&
+            !isUsed &&
+            otpCode.isNotEmpty) {
+          return Card(
+            elevation: 4,
+            margin: const EdgeInsets.only(bottom: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                gradient: LinearGradient(
+                  colors: [
+                    Colors.orange.withOpacity(0.1),
+                    Colors.orange.withOpacity(0.05),
+                  ],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.orange,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: const Icon(
+                          Icons.security,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      const Expanded(
+                        child: Text(
+                          'Service Verification Code',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Text(
+                          'Share this code with your service provider',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 12,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.orange),
+                          ),
+                          child: Text(
+                            otpCode,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.orange,
+                              letterSpacing: 8,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        InkWell(
+                          onTap: () {
+                            Clipboard.setData(ClipboardData(text: otpCode));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('✅ OTP copied to clipboard'),
+                                backgroundColor: Colors.orange,
+                                duration: Duration(seconds: 2),
+                              ),
+                            );
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 12,
+                              vertical: 8,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.orange.withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.copy,
+                                  color: Colors.orange,
+                                  size: 16,
+                                ),
+                                SizedBox(width: 4),
+                                Text(
+                                  'Tap to copy',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.orange,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            'Keep this code ready. Your provider will ask for it to start the service.',
+                            style: TextStyle(fontSize: 12, color: Colors.blue),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+
+        return const SizedBox.shrink();
+      },
+    );
+  }
+
+  // ✅ NEW: Real-time Payment Section Widget
+  Widget _buildRealTimePaymentSection(BookingModel booking) {
+    // Only show payment option when work is completed but not paid
+    if (booking.status == BookingStatus.completed &&
+        !booking.paymentConfirmed) {
+      return Card(
+        elevation: 4,
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            gradient: LinearGradient(
+              colors: [
+                AppColors.success.withOpacity(0.1),
+                AppColors.success.withOpacity(0.05),
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.success,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: const Icon(
+                      Icons.payment,
+                      color: Colors.white,
+                      size: 20,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      'Service Completed!',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Your service has been completed successfully. Please proceed with the payment to finalize the booking.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      'Total Amount:',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.textPrimary,
+                      ),
+                    ),
+                    Text(
+                      Helpers.formatCurrency(booking.totalAmount),
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: AppColors.success,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 50,
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) =>
+                            RealTimePaymentScreen(booking: booking),
+                      ),
+                    );
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.success,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    elevation: 2,
+                  ),
+                  icon: const Icon(Icons.payment, size: 20),
+                  label: Text(
+                    'Pay Now ${Helpers.formatCurrency(booking.totalAmount)}',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.blue.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue, size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Secure payment powered by industry-standard encryption.',
+                        style: TextStyle(fontSize: 12, color: Colors.blue),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // Show payment confirmation if already paid
+    if (booking.paymentConfirmed) {
+      return Card(
+        elevation: 4,
+        margin: const EdgeInsets.only(bottom: 16),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        child: Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(12),
+            color: Colors.green.withOpacity(0.05),
+            border: Border.all(color: Colors.green.withOpacity(0.2)),
+          ),
+          child: Column(
+            children: [
+              const Icon(Icons.check_circle, color: Colors.green, size: 40),
+              const SizedBox(height: 12),
+              const Text(
+                'Payment Completed!',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.green,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                'Amount Paid: ${Helpers.formatCurrency(booking.totalAmount)}',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                'Thank you for using our service! Your booking is now complete.',
+                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return const SizedBox.shrink();
   }
 
   // ✅ NEW: Helper methods for provider privacy styling
@@ -578,7 +1111,6 @@ class _CustomerBookingDetailScreenState
     }
   }
 
-
   // Helper method for loading states
   Widget _buildLoadingRow(String label, String message) {
     return Padding(
@@ -628,7 +1160,6 @@ class _CustomerBookingDetailScreenState
   }
 
   // ✅ ADD: Method to fetch provider details from Firestore
-  // Enhanced provider details fetching with better error handling
   Future<Map<String, dynamic>?> _fetchProviderDetails(String providerId) async {
     try {
       debugPrint(
@@ -888,7 +1419,8 @@ class _CustomerBookingDetailScreenState
           ),
 
           // Status indicator for completed events
-          if (title.contains('Completed'))
+          if (title.contains('Completed') ||
+              title.contains('Payment completed')) ...[
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
@@ -904,6 +1436,7 @@ class _CustomerBookingDetailScreenState
                 ),
               ),
             ),
+          ],
         ],
       ),
     );
@@ -956,19 +1489,232 @@ class _CustomerBookingDetailScreenState
       case BookingStatus.pending:
         return Icons.schedule;
       case BookingStatus.confirmed:
-        return Icons.construction; // More appropriate for active service
+        return Icons.construction;
       case BookingStatus.inProgress:
-        return Icons.work; // New icon for in-progress status
+        return Icons.build;
       case BookingStatus.completed:
-        return Icons.done; // Different from confirmed
+        return Icons.done;
       case BookingStatus.cancelled:
         return Icons.cancel;
       case BookingStatus.refunded:
         return Icons.money_off;
       case BookingStatus.paymentPending:
-        return Icons.pending; // Alternative: Icons.access_time, Icons.timer
+        return Icons.pending;
       case BookingStatus.paid:
         return Icons.verified;
     }
+  }
+
+  Widget _buildProgressSection(BookingModel booking) {
+    // Only show progress for inProgress bookings
+    if (booking.status != BookingStatus.inProgress) {
+      return const SizedBox.shrink();
+    }
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(booking.id)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (!snapshot.hasData) return const SizedBox.shrink();
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+        if (data == null) return const SizedBox.shrink();
+
+        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
+        final workStartTime = (data['workStartTime'] as Timestamp?)?.toDate();
+        final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
+
+        if (!isWorkInProgress || workStartTime == null) {
+          return const SizedBox.shrink();
+        }
+
+        // Calculate elapsed time
+        final elapsed = DateTime.now().difference(workStartTime);
+        final elapsedMinutes = elapsed.inMinutes;
+        final elapsedHours = elapsed.inHours;
+        final remainingMinutes = elapsed.inMinutes % 60;
+
+        return Card(
+          elevation: 4,
+          margin: const EdgeInsets.only(bottom: 16),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(12),
+              gradient: LinearGradient(
+                colors: [
+                  Colors.blue.withOpacity(0.1),
+                  Colors.blue.withOpacity(0.05),
+                ],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Icon(
+                        Icons.construction,
+                        color: Colors.white,
+                        size: 20,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Work in Progress',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.blue,
+                        ),
+                      ),
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 6,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.blue,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        '${(progress * 100).toInt()}%',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+
+                // Progress Bar
+                Container(
+                  width: double.infinity,
+                  height: 12,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: FractionallySizedBox(
+                    alignment: Alignment.centerLeft,
+                    widthFactor: progress,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Colors.blue, Colors.blue.shade700],
+                        ),
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 16),
+
+                // Time Information
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Time Elapsed',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          elapsedHours > 0
+                              ? '${elapsedHours}h ${remainingMinutes}m'
+                              : '${elapsedMinutes}m',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        const Text(
+                          'Status',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          progress >= 0.75
+                              ? 'Almost Complete'
+                              : progress >= 0.5
+                              ? 'In Progress'
+                              : 'Getting Started',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: 12),
+
+                // Info Message
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.blue.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        color: Colors.blue.shade700,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      const Expanded(
+                        child: Text(
+                          'Your service provider is working on your request. You\'ll be notified when it\'s completed.',
+                          style: TextStyle(fontSize: 12, color: Colors.blue),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
