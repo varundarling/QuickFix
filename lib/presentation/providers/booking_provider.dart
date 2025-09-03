@@ -1213,9 +1213,9 @@ class BookingProvider extends ChangeNotifier {
     required double customerLatitude,
     required double customerLongitude,
     required double totalAmount,
-    required String customerName, // ✅ NEW: Required parameter
-    required String customerPhone, // ✅ NEW: Required parameter
-    required String customerEmail, // ✅ NEW: Required parameter
+    required String customerName, 
+    required String customerPhone,
+    required String customerEmail,
     DateTime? selectedDate,
     DateTime? bookedDate,
   }) async {

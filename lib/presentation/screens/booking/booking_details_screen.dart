@@ -7,7 +7,6 @@ import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
-import 'package:quickfix/presentation/screens/payment/customer_payment_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
 import 'package:quickfix/presentation/screens/payment/real_time_payment_screen.dart';
 
@@ -248,8 +247,6 @@ class _CustomerBookingDetailScreenState
           // ✅ NEW: OTP Section (shows when confirmed and OTP not used)
           _buildOTPSection(booking),
 
-          _buildProgressSection(booking),
-
           // ✅ NEW: Real-time Payment Section (shows when completed)
           // _buildRealTimePaymentSection(booking),
 
@@ -386,6 +383,10 @@ class _CustomerBookingDetailScreenState
 
           const SizedBox(height: 16),
 
+          _buildProgressSection(booking),
+
+          const SizedBox(height: 16),
+
           // Legacy OTP Card (keep for backward compatibility but hide if new OTP section is shown)
           if (booking.status == BookingStatus.confirmed) ...[
             const SizedBox(height: 16),
@@ -483,7 +484,9 @@ class _CustomerBookingDetailScreenState
                       _buildSimpleTimelineRow(
                         Icons.calendar_today,
                         'Booked Date',
-                        Helpers.formatDateTime(booking.bookedDate ?? booking.createdAt),
+                        Helpers.formatDateTime(
+                          booking.bookedDate ?? booking.createdAt,
+                        ),
                         Colors.blue,
                       ),
 
@@ -856,200 +859,6 @@ class _CustomerBookingDetailScreenState
     );
   }
 
-  // ✅ NEW: Real-time Payment Section Widget
-  Widget _buildRealTimePaymentSection(BookingModel booking) {
-    // Only show payment option when work is completed but not paid
-    if (booking.status == BookingStatus.completed &&
-        !booking.paymentConfirmed) {
-      return Card(
-        elevation: 4,
-        margin: const EdgeInsets.only(bottom: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            gradient: LinearGradient(
-              colors: [
-                AppColors.success.withOpacity(0.1),
-                AppColors.success.withOpacity(0.05),
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: AppColors.success,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Icon(
-                      Icons.payment,
-                      color: Colors.white,
-                      size: 20,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  const Expanded(
-                    child: Text(
-                      'Service Completed!',
-                      style: TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
-              const Text(
-                'Your service has been completed successfully. Please proceed with the payment to finalize the booking.',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: AppColors.success.withOpacity(0.3)),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      'Total Amount:',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.w600,
-                        color: AppColors.textPrimary,
-                      ),
-                    ),
-                    Text(
-                      Helpers.formatCurrency(booking.totalAmount),
-                      style: const TextStyle(
-                        fontSize: 18,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.success,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                height: 50,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) =>
-                            RealTimePaymentScreen(booking: booking),
-                      ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.success,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    elevation: 2,
-                  ),
-                  icon: const Icon(Icons.payment, size: 20),
-                  label: Text(
-                    'Pay Now ${Helpers.formatCurrency(booking.totalAmount)}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: const Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Colors.blue, size: 16),
-                    SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Secure payment powered by industry-standard encryption.',
-                        style: TextStyle(fontSize: 12, color: Colors.blue),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    // Show payment confirmation if already paid
-    if (booking.paymentConfirmed) {
-      return Card(
-        elevation: 4,
-        margin: const EdgeInsets.only(bottom: 16),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        child: Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(12),
-            color: Colors.green.withOpacity(0.05),
-            border: Border.all(color: Colors.green.withOpacity(0.2)),
-          ),
-          child: Column(
-            children: [
-              const Icon(Icons.check_circle, color: Colors.green, size: 40),
-              const SizedBox(height: 12),
-              const Text(
-                'Payment Completed!',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green,
-                ),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                'Amount Paid: ${Helpers.formatCurrency(booking.totalAmount)}',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Thank you for using our service! Your booking is now complete.',
-                style: TextStyle(fontSize: 14, color: AppColors.textSecondary),
-                textAlign: TextAlign.center,
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-
-    return const SizedBox.shrink();
-  }
-
   // ✅ NEW: Helper methods for provider privacy styling
   Color _getProviderPrivacyColor(BookingStatus status) {
     switch (status) {
@@ -1370,78 +1179,6 @@ class _CustomerBookingDetailScreenState
     );
   }
 
-  Widget _buildTimelineItem(
-    String title,
-    String time,
-    IconData icon,
-    Color color,
-  ) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        children: [
-          // Timeline indicator with enhanced styling
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: color, width: 2),
-            ),
-            child: Icon(icon, size: 20, color: color),
-          ),
-          const SizedBox(width: 16),
-
-          // Timeline content
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
-                    color: color,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  time,
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // Status indicator for completed events
-          if (title.contains('Completed') ||
-              title.contains('Payment completed')) ...[
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                'Completed',
-                style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                  color: color,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
-
   Future<void> _cancelBooking(BookingModel booking) async {
     final confirmed = await showDialog<bool>(
       context: context,
@@ -1481,27 +1218,6 @@ class _CustomerBookingDetailScreenState
         // Refresh the booking data after cancellation
         await _loadBooking();
       }
-    }
-  }
-
-  IconData _getStatusIcon(BookingStatus status) {
-    switch (status) {
-      case BookingStatus.pending:
-        return Icons.schedule;
-      case BookingStatus.confirmed:
-        return Icons.construction;
-      case BookingStatus.inProgress:
-        return Icons.build;
-      case BookingStatus.completed:
-        return Icons.done;
-      case BookingStatus.cancelled:
-        return Icons.cancel;
-      case BookingStatus.refunded:
-        return Icons.money_off;
-      case BookingStatus.paymentPending:
-        return Icons.pending;
-      case BookingStatus.paid:
-        return Icons.verified;
     }
   }
 
@@ -1703,8 +1419,8 @@ class _CustomerBookingDetailScreenState
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'Your service provider is working on your request. You\'ll be notified when it\'s completed.',
-                          style: TextStyle(fontSize: 12, color: Colors.blue),
+                          'Your service provider is working on your request.\nYou\'ll be notified when it\'s completed.',
+                          style: TextStyle(fontSize: 14, color: Colors.blue),
                         ),
                       ),
                     ],

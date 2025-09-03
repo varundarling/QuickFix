@@ -67,9 +67,9 @@ class BookingModel {
   final String description;
   final double totalAmount;
   final BookingStatus status;
-  final String customerAddress;
-  final double customerLatitude;
-  final double customerLongitude;
+  final String? customerAddress;
+  final double? customerLatitude;
+  final double? customerLongitude;
   final DateTime createdAt;
   final DateTime? bookedDate;
   final DateTime? completedAt;
@@ -114,9 +114,9 @@ class BookingModel {
     required this.description,
     required this.totalAmount,
     required this.status,
-    required this.customerAddress,
-    required this.customerLatitude,
-    required this.customerLongitude,
+    this.customerAddress,
+    this.customerLatitude,
+    this.customerLongitude,
     this.bookedDate,
     required this.createdAt,
     this.completedAt,
@@ -160,9 +160,9 @@ class BookingModel {
       description: data['description'] ?? '',
       totalAmount: (data['totalAmount'] ?? 0.0).toDouble(),
       status: parsedStatus ?? BookingStatus.pending,
-      customerAddress: data['customerAddress'] ?? '',
-      customerLatitude: (data['customerLatitude'] ?? 0.0).toDouble(),
-      customerLongitude: (data['customerLongitude'] ?? 0.0).toDouble(),
+      customerAddress: data['customerAddress']?.toString(),
+      customerLatitude: (data['customerLatitude'] as num?)?.toDouble(),
+      customerLongitude: (data['customerLongitude'] as num?)?.toDouble(),
       bookedDate: (data['bookedDate'] as Timestamp?)?.toDate(),
       createdAt: _parseDateTime(data['createdAt']),
       completedAt: data['completedAt'] != null
@@ -238,7 +238,7 @@ class BookingModel {
       'customerAddress': customerAddress,
       'customerLatitude': customerLatitude,
       'customerLongitude': customerLongitude,
-      'bookedDate' : bookedDate != null ? Timestamp.fromDate(bookedDate!) : null,
+      'bookedDate': bookedDate != null ? Timestamp.fromDate(bookedDate!) : null,
       'createdAt': Timestamp.fromDate(createdAt),
       'completedAt': completedAt != null
           ? Timestamp.fromDate(completedAt!)
@@ -289,7 +289,8 @@ class BookingModel {
         return 'Pending';
       case BookingStatus.confirmed:
         return 'Confirmed'; // ✅ This is now "Active" for both customer and provider
-      // ✅ REMOVED: inProgress case
+      case BookingStatus.inProgress:
+        return 'In Progress';
       case BookingStatus.completed:
         return 'Completed';
       case BookingStatus.cancelled:

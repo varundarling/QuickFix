@@ -6,6 +6,7 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
@@ -30,6 +31,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   ProviderModel? _provider;
   bool _isLoadingProvider = false;
   DateTime? _selectedDate;
+
+  final TextEditingController _locationController = TextEditingController();
+  bool _isFetchingLocation = false;
+  bool _isLocationChanged = false;
+  String _savedLocationText = '';
 
   @override
   void initState() {
@@ -57,7 +63,288 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     _loadBookingData();
 
     // Debug initial state
-    WidgetsBinding.instance.addPostFrameCallback((_) {});
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _fetchCurrentLocation();
+    });
+  }
+
+  Future<DateTime?> _selectConstrainedDate() async {
+    final DateTime now = DateTime.now();
+    final DateTime maxDate = now.add(const Duration(days: 30));
+
+    final DateTime? pickedDate = await showDatePicker(
+      context: context,
+      initialDate: now,
+      firstDate: now,
+      lastDate: maxDate,
+      helpText: 'Select service date',
+      fieldLabelText: 'Service date',
+      errorInvalidText: 'Date must be within 30 days',
+    );
+
+    return pickedDate;
+  }
+
+  // ✅ NEW: Pick time between 9 AM - 6 PM only
+  Future<TimeOfDay?> _selectConstrainedTime() async {
+    while (true) {
+      final TimeOfDay? pickedTime = await showTimePicker(
+        context: context,
+        initialTime: const TimeOfDay(hour: 9, minute: 0),
+        helpText: 'Select service time',
+        errorInvalidText: 'Please select time between 9 AM - 6 PM',
+        hourLabelText: 'Hour',
+        minuteLabelText: 'Minute',
+      );
+
+      // If user cancelled, return null
+      if (pickedTime == null) return null;
+
+      // ✅ Validate working hours (9 AM - 6 PM)
+      if (_isWithinWorkingHours(pickedTime)) {
+        return pickedTime;
+      } else {
+        // Show error and ask to pick again
+        await _showWorkingHoursError();
+      }
+    }
+  }
+
+  // ✅ NEW: Check if time is within working hours
+  bool _isWithinWorkingHours(TimeOfDay time) {
+    // Working hours: 9:00 AM to 6:00 PM (18:00)
+    const int startHour = 9;
+    const int endHour = 18;
+
+    return time.hour >= startHour && time.hour < endHour;
+  }
+
+  // ✅ NEW: Show working hours error dialog
+  Future<void> _showWorkingHoursError() async {
+    return await showDialog<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.access_time, color: Colors.orange, size: 24),
+              const SizedBox(width: 8),
+              const Text('Invalid Time'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                'Please select a time during our working hours:',
+                style: TextStyle(fontSize: 16),
+              ),
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                ),
+                child: const Column(
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.schedule, color: Colors.orange, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Working Hours: 9:00 AM - 6:00 PM',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                      ],
+                    ),
+                    SizedBox(height: 4),
+                    Text(
+                      'Monday to Sunday',
+                      style: TextStyle(fontSize: 12, color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('OK'),
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ✅ NEW: Combined date and time picker with constraints
+  Future<void> _selectConstrainedDateTime() async {
+    try {
+      // First pick the date
+      final DateTime? pickedDate = await _selectConstrainedDate();
+      if (pickedDate == null) return; // User cancelled
+
+      // Then pick the time
+      final TimeOfDay? pickedTime = await _selectConstrainedTime();
+      if (pickedTime == null) return; // User cancelled
+
+      // Combine date and time
+      final DateTime selectedDateTime = DateTime(
+        pickedDate.year,
+        pickedDate.month,
+        pickedDate.day,
+        pickedTime.hour,
+        pickedTime.minute,
+      );
+
+      // Update the selected date
+      setState(() {
+        _selectedDate = selectedDateTime;
+      });
+
+      // Show success message
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '✅ Scheduled for ${Helpers.formatDateTime(selectedDateTime)}',
+          ),
+          backgroundColor: AppColors.success,
+          duration: const Duration(seconds: 2),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Error selecting date/time: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error selecting date/time: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  Future<void> _fetchCurrentLocation() async {
+    setState(() => _isFetchingLocation = true);
+
+    try {
+      final LocationService locationService = LocationService.instance;
+      final locationData = await locationService.getCurrentLocation();
+
+      if (locationData != null && mounted) {
+        // Get address from coordinates
+        final address = await locationService.getAddressFromCoordinates(
+          locationData.latitude!,
+          locationData.longitude!,
+        );
+
+        if (address != null && mounted) {
+          _locationController.text = address;
+          _savedLocationText = address; // ✅ NEW: Mark as saved
+          debugPrint('✅ Location auto-fetched: $address');
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ Error auto-fetching location: $e');
+      // Don't show error - location is optional
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
+    }
+  }
+
+  // ✅ ENHANCED: Manual location refresh
+  Future<void> _refreshLocation() async {
+    setState(() => _isFetchingLocation = true);
+
+    try {
+      final LocationService locationService = LocationService.instance;
+      final locationData = await locationService.getCurrentLocation();
+
+      if (locationData != null && mounted) {
+        final address = await locationService.getAddressFromCoordinates(
+          locationData.latitude!,
+          locationData.longitude!,
+        );
+
+        if (address != null && mounted) {
+          _locationController.text = address;
+          _savedLocationText = address; // ✅ NEW: Mark as saved
+          setState(
+            () => _isLocationChanged = false,
+          ); // ✅ NEW: Reset changed flag
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('✅ Location updated successfully'),
+              backgroundColor: AppColors.success,
+              duration: Duration(seconds: 2),
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to get location: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isFetchingLocation = false);
+      }
+    }
+  }
+
+  Future<void> _saveLocation() async {
+    final currentLocation = _locationController.text.trim();
+
+    if (currentLocation.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location cannot be empty'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    try {
+      // ✅ Save location logic (you can add backend save here if needed)
+      setState(() {
+        _savedLocationText = currentLocation;
+        _isLocationChanged = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('✅ Location saved successfully'),
+          backgroundColor: AppColors.success,
+          duration: Duration(seconds: 2),
+        ),
+      );
+
+      debugPrint('✅ Location saved: $currentLocation');
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Failed to save location: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 
   Future<void> _fetchProviderData() async {
@@ -246,91 +533,111 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   _buildServiceDescription(),
                   const SizedBox(height: 24),
 
+                  _buildLocationField(),
+                  const SizedBox(height: 24),
+
                   Card(
                     elevation: 4,
                     margin: const EdgeInsets.symmetric(vertical: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: ListTile(
-                      contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20,
-                        vertical: 12,
-                      ),
-                      tileColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      title: Text(
-                        _selectedDate == null
-                            ? 'Select desired date & time'
-                            : 'Selected: ${Helpers.formatDateTime(_selectedDate!)}',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                    child: InkWell(
+                      onTap:
+                          _selectConstrainedDateTime, // ✅ Use new constrained picker
+                      borderRadius: BorderRadius.circular(14),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 16,
                         ),
-                      ),
-                      trailing: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.blue.shade50,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          Icons.event,
-                          color: Colors.blue,
-                          size: 28,
-                        ),
-                      ),
-                      onTap: () async {
-                        // Pick Date
-                        final pickedDate = await showDatePicker(
-                          context: context,
-                          initialDate:
-                              _selectedDate ??
-                              DateTime.now().add(const Duration(hours: 1)),
-                          firstDate: DateTime.now(),
-                          lastDate: DateTime.now().add(
-                            const Duration(days: 365),
-                          ),
-                        );
-
-                        if (pickedDate != null) {
-                          // Pick Time
-                          final pickedTime = await showTimePicker(
-                            context: context,
-                            initialTime: TimeOfDay.fromDateTime(
-                              _selectedDate ?? DateTime.now(),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.blue.shade50,
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: const Icon(
+                                    Icons.event,
+                                    color: Colors.blue,
+                                    size: 24,
+                                  ),
+                                ),
+                                const SizedBox(width: 16),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        _selectedDate == null
+                                            ? 'Select desired date & time'
+                                            : 'Selected Date & Time',
+                                        style: const TextStyle(
+                                          fontSize: 16,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.black87,
+                                        ),
+                                      ),
+                                      if (_selectedDate != null) ...[
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          Helpers.formatDateTime(
+                                            _selectedDate!,
+                                          ),
+                                          style: TextStyle(
+                                            fontSize: 14,
+                                            color: Colors.blue.shade700,
+                                            fontWeight: FontWeight.w500,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.arrow_forward_ios,
+                                  size: 16,
+                                  color: Colors.grey.shade600,
+                                ),
+                              ],
                             ),
-                          );
 
-                          if (pickedTime != null) {
-                            final selectedDateTime = DateTime(
-                              pickedDate.year,
-                              pickedDate.month,
-                              pickedDate.day,
-                              pickedTime.hour,
-                              pickedTime.minute,
-                            );
-
-                            setState(() {
-                              _selectedDate = selectedDateTime;
-                            });
-                          } else {
-                            // User canceled time picker, still update date only with zero time or keep existing time
-                            setState(() {
-                              _selectedDate = DateTime(
-                                pickedDate.year,
-                                pickedDate.month,
-                                pickedDate.day,
-                                _selectedDate?.hour ?? 0,
-                                _selectedDate?.minute ?? 0,
-                              );
-                            });
-                          }
-                        }
-                      },
+                            // ✅ NEW: Show working hours info
+                            const SizedBox(height: 12),
+                            Container(
+                              padding: const EdgeInsets.all(8),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    Icons.info_outline,
+                                    size: 14,
+                                    color: Colors.blue.shade700,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    'Available: Next 30 days • 9 AM - 6 PM',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.blue.shade700,
+                                      fontWeight: FontWeight.w500,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
                     ),
                   ),
 
@@ -1202,6 +1509,49 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       return;
     }
 
+    final selectedTime = TimeOfDay.fromDateTime(_selectedDate!);
+    if (!_isWithinWorkingHours(selectedTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selected time is outside working hours (9 AM - 6 PM)'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    if (_locationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your location before booking'),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    if (_isLocationChanged) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          // ✅ Remove 'const' since we're using a function
+          content: const Text(
+            'Please save your location changes before booking',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'SAVE NOW',
+            textColor: Colors.white,
+            onPressed: () async {
+              // ✅ Provide actual callback function
+              await _saveLocation();
+            },
+          ),
+        ),
+      );
+    }
+
     final bool? confirmed = await _showBookingConfirmationDialog(context);
     if (confirmed != true || !mounted) return;
 
@@ -1246,11 +1596,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         description: widget.service.description.isNotEmpty
             ? widget.service.description
             : 'Service booking',
-        customerAddress:
-            authProvider.userModel?.address ??
-            'Customer address to be confirmed',
-        customerLatitude: widget.service.latitude ?? 0.0,
-        customerLongitude: widget.service.longitude ?? 0.0,
+        customerAddress: _savedLocationText.isNotEmpty
+            ? _savedLocationText
+            : _locationController.text.trim(),
+        customerLatitude: 0.0,
+        customerLongitude: 0.0,
         totalAmount: widget.service.basePrice,
         selectedDate: _selectedDate,
         // ✅ ADD THESE REQUIRED PARAMETERS
@@ -1306,6 +1656,124 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         });
       }
     }
+  }
+
+  Widget _buildLocationField() {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.location_on, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Service Location',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Spacer(),
+                if (_isFetchingLocation)
+                  const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _locationController,
+              decoration: InputDecoration(
+                hintText: _isFetchingLocation
+                    ? 'Getting your location...'
+                    : 'Enter your location',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+                suffixIcon: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // ✅ NEW: Show save button when location is changed
+                    if (_isLocationChanged)
+                      IconButton(
+                        icon: const Icon(
+                          Icons.save,
+                          size: 20,
+                          color: AppColors.success,
+                        ),
+                        onPressed: _saveLocation,
+                        tooltip: 'Save location',
+                      ),
+                    IconButton(
+                      icon: const Icon(Icons.my_location, size: 20),
+                      onPressed: _refreshLocation,
+                      tooltip: 'Get current location',
+                    ),
+                  ],
+                ),
+              ),
+              style: const TextStyle(fontSize: 14),
+              maxLines: 2,
+              // ✅ NEW: Track when user manually changes location
+              onChanged: (value) {
+                setState(() {
+                  _isLocationChanged = value.trim() != _savedLocationText;
+                });
+              },
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'This location will be shared with the service provider',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey.shade600,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+                // ✅ NEW: Show indicator if location has unsaved changes
+                if (_isLocationChanged)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: const Text(
+                      'UNSAVED',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.orange,
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<bool?> _showBookingConfirmationDialog(BuildContext context) async {
@@ -1369,6 +1837,50 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ],
                   ),
+
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        Icons.location_on,
+                        size: 16,
+                        color: AppColors.primary,
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          'Location: ${_savedLocationText.isNotEmpty ? _savedLocationText : _locationController.text.trim()}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: AppColors.textSecondary,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                      // ✅ NEW: Show save status indicator
+                      if (_isLocationChanged)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 4,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.orange,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'UNSAVED',
+                            style: TextStyle(
+                              fontSize: 8,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                   // Add selected date display here
                   if (_selectedDate != null) ...[
                     const SizedBox(height: 8),
@@ -1424,6 +1936,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ],
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    _locationController.dispose();
+    super.dispose();
   }
 }
 

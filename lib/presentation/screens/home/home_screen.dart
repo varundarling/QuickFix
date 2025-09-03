@@ -9,7 +9,7 @@ import 'package:quickfix/core/notifications/notification_permission_helper.dart'
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
-import 'package:quickfix/presentation/screens/service/service_detail_screen.dart';
+import 'package:quickfix/presentation/screens/booking/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';

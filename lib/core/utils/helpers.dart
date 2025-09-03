@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -147,6 +149,29 @@ class Helpers {
         return Colors.red;
       default:
         return Colors.grey;
+    }
+  }
+
+  static Future<void> launchMaps(
+    double latitude,
+    double longitude,
+    String address,
+  ) async {
+    final url = Platform.isIOS
+        ? 'maps://maps.apple.com/?q=$latitude,$longitude'
+        : 'geo:$latitude,$longitude?q=$latitude,$longitude($address)';
+
+    if (await canLaunchUrl(Uri.parse(url))) {
+      await launchUrl(Uri.parse(url));
+    } else {
+      // Fallback to Google Maps web
+      final googleMapsUrl =
+          'https://www.google.com/maps/search/?api=1&query=$latitude,$longitude';
+      if (await canLaunchUrl(Uri.parse(googleMapsUrl))) {
+        await launchUrl(Uri.parse(googleMapsUrl));
+      } else {
+        throw 'Could not launch maps';
+      }
     }
   }
 }

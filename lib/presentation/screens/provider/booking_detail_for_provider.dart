@@ -8,6 +8,7 @@ import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/core/services/otp_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class BookingDetailForProvider extends StatefulWidget {
   final String bookingId;
@@ -26,6 +27,7 @@ class BookingDetailForProvider extends StatefulWidget {
 
 class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
   bool _isUpdating = false;
+  bool _showProgressCard = true;
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -60,76 +62,30 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Service Information
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.build_circle,
-                              color: AppColors.primary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Service Information',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        _buildDetailRow(
-                          Icons.business_center,
-                          'Service Name',
-                          currentBooking.serviceName,
-                        ),
-                        _buildDetailRow(
-                          Icons.monetization_on,
-                          'Amount',
-                          Helpers.formatCurrency(currentBooking.totalAmount),
-                        ),
-                        _buildDetailRow(
-                          Icons.description,
-                          'Description',
-                          currentBooking.description.isNotEmpty
-                              ? currentBooking.description
-                              : 'No description provided',
-                        ),
-                        const SizedBox(height: 12),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: _getStatusColor(
-                              currentBooking,
-                            ).withValues(alpha: 0.1),
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: Text(
-                            currentBooking.statusDisplay,
-                            style: TextStyle(
-                              color: _getStatusColor(currentBooking),
-                              fontWeight: FontWeight.w600,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ),
-                      ],
+                _buildDetailCard(
+                  title: 'Service Details',
+                  icon: Icons.build_circle,
+                  children: [
+                    _buildDetailRow('Service', currentBooking.serviceName),
+                    _buildDetailRow(
+                      'Description',
+                      currentBooking.description.isNotEmpty
+                          ? currentBooking.description
+                          : 'No description provided',
                     ),
-                  ),
+                    _buildDetailRow(
+                      'Booked Date',
+                      Helpers.formatDateTime(currentBooking.createdAt),
+                    ),
+                    _buildDetailRow(
+                      'Scheduled Date',
+                      Helpers.formatDateTime(currentBooking.scheduledDateTime),
+                    ),
+                    _buildDetailRow(
+                      'Amount',
+                      Helpers.formatCurrency(currentBooking.totalAmount),
+                    ),
+                  ],
                 ),
 
                 const SizedBox(height: 16),
@@ -203,7 +159,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           const SizedBox(height: 16),
 
                           // ✅ Customer Name - Always show
-                          _buildDetailRow(
+                          _buildDetailRowName(
                             Icons.account_circle,
                             'Customer Name',
                             currentBooking.customerName ?? 'Loading...',
@@ -217,23 +173,19 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                             if (currentBooking.customerPhone != null &&
                                 currentBooking.customerPhone!.isNotEmpty &&
                                 currentBooking.customerPhone != 'No Phone')
-                              _buildDetailRowWithAction(
+                              _buildDetailRowWithCall(
                                 Icons.phone,
                                 'Phone Number',
                                 currentBooking.customerPhone!,
-                                onTap: () => Helpers.launchPhone(
-                                  currentBooking.customerPhone!,
-                                ),
                               ),
 
                             // Address if valid and present (only for non-cancelled/paid)
-                            if ((currentBooking.customerAddressFromProfile ??
-                                    '')
+                            if ((currentBooking.customerAddress ?? '')
                                 .isNotEmpty)
-                              _buildDetailRow(
+                              _buildDetailRowWithNavigation(
                                 Icons.location_on,
-                                'Address',
-                                currentBooking.customerAddressFromProfile!,
+                                'Service Location',
+                                currentBooking.customerAddress!,
                               ),
                           ] else ...[
                             // ✅ Privacy notice for cancelled/paid bookings
@@ -263,9 +215,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                                   const SizedBox(width: 8),
                                   Expanded(
                                     child: Text(
-                                      _getPrivacyNoticeMessage(
-                                        currentBooking.status,
-                                      ),
+                                      'Customer contact details and service location are protected for privacy.',
                                       style: TextStyle(
                                         fontSize: 13,
                                         color: _getPrivacyNoticeTextColor(
@@ -448,6 +398,263 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
     );
   }
 
+  Widget _buildDetailCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: AppColors.primary, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          SizedBox(
+            width: 100,
+            child: Text(
+              label,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ),
+          const Text(': '),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Phone number row with call icon
+  Widget _buildDetailRowWithCall(
+    IconData icon,
+    String label,
+    String phoneNumber,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        phoneNumber,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => _launchCaller(phoneNumber),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.call,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Launch caller method
+  Future<void> _launchCaller(String phoneNumber) async {
+    try {
+      final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not launch phone dialer'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error making call: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
+  // ✅ NEW: Address row with navigation button
+  Widget _buildDetailRowWithNavigation(
+    IconData icon,
+    String label,
+    String address,
+  ) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, size: 20, color: Colors.grey[600]),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[600],
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        address,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: AppColors.textPrimary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    InkWell(
+                      onTap: () => _launchMaps(address),
+                      child: Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.blue,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: const Icon(
+                          Icons.navigation_rounded,
+                          size: 16,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ✅ NEW: Launch maps method
+  Future<void> _launchMaps(String address) async {
+    try {
+      final Uri googleMapsUri = Uri.parse(
+        'https://www.google.com/maps/search/?api=1&query=${Uri.encodeComponent(address)}',
+      );
+
+      if (await canLaunchUrl(googleMapsUri)) {
+        await launchUrl(googleMapsUri);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not open maps'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error opening maps: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    }
+  }
+
   // Helper methods for privacy styling
   Color _getPrivacyIndicatorColor(BookingStatus status) {
     switch (status) {
@@ -493,18 +700,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
     }
   }
 
-  String _getPrivacyNoticeMessage(BookingStatus status) {
-    switch (status) {
-      case BookingStatus.cancelled:
-        return 'This booking was cancelled. Customer contact details are protected for privacy.';
-      case BookingStatus.paid:
-        return 'Service has been paid. Customer contact details are now protected for privacy.';
-      default:
-        return 'Customer contact details are protected.';
-    }
-  }
-
-  Widget _buildDetailRow(IconData icon, String label, String value) {
+  Widget _buildDetailRowName(IconData icon, String label, String value) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Row(
@@ -1037,6 +1233,11 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
   }
 
   Widget _buildWorkProgressCard(BookingModel booking) {
+    // ✅ NEW: Hide progress card if work is completed
+    if (!_showProgressCard) {
+      return const SizedBox.shrink();
+    }
+
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
           .collection('bookings')
@@ -1157,15 +1358,13 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
 
                 const SizedBox(height: 20),
 
-                // Complete Work Button
+                // ✅ UPDATED: Complete Work Button - Always Enabled
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: progress >= 0.75 ? _completeWork : null,
+                    onPressed: _handleCompleteWork, // ✅ Always enabled
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: progress >= 0.75
-                          ? AppColors.success
-                          : Colors.grey,
+                      backgroundColor: AppColors.success, // ✅ Always green
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -1173,40 +1372,15 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                       ),
                     ),
                     icon: const Icon(Icons.check_circle),
-                    label: Text(
-                      progress >= 0.75
-                          ? 'Complete Work'
-                          : 'Work in Progress...',
-                      style: const TextStyle(
+                    label: const Text(
+                      'Complete Work',
+                      style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
-
-                if (progress < 0.75) ...[
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: const Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.blue, size: 16),
-                        SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Continue working. Complete button will be enabled at 75% progress.',
-                            style: TextStyle(fontSize: 12, color: Colors.blue),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ],
             ),
           ),
@@ -1215,7 +1389,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
     );
   }
 
-  Future<void> _completeWork() async {
+  Future<void> _handleCompleteWork() async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1246,7 +1420,12 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
 
     if (confirmed == true && mounted) {
       try {
-        // Use progress tracking service to complete work
+        // ✅ First hide the progress card immediately
+        setState(() {
+          _showProgressCard = false;
+        });
+
+        // ✅ Then complete the work
         await ProgressTrackingService.instance.completeWork(widget.bookingId);
 
         if (mounted) {
@@ -1256,9 +1435,20 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
               backgroundColor: AppColors.success,
             ),
           );
-          Navigator.of(context).pop();
+
+          // Navigate back after a short delay to show the success message
+          Future.delayed(const Duration(seconds: 1), () {
+            if (mounted) {
+              Navigator.of(context).pop();
+            }
+          });
         }
       } catch (e) {
+        // ✅ If error occurs, show progress card again
+        setState(() {
+          _showProgressCard = true;
+        });
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
