@@ -5,7 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
-import 'package:quickfix/presentation/screens/booking/booking_details_screen.dart';
+import 'package:quickfix/presentation/screens/booking/customer_booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
 import 'package:quickfix/presentation/screens/home/customer_settings-screen.dart';
 import 'package:quickfix/presentation/screens/home/favourites_screen.dart';

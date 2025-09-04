@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
     );
 
     if (success && mounted) {
-          // Navigate based on role
+      // Navigate based on role
       await NavigationHelper.navigateBasedOnRole(context);
     } else if (mounted && authProvider.errorMessage != null) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -150,42 +150,83 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
 
-                // ✅ Add notification info for providers
-                if (_selectedUserType == 'provider') ...[
-                  const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.orange.withValues(alpha: 0.3),
-                        width: 1,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(
-                          Icons.notification_important,
-                          color: Colors.orange[700],
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            'We\'ll request notification permission to keep you updated with customer bookings',
-                            style: TextStyle(
-                              color: Colors.orange[700],
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
+                // Google Sign-In Button
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    return Container(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: authProvider.isGoogleSigningIn
+                            ? null
+                            : _handleGoogleSignIn,
+                        icon: authProvider.isGoogleSigningIn
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
+                                  ),
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/icons/google.png',
+                                width: 20,
+                                height: 20,
+                              ),
+                        label: Text(
+                          authProvider.isGoogleSigningIn
+                              ? 'Signing in...'
+                              : 'Continue with Google',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
                           ),
                         ),
-                      ],
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.3),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textSecondary.withOpacity(0.3),
+                      ),
                     ),
-                  ),
-                ],
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textSecondary.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
+                ),
 
                 const SizedBox(height: 30),
 
@@ -263,5 +304,22 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    final authProvider = context.read<AuthProvider>();
+
+    final success = await authProvider.signInWithGoogle(isSignUp: false);
+
+    if (success && mounted) {
+      await NavigationHelper.navigateBasedOnRole(context);
+    } else if (mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
   }
 }

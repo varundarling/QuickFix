@@ -1,6 +1,8 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
 import '../../../core/constants/app_strings.dart';
@@ -164,6 +166,85 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ],
                   ),
                 ),
+                const SizedBox(height: 20),
+
+                // Google Sign-Up Button
+                Consumer<AuthProvider>(
+                  builder: (context, authProvider, child) {
+                    return Container(
+                      width: double.infinity,
+                      height: 56,
+                      child: OutlinedButton.icon(
+                        onPressed: authProvider.isGoogleSigningIn
+                            ? null
+                            : _handleGoogleSignUp,
+                        icon: authProvider.isGoogleSigningIn
+                            ? SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  valueColor: AlwaysStoppedAnimation<Color>(
+                                    AppColors.primary,
+                                  ),
+                                ),
+                              )
+                            : Image.asset(
+                                'assets/icons/google.png',
+                                width: 20,
+                                height: 20,
+                              ),
+                        label: Text(
+                          authProvider.isGoogleSigningIn
+                              ? 'Signing up...'
+                              : 'Sign up with Google',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.textPrimary,
+                          ),
+                        ),
+                        style: OutlinedButton.styleFrom(
+                          side: BorderSide(
+                            color: AppColors.textSecondary.withOpacity(0.3),
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                const SizedBox(height: 20),
+
+                Row(
+                  children: [
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textSecondary.withOpacity(0.3),
+                      ),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        'OR',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                    Expanded(
+                      child: Divider(
+                        color: AppColors.textSecondary.withOpacity(0.3),
+                      ),
+                    ),
+                  ],
+                ),
+
                 const SizedBox(height: 30),
 
                 // Name Field
@@ -256,7 +337,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         });
                       },
                       activeColor: AppColors.primary,
+                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
                     ),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: GestureDetector(
                         onTap: () {
@@ -264,13 +347,42 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             _agreeToTerms = !_agreeToTerms;
                           });
                         },
-                        child: const Padding(
-                          padding: EdgeInsets.only(top: 12),
-                          child: Text(
-                            'I agree to the Terms & Conditions and Privacy Policy',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: AppColors.textSecondary,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 12),
+                          child: RichText(
+                            text: TextSpan(
+                              text: 'I agree to the ',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
+                                height: 1.4,
+                              ),
+                              children: [
+                                TextSpan(
+                                  text: 'Terms & Conditions',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppColors.primary,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () => _openTermsAndConditions(),
+                                ),
+                                const TextSpan(text: ' and '),
+                                TextSpan(
+                                  text: 'Privacy Policy',
+                                  style: const TextStyle(
+                                    color: AppColors.primary,
+                                    fontWeight: FontWeight.w500,
+                                    decoration: TextDecoration.underline,
+                                    decorationColor: AppColors.primary,
+                                  ),
+                                  recognizer: TapGestureRecognizer()
+                                    ..onTap = () => _openPrivacyPolicy(),
+                                ),
+                                const TextSpan(text: '.'),
+                              ],
                             ),
                           ),
                         ),
@@ -278,6 +390,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                   ],
                 ),
+
                 const SizedBox(height: 30),
 
                 // Sign Up Button
@@ -318,6 +431,74 @@ class _SignUpScreenState extends State<SignUpScreen> {
             ),
           ),
         ),
+      ),
+    );
+  }
+
+  Future<void> _handleGoogleSignUp() async {
+    final authProvider = context.read<AuthProvider>();
+
+    final success = await authProvider.signInWithGoogle(isSignUp: true);
+
+    if (success && mounted) {
+      final userType = await authProvider.getUserType();
+      if (userType == 'provider') {
+        context.go('/provider-dashboard');
+      } else {
+        context.go('/home');
+      }
+    } else if (mounted && authProvider.errorMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(authProvider.errorMessage!),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    }
+  }
+
+  // Method to open Terms & Conditions
+  void _openTermsAndConditions() async {
+    const String termsUrl = 'https://yourwebsite.com/terms-and-conditions';
+
+    try {
+      if (await canLaunchUrl(Uri.parse(termsUrl))) {
+        await launchUrl(
+          Uri.parse(termsUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        _showLinkError('Terms & Conditions');
+      }
+    } catch (e) {
+      _showLinkError('Terms & Conditions');
+    }
+  }
+
+  // Method to open Privacy Policy
+  void _openPrivacyPolicy() async {
+    const String privacyUrl = 'https://yourwebsite.com/privacy-policy';
+
+    try {
+      if (await canLaunchUrl(Uri.parse(privacyUrl))) {
+        await launchUrl(
+          Uri.parse(privacyUrl),
+          mode: LaunchMode.externalApplication,
+        );
+      } else {
+        _showLinkError('Privacy Policy');
+      }
+    } catch (e) {
+      _showLinkError('Privacy Policy');
+    }
+  }
+
+  // Error handling for link opening
+  void _showLinkError(String linkName) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text('Could not open $linkName. Please try again.'),
+        backgroundColor: AppColors.error,
       ),
     );
   }
