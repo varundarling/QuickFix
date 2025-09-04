@@ -8,6 +8,7 @@ import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
+import 'package:quickfix/presentation/screens/home/customer_rating_screen.dart';
 
 class CashPaymentScreen extends StatefulWidget {
   final BookingModel booking;
@@ -288,7 +289,6 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
 
       debugPrint('🔄 Updating booking ${widget.booking.id} to paid status');
 
-      // ✅ CRITICAL: Update to "paid" status instead of "completed"
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(widget.booking.id)
@@ -302,10 +302,8 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
 
       debugPrint('✅ Firestore updated to paid status');
 
-      // ✅ NEW: Send payment notification to provider
       await _sendPaymentNotificationToProvider();
 
-      // ✅ CRITICAL: Force refresh with delay to ensure Firestore consistency
       await Future.delayed(const Duration(milliseconds: 1000));
       await bookingProvider.loadUserBookings(currentUserId);
 
@@ -323,6 +321,20 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
         if (mounted) {
           Navigator.of(context).pop(); // Close cash payment screen
           Navigator.of(context).pop(); // Close payment options screen
+
+          // ✅ NEW: Show rating screen after payment
+          final ratingResult = await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) =>
+                  CustomerRatingScreen(booking: widget.booking),
+            ),
+          );
+
+          // Optional: Handle rating result
+          if (ratingResult == true) {
+            debugPrint('✅ Rating submitted successfully');
+          }
         }
         await AdService.instance.showInterstitial();
       }

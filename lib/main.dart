@@ -31,7 +31,6 @@ Future<void> main() async {
   await AdService.instance.initialize();
   await NotificationService.instance.initialize();
   await NotificationChannels.createChannels();
-  
 
   FCMTokenManager.initializeTokenListener();
 
@@ -42,11 +41,14 @@ Future<void> main() async {
     debugPrint('❌ Error in one-time setup: $e');
   }
 
+  // ✅ STEP 5: Initialize RatingProvider here if needed
+  debugPrint('🌟 Initializing rating system...');
+
   print('Connected to Firebase app → ${Firebase.app().name}');
   runApp(const QuickFix());
 }
 
-// FCM Token Manager
+// FCM Token Manager (keep your existing code)
 class FCMTokenManager {
   static String? _cachedToken;
 

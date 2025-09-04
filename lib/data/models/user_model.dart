@@ -4,7 +4,7 @@ class UserModel {
   final String email;
   final String phone;
   final String? photoUrl;
-  final String userType; // customer or provider
+  final String userType; 
   final DateTime createdAt;
   final bool isActive;
   final double? latitude;

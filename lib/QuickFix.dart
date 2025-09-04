@@ -8,6 +8,7 @@ import 'package:quickfix/core/routes/app_router.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
+import 'package:quickfix/presentation/providers/rating_providers.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/favourites_provider.dart';
 
@@ -150,6 +151,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
+        ChangeNotifierProvider(create: (_) => RatingProvider()), // ✅ ADD THIS LINE
       ],
       child: MaterialApp.router(
         title: 'QuickFix',

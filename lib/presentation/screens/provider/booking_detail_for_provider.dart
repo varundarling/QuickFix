@@ -6,8 +6,11 @@ import 'package:quickfix/core/services/otp_verification_service.dart';
 import 'package:quickfix/core/services/progress_tracking_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
+import 'package:quickfix/data/models/rating_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/core/services/otp_service.dart';
+import 'package:quickfix/presentation/providers/rating_providers.dart';
+import 'package:quickfix/presentation/widgets/rating/rating_display_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class BookingDetailForProvider extends StatefulWidget {
@@ -373,6 +376,11 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                             );
                           },
                         ),
+                        const SizedBox(height: 20),
+
+                        _buildCustomerRatingSection(currentBooking),
+
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -1459,6 +1467,66 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         }
       }
     }
+  }
+
+  Widget _buildCustomerRatingSection(BookingModel booking) {
+    // Only show rating section for paid bookings
+    if (booking.status != BookingStatus.paid) {
+      return const SizedBox.shrink();
+    }
+
+    return Consumer<RatingProvider>(
+      builder: (context, ratingProvider, child) {
+        return FutureBuilder<RatingModel?>(
+          future: ratingProvider.getRatingForBooking(booking.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const SizedBox.shrink();
+            }
+
+            final rating = snapshot.data;
+
+            if (rating != null) {
+              return Column(
+                children: [
+                  const SizedBox(height: 16),
+                  RatingDisplayWidget(rating: rating),
+                ],
+              );
+            } else {
+              return Column(
+                children: [
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                    ),
+                    child: const Row(
+                      children: [
+                        Icon(Icons.star_border, color: Colors.grey, size: 20),
+                        SizedBox(width: 8),
+                        Text(
+                          'Customer hasn\'t rated this service yet',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey,
+                            fontStyle: FontStyle.italic,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
+        );
+      },
+    );
   }
 
   Color _getStatusColor(BookingModel booking) {

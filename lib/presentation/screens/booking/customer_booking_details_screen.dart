@@ -6,9 +6,13 @@ import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
+import 'package:quickfix/data/models/rating_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
+import 'package:quickfix/presentation/providers/rating_providers.dart';
 import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
+import 'package:quickfix/presentation/screens/home/customer_rating_screen.dart';
 import 'package:quickfix/presentation/screens/payment/real_time_payment_screen.dart';
+import 'package:quickfix/presentation/widgets/rating/rating_display_widget.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
   final String bookingId;
@@ -448,7 +452,6 @@ class _CustomerBookingDetailScreenState
           const SizedBox(height: 16),
 
           // Timeline
-          // Timeline - Simple like the image
           _buildDetailCard(
             title: 'Booking Timeline',
             icon: Icons.timeline,
@@ -548,6 +551,10 @@ class _CustomerBookingDetailScreenState
 
           const SizedBox(height: 20),
 
+          _buildRatingSection(booking),
+
+          const SizedBox(height: 20),
+
           // Action Buttons (Updated to handle real-time payment)
           if (booking.status == BookingStatus.completed &&
               !booking.paymentConfirmed)
@@ -622,6 +629,102 @@ class _CustomerBookingDetailScreenState
             ),
         ],
       ),
+    );
+  }
+
+  Widget _buildRatingSection(BookingModel booking) {
+    // Only show rating section for paid bookings
+    if (booking.status != BookingStatus.paid) {
+      return const SizedBox.shrink();
+    }
+
+    return Consumer<RatingProvider>(
+      builder: (context, ratingProvider, child) {
+        return FutureBuilder<RatingModel?>(
+          future: ratingProvider.getRatingForBooking(booking.id),
+          builder: (context, snapshot) {
+            if (snapshot.connectionState == ConnectionState.waiting) {
+              return const Center(child: CircularProgressIndicator());
+            }
+
+            final rating = snapshot.data;
+
+            if (rating != null) {
+              // Show submitted rating
+              return Column(
+                children: [
+                  const SizedBox(height: 16),
+                  RatingDisplayWidget(rating: rating),
+                ],
+              );
+            } else {
+              // Show rate button if not rated
+              return Column(
+                children: [
+                  const SizedBox(height: 16),
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      children: [
+                        const Icon(
+                          Icons.star_border,
+                          color: Colors.orange,
+                          size: 32,
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Rate This Service',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        const Text(
+                          'Share your experience to help other customers',
+                          style: TextStyle(fontSize: 14, color: Colors.orange),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () async {
+                              final result = await Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) =>
+                                      CustomerRatingScreen(booking: booking),
+                                ),
+                              );
+                              if (result == true) {
+                                // Refresh the page to show the new rating
+                                setState(() {});
+                              }
+                            },
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.orange,
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('Rate Now'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              );
+            }
+          },
+        );
+      },
     );
   }
 

@@ -93,11 +93,15 @@ class BookingModel {
   final String? paymentMethod;
   final DateTime? paymentConfirmedAt;
   final bool? realTimePayment;
-
   final DateTime? workStartTime;
   final DateTime? workEndTime;
-  final double workProgress; // 0.0 to 1.0
+  final double workProgress;
   final bool isWorkInProgress;
+  final String? ratingId;
+  final bool isRated;
+  final double? customerRating;
+  final bool hasCustomerReview;
+  final DateTime? ratedAt;
 
   BookingModel({
     this.paymentDate,
@@ -143,6 +147,11 @@ class BookingModel {
     this.workEndTime,
     this.workProgress = 0.0,
     this.isWorkInProgress = false,
+    this.ratingId,
+    this.isRated = false,
+    this.customerRating,
+    this.hasCustomerReview = false,
+    this.ratedAt,
   });
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
@@ -185,8 +194,6 @@ class BookingModel {
       providerName: data['providerName']?.toString(),
       providerPhone: data['providerPhone']?.toString(),
       providerEmail: data['providerEmail']?.toString(),
-
-      // ✅ NEW: Real-time payment fields from Firestore
       paymentConfirmed: data['paymentConfirmed'] ?? false,
       paymentMethod: data['paymentMethod']?.toString(),
       paymentConfirmedAt: data['paymentConfirmedAt'] != null
@@ -208,6 +215,13 @@ class BookingModel {
           : null,
       workProgress: (data['workProgress'] ?? 0.0).toDouble(),
       isWorkInProgress: data['isWorkInProgress'] ?? false,
+      ratingId: data['ratingId']?.toString(),
+      isRated: data['isRated'] ?? false,
+      customerRating: (data['customerRating'] as num?)?.toDouble(),
+      hasCustomerReview: data['hasCustomerReview'] ?? false,
+      ratedAt: data['ratedAt'] != null
+          ? (data['ratedAt'] as Timestamp).toDate()
+          : null,
     );
   }
 
@@ -257,8 +271,6 @@ class BookingModel {
       'providerName': providerName,
       'providerPhone': providerPhone,
       'providerEmail': providerEmail,
-
-      // ✅ NEW: Real-time payment fields to Firestore
       'paymentConfirmed': paymentConfirmed,
       'paymentMethod': paymentMethod,
       'paymentConfirmedAt': paymentConfirmedAt != null
@@ -280,6 +292,11 @@ class BookingModel {
           : null,
       'workProgress': workProgress,
       'isWorkInProgress': isWorkInProgress,
+      'ratingId': ratingId,
+      'isRated': isRated,
+      'customerRating': customerRating,
+      'hasCustomerReview': hasCustomerReview,
+      'ratedAt': ratedAt != null ? Timestamp.fromDate(ratedAt!) : null,
     };
   }
 
@@ -371,6 +388,11 @@ extension BookingModelCopyWith on BookingModel {
     DateTime? workEndTime,
     double? workProgress,
     bool? isWorkInProgress,
+    String? ratingId,
+    bool? isRated,
+    double? customerRating,
+    bool? hasCustomerReview,
+    DateTime? ratedAt,
   }) {
     return BookingModel(
       paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
@@ -407,7 +429,6 @@ extension BookingModelCopyWith on BookingModel {
       acceptedAt: acceptedAt ?? this.acceptedAt,
       customerAddressFromProfile:
           customerAddressFromProfile ?? this.customerAddressFromProfile,
-      // ✅ NEW: Real-time payment copyWith assignments
       paymentConfirmed: paymentConfirmed ?? this.paymentConfirmed,
       paymentMethod: paymentMethod ?? this.paymentMethod,
       paymentConfirmedAt: paymentConfirmedAt ?? this.paymentConfirmedAt,
@@ -419,6 +440,11 @@ extension BookingModelCopyWith on BookingModel {
       workEndTime: workEndTime ?? this.workEndTime,
       workProgress: workProgress ?? this.workProgress,
       isWorkInProgress: isWorkInProgress ?? this.isWorkInProgress,
+      ratingId: ratingId ?? this.ratingId,
+      isRated: isRated ?? this.isRated,
+      customerRating: customerRating ?? this.customerRating,
+      hasCustomerReview: hasCustomerReview ?? this.hasCustomerReview,
+      ratedAt: ratedAt ?? this.ratedAt,
     );
   }
 }
