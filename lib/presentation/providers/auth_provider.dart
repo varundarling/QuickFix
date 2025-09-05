@@ -31,6 +31,7 @@ class AuthProvider extends ChangeNotifier {
   bool _isUpdatingProfile = false;
   bool _isGoogleSigningIn = false;
   bool _isGoogleInitialized = false;
+  bool _isInitialized = false;
 
   User? get user => _user;
   UserModel? get userModel => _userModel;
@@ -41,6 +42,7 @@ class AuthProvider extends ChangeNotifier {
   bool get isSigningUp => _isSigningUp;
   bool get isUpdatingProfile => _isUpdatingProfile;
   bool get isGoogleSigningIn => _isGoogleSigningIn;
+  bool get isInitialized => _isInitialized;
 
   void _setSignInLoading(bool loading) {
     _isSigningIn = loading;
@@ -376,28 +378,6 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  // ... [Keep all your other existing methods unchanged - they don't need modifications]
-
-  Future<bool> ensureUserAuthenticated() async {
-    debugPrint('🔍 Checking user authentication status...');
-
-    if (_user == null) {
-      await Future.delayed(const Duration(milliseconds: 500));
-      await FirebaseAuth.instance.currentUser?.reload();
-      _user = FirebaseAuth.instance.currentUser;
-      debugPrint('🔄 Current user after reload: ${_user?.uid}');
-    }
-
-    if (_user != null && _userModel == null) {
-      debugPrint('🔄 Loading user model...');
-      await _loadUserModel();
-    }
-
-    final isAuth = _user != null;
-    debugPrint('✅ User authentication status: $isAuth');
-    return isAuth;
-  }
-
   String? getCurrentUserId() {
     final userId = _user?.uid;
     debugPrint('🔍 Getting current user ID: $userId');
@@ -467,19 +447,198 @@ class AuthProvider extends ChangeNotifier {
     _firebaseService.auth.authStateChanges().listen((User? user) async {
       debugPrint('🔄 Auth state changed: ${user?.uid}');
       _user = user;
+
       if (user != null) {
         debugPrint('✅ User authenticated: ${user.email}');
-        await _startUserProfileListener();
-        await _setupNotifications();
+
+        // ✅ CRITICAL: Ensure proper initialization sequence
+        await _initializeUserSession(user);
       } else {
         _stopUserProfileListener();
         _userModel = null;
-        if (user != null) {
-          EncryptionService.clearSession(user.uid);
-        }
+        _isInitialized = true; // ✅ Mark as initialized even when logged out
+        debugPrint('❌ User logged out');
       }
       notifyListeners();
     });
+  }
+
+  Future<void> _initializeUserSession(User user) async {
+    try {
+      debugPrint('🔄 Initializing user session for: ${user.uid}');
+
+      // ✅ STEP 1: Restore encryption session first
+      await _restoreEncryptionSession(user);
+
+      // ✅ STEP 2: Load user profile with retry logic
+      await _loadUserModelWithRetry();
+
+      // ✅ STEP 3: Start real-time listener only after profile is loaded
+      await _startUserProfileListener();
+
+      // ✅ STEP 4: Setup notifications
+      await _setupNotifications();
+
+      _isInitialized = true;
+      debugPrint('✅ User session initialized successfully');
+    } catch (e) {
+      debugPrint('❌ Error initializing user session: $e');
+      _isInitialized = true; // Mark as initialized to prevent infinite loading
+    }
+  }
+
+  Future<void> _restoreEncryptionSession(User user) async {
+    try {
+      debugPrint('🔐 Restoring encryption session for: ${user.uid}');
+
+      // Check if encryption is already set up
+      final hasEncryption = await EncryptionService.hasEncryptionSetup(
+        user.uid,
+      );
+
+      if (hasEncryption) {
+        // Try to restore from device storage
+        final masterKey = await EncryptionService.getMasterKey(user.uid);
+        if (masterKey != null) {
+          debugPrint('✅ Encryption session restored from device storage');
+          return;
+        }
+      }
+
+      // ✅ For Google users, regenerate the password-based encryption
+      if (user.providerData.any((info) => info.providerId == 'google.com')) {
+        debugPrint('🔄 Regenerating encryption for Google user');
+        final generatedPassword = _generatePasswordFromGoogleData(user);
+        await EncryptionService.initializeUserEncryption(
+          generatedPassword,
+          user.uid,
+        );
+        debugPrint('✅ Google user encryption restored');
+      } else {
+        // ✅ For email users, we need them to re-enter password if session is lost
+        debugPrint(
+          '⚠️ Email user encryption session lost - may need re-authentication',
+        );
+      }
+    } catch (e) {
+      debugPrint('❌ Error restoring encryption: $e');
+      // Don't throw - let the app continue and handle missing profile gracefully
+    }
+  }
+
+  Future<void> _loadUserModelWithRetry({int maxRetries = 3}) async {
+    debugPrint('🔄 Loading user profile with retry logic...');
+
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        debugPrint('🔄 Profile load attempt $attempt/$maxRetries');
+
+        final doc = await _firebaseService.getUserData(_user!.uid);
+        if (doc.exists) {
+          final data = doc.value as Map<dynamic, dynamic>;
+          await _handleUserDataUpdate(Map<String, dynamic>.from(data));
+
+          if (_userModel != null) {
+            debugPrint(
+              '✅ User profile loaded successfully on attempt $attempt',
+            );
+            return;
+          }
+        } else {
+          debugPrint('⚠️ No user data found in database');
+          break; // Don't retry if no data exists
+        }
+      } catch (e) {
+        debugPrint('❌ Profile load attempt $attempt failed: $e');
+
+        if (attempt < maxRetries) {
+          // Wait before retrying, with exponential backoff
+          final delay = Duration(milliseconds: 500 * attempt);
+          debugPrint('⏳ Waiting ${delay.inMilliseconds}ms before retry...');
+          await Future.delayed(delay);
+        }
+      }
+    }
+
+    debugPrint('❌ All profile load attempts failed');
+  }
+
+  Future<bool> ensureUserAuthenticated() async {
+    debugPrint('🔍 Checking user authentication status...');
+
+    // Wait for initialization to complete
+    if (!_isInitialized) {
+      debugPrint('⏳ Waiting for initialization to complete...');
+      int waitCount = 0;
+      while (!_isInitialized && waitCount < 20) {
+        // Max 10 seconds
+        await Future.delayed(const Duration(milliseconds: 500));
+        waitCount++;
+      }
+    }
+
+    if (_user == null) {
+      debugPrint('❌ User not authenticated');
+      return false;
+    }
+
+    if (_userModel == null) {
+      debugPrint(
+        '⚠️ User authenticated but profile not loaded, attempting to load...',
+      );
+      await _loadUserModelWithRetry();
+    }
+
+    final isAuth = _user != null && _userModel != null;
+    debugPrint(
+      '✅ User authentication status: $isAuth (Profile: ${_userModel?.name})',
+    );
+    return isAuth;
+  }
+
+  Future<String> getUserType() async {
+    debugPrint('🔍 Getting user type for user: ${_user?.uid}');
+
+    // Wait for initialization if not complete
+    if (!_isInitialized && _user != null) {
+      debugPrint('⏳ Waiting for user initialization...');
+      int waitCount = 0;
+      while (!_isInitialized && waitCount < 20) {
+        await Future.delayed(const Duration(milliseconds: 500));
+        waitCount++;
+      }
+    }
+
+    // Try to get from loaded user model first
+    if (_userModel?.userType != null) {
+      debugPrint('🔥 Got user type from loaded model: ${_userModel!.userType}');
+      await _saveUserType(_userModel!.userType);
+      return _userModel!.userType;
+    }
+
+    // Try to load fresh data from database
+    if (_user != null) {
+      try {
+        await _loadUserModelWithRetry(maxRetries: 2);
+        if (_userModel?.userType != null) {
+          debugPrint('🔥 Got fresh user type: ${_userModel!.userType}');
+          await _saveUserType(_userModel!.userType);
+          return _userModel!.userType;
+        }
+      } catch (e) {
+        debugPrint('❌ Failed to load from database: $e');
+      }
+    }
+
+    // Fallback to cached user type
+    final savedUserType = await _getSavedUserType();
+    if (savedUserType != null) {
+      debugPrint('💾 Using cached user type: $savedUserType');
+      return savedUserType;
+    }
+
+    debugPrint('⚠️ Defaulting to customer');
+    return 'customer';
   }
 
   Future<void> _startUserProfileListener() async {
@@ -675,32 +834,6 @@ class AuthProvider extends ChangeNotifier {
     } finally {
       _setSignUpLoading(false);
     }
-  }
-
-  Future<String> getUserType() async {
-    debugPrint('🔍 Getting user type for user: ${_user?.uid}');
-
-    if (_user != null) {
-      try {
-        await _loadUserModel();
-        if (_userModel?.userType != null) {
-          debugPrint('🔥 Got fresh user type: ${_userModel!.userType}');
-          await _saveUserType(_userModel!.userType);
-          return _userModel!.userType;
-        }
-      } catch (e) {
-        debugPrint('❌ Failed to load from database: $e');
-      }
-    }
-
-    final savedUserType = await _getSavedUserType();
-    if (savedUserType != null) {
-      debugPrint('💾 Using cached user type: $savedUserType');
-      return savedUserType;
-    }
-
-    debugPrint('⚠️ Defaulting to customer');
-    return 'customer';
   }
 
   Future<bool> updateProfile({

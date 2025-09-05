@@ -151,49 +151,90 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => BookingProvider()),
         ChangeNotifierProvider(create: (_) => ServiceProvider()),
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
-        ChangeNotifierProvider(create: (_) => RatingProvider()), // ✅ ADD THIS LINE
+        ChangeNotifierProvider(create: (_) => RatingProvider()),
       ],
-      child: MaterialApp.router(
-        title: 'QuickFix',
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData(
-          primarySwatch: Colors.blue,
-          primaryColor: AppColors.primary,
-          scaffoldBackgroundColor: AppColors.background,
-          fontFamily: 'Poppins',
-          appBarTheme: const AppBarTheme(
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-          ),
-          elevatedButtonTheme: ElevatedButtonThemeData(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
+      child: Consumer<AuthProvider>(
+        builder: (context, authProvider, child) {
+          // ✅ Show loading screen while initializing
+          if (authProvider.user != null &&
+              (!authProvider.isInitialized || authProvider.userModel == null)) {
+            return MaterialApp(
+              title: 'QuickFix',
+              debugShowCheckedModeBanner: false,
+              home: Scaffold(
+                body: Container(
+                  decoration: const BoxDecoration(
+                    gradient: AppColors.primaryGradient,
+                  ),
+                  child: const Center(
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        CircularProgressIndicator(
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                        SizedBox(height: 20),
+                        Text(
+                          'Loading your profile...',
+                          style: TextStyle(color: Colors.white, fontSize: 16),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
               ),
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+            );
+          }
+
+          // ✅ Normal app flow
+          return MaterialApp.router(
+            title: 'QuickFix',
+            debugShowCheckedModeBanner: false,
+            theme: ThemeData(
+              primarySwatch: Colors.blue,
+              primaryColor: AppColors.primary,
+              scaffoldBackgroundColor: AppColors.background,
+              fontFamily: 'Poppins',
+              appBarTheme: const AppBarTheme(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primary,
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                ),
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: Colors.white,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.divider),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: const BorderSide(color: AppColors.primary),
+                ),
+              ),
             ),
-          ),
-          inputDecorationTheme: InputDecorationTheme(
-            filled: true,
-            fillColor: Colors.white,
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            enabledBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.divider),
-            ),
-            focusedBorder: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-              borderSide: const BorderSide(color: AppColors.primary),
-            ),
-          ),
-        ),
-        routerConfig: AppRouter.router,
+            routerConfig: AppRouter.router,
+          );
+        },
       ),
     );
   }

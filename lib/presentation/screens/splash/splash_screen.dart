@@ -43,7 +43,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     final authProvider = context.read<AuthProvider>();
 
-    // ✅ Wait for Firebase auth to settle
+    // ✅ CRITICAL: Wait for Firebase auth to settle
     await Future.delayed(const Duration(milliseconds: 500));
 
     final isLoggedIn =
@@ -52,11 +52,36 @@ class _SplashScreenState extends State<SplashScreen>
     if (isLoggedIn) {
       debugPrint('✅ User is logged in: ${authProvider.user!.email}');
 
-      // ✅ Always get fresh user type from database
+      // ✅ CRITICAL: Wait for user session to be fully initialized
+      debugPrint('⏳ Waiting for user session initialization...');
+
+      int waitCount = 0;
+      while (!authProvider.isInitialized && waitCount < 40) {
+        // Max 20 seconds
+        await Future.delayed(const Duration(milliseconds: 500));
+        waitCount++;
+
+        if (waitCount % 4 == 0) {
+          // Log every 2 seconds
+          debugPrint(
+            '⏳ Still waiting for initialization... (${waitCount * 0.5}s)',
+          );
+        }
+      }
+
+      if (!authProvider.isInitialized) {
+        debugPrint('⚠️ Initialization timeout, proceeding with fallback');
+      }
+
+      // ✅ Get user type after initialization
       final userType = await authProvider.getUserType();
-      debugPrint(
-        '👤 User type determined for ${authProvider.user!.uid}: $userType',
-      );
+      debugPrint('👤 User type determined: $userType');
+
+      // ✅ Verify profile is loaded before navigation
+      final hasProfile = authProvider.userModel != null;
+      debugPrint('📄 Profile loaded: $hasProfile');
+
+      if (!mounted) return;
 
       // Navigate based on user type
       if (userType == 'provider') {
@@ -68,7 +93,9 @@ class _SplashScreenState extends State<SplashScreen>
       }
     } else {
       debugPrint('❌ User not logged in, navigating to user type selection');
-      context.go('/user-type-selection');
+      if (mounted) {
+        context.go('/user-type-selection');
+      }
     }
   }
 

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class EncryptionService {
@@ -71,6 +72,7 @@ class EncryptionService {
   }) async {
     // Check session first
     if (_sessionKeys.containsKey(userUID)) {
+      debugPrint('✅ Master key found in session');
       return _sessionKeys[userUID];
     }
 
@@ -84,19 +86,22 @@ class EncryptionService {
       if (deviceKey != null && encryptedMasterKey != null) {
         final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
         _sessionKeys[userUID] = masterKey;
+        debugPrint('✅ Master key restored from device storage');
         return masterKey;
       }
     } catch (e) {
-      print('Device key failed, need password');
+      debugPrint('❌ Device key restoration failed: $e');
     }
 
     // Fallback to password derivation
     if (password != null) {
       final masterKey = await _deriveMasterKey(password, userUID);
       _sessionKeys[userUID] = masterKey;
+      debugPrint('✅ Master key derived from password');
       return masterKey;
     }
 
+    debugPrint('❌ No master key available');
     return null;
   }
 
@@ -162,5 +167,47 @@ class EncryptionService {
   static Future<bool> hasEncryptionSetup(String userUID) async {
     final deviceKey = await _secureStorage.read(key: 'device_key_$userUID');
     return deviceKey != null;
+  }
+
+  static Future<bool> restoreEncryptionSession(String userUID) async {
+    try {
+      debugPrint('🔐 Attempting to restore encryption session for: $userUID');
+
+      // Check if we already have a session key
+      if (_sessionKeys.containsKey(userUID)) {
+        debugPrint('✅ Session key already exists in memory');
+        return true;
+      }
+
+      // Try to restore from secure storage
+      final deviceKey = await _secureStorage.read(key: 'device_key_$userUID');
+      final encryptedMasterKey = await _secureStorage.read(
+        key: 'master_key_$userUID',
+      );
+
+      if (deviceKey != null && encryptedMasterKey != null) {
+        try {
+          final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
+          _sessionKeys[userUID] = masterKey;
+          debugPrint('✅ Encryption session restored successfully');
+          return true;
+        } catch (e) {
+          debugPrint('❌ Failed to decrypt stored master key: $e');
+          // Clear corrupted keys
+          await _secureStorage.delete(key: 'device_key_$userUID');
+          await _secureStorage.delete(key: 'master_key_$userUID');
+        }
+      }
+
+      debugPrint('❌ No valid encryption session found');
+      return false;
+    } catch (e) {
+      debugPrint('❌ Error restoring encryption session: $e');
+      return false;
+    }
+  }
+
+  static bool isSessionReady(String userUID) {
+    return _sessionKeys.containsKey(userUID);
   }
 }
