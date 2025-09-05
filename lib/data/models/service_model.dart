@@ -15,13 +15,12 @@ class ServiceModel {
   final Map<String, dynamic>? metadata;
   final String mobileNumber;
   final String availability;
-
-  // Location fields
+  final String? providerBusinessName;
+  final String? providerName;
+  final String? providerEmail;
   final double? latitude;
   final double? longitude;
   final String? address;
-
-  // ✅ NEW: Booking-related fields
   final bool isBooked;
   final String? bookedByUserId;
   final DateTime? bookedAt;
@@ -45,12 +44,14 @@ class ServiceModel {
     this.latitude,
     this.longitude,
     this.address,
-    // ✅ NEW: Booking parameters
     this.isBooked = false,
     this.bookedByUserId,
     this.bookedAt,
     this.customerName,
     this.customerPhone,
+    this.providerBusinessName,
+    this.providerName,
+    this.providerEmail,
   });
 
   factory ServiceModel.fromFireStore(
@@ -87,6 +88,9 @@ class ServiceModel {
           : null,
       customerName: data['customerName'],
       customerPhone: data['customerPhone'],
+      providerBusinessName: data['providerBusinessName'],
+      providerName: data['providerName'],
+      providerEmail: data['providerEmail'],
     );
   }
 
@@ -121,12 +125,14 @@ class ServiceModel {
       'latitude': latitude,
       'longitude': longitude,
       'address': address,
-      // ✅ NEW: Booking fields in Firestore
       'isBooked': isBooked,
       'bookedByUserId': bookedByUserId,
       'bookedAt': bookedAt != null ? Timestamp.fromDate(bookedAt!) : null,
       'customerName': customerName,
       'customerPhone': customerPhone,
+      'providerBusinessName': providerBusinessName,
+      'providerName': providerName,
+      'providerEmail': providerEmail,
     };
   }
 
@@ -169,6 +175,9 @@ class ServiceModel {
     DateTime? bookedAt,
     String? customerName,
     String? customerPhone,
+    String? providerBusinessName,
+    String? providerName,
+    String? providerEmail,
   }) {
     return ServiceModel(
       id: id ?? this.id,
@@ -192,6 +201,9 @@ class ServiceModel {
       bookedAt: bookedAt ?? this.bookedAt,
       customerName: customerName ?? this.customerName,
       customerPhone: customerPhone ?? this.customerPhone,
+      providerBusinessName: providerBusinessName ?? this.providerBusinessName,
+      providerName: providerName ?? this.providerName,
+      providerEmail: providerEmail ?? this.providerEmail,
     );
   }
 

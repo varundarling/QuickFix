@@ -487,6 +487,99 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
+  Future<Map<String, dynamic>?> _safeDecryptUserData(
+    String encryptedData,
+    String userUID,
+    BuildContext? context,
+  ) async {
+    try {
+      // First, ensure encryption session is ready
+      if (!EncryptionService.isSessionReady(userUID)) {
+        debugPrint('🔐 Session not ready, attempting to restore...');
+        final restored = await EncryptionService.restoreEncryptionSession(
+          userUID,
+        );
+
+        if (!restored) {
+          debugPrint('❌ Failed to restore encryption session');
+          await _handleEncryptionFailure(context);
+          return null;
+        }
+      }
+
+      return await EncryptionService.decryptUserData(encryptedData, userUID);
+    } catch (e) {
+      debugPrint('❌ Decryption failed: $e');
+
+      if (e.toString().contains('No decryption key')) {
+        await _handleEncryptionFailure(context);
+        return null;
+      }
+      rethrow;
+    }
+  }
+
+  Future<void> _handleEncryptionFailure(BuildContext? context) async {
+    debugPrint('🔑 Handling encryption failure...');
+
+    try {
+      // For Google users, try to regenerate encryption
+      if (_user?.providerData.any((info) => info.providerId == 'google.com') ==
+          true) {
+        debugPrint('🔄 Attempting to regenerate Google user encryption...');
+        final generatedPassword = _generatePasswordFromGoogleData(_user!);
+        await EncryptionService.initializeUserEncryption(
+          generatedPassword,
+          _user!.uid,
+        );
+        debugPrint('✅ Google user encryption regenerated');
+        return;
+      }
+    } catch (e) {
+      debugPrint('❌ Failed to regenerate encryption: $e');
+    }
+
+    // Show user-friendly error and prompt re-authentication
+    if (context != null) {
+      _showReAuthenticationDialog(context);
+    } else {
+      // Set error state if no context available
+      _setError('Session expired. Please login again to continue.');
+    }
+  }
+
+  // Show re-authentication dialog
+  void _showReAuthenticationDialog(BuildContext context) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        title: const Text(
+          '🔐 Session Expired',
+          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
+        content: const Text(
+          'Your secure session has expired. Please login again to continue using the app safely.',
+          style: TextStyle(fontSize: 14),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              Navigator.of(context).pop();
+              await signOut();
+              // Navigate to login screen
+              Navigator.of(context).pushReplacementNamed('/login');
+            },
+            child: const Text(
+              'Login Again',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _restoreEncryptionSession(User user) async {
     try {
       debugPrint('🔐 Restoring encryption session for: ${user.uid}');
@@ -676,44 +769,46 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleUserDataUpdate(Map<String, dynamic> data) async {
-    try {
-      if (data.containsKey('encrypted_profile')) {
-        final encryptedProfile = data['encrypted_profile'] as String;
-        final publicInfo = data['public_info'] as Map<dynamic, dynamic>?;
+  try {
+    if (data.containsKey('encrypted_profile')) {
+      final encryptedProfile = data['encrypted_profile'] as String;
+      final publicInfo = data['public_info'] as Map<dynamic, dynamic>?;
 
-        try {
-          final decryptedData = await EncryptionService.decryptUserData(
-            encryptedProfile,
-            _user!.uid,
-          );
+      // ✅ Use safe decryption method
+      final decryptedData = await _safeDecryptUserData(
+        encryptedProfile,
+        _user!.uid,
+        null, // No context available here
+      );
 
-          final combinedData = Map<String, dynamic>.from(decryptedData);
-          if (publicInfo != null) {
-            combinedData.addAll(Map<String, dynamic>.from(publicInfo));
-          }
-
-          _userModel = UserModel.fromRealtimeDatabase(combinedData);
-          debugPrint(
-            '✅ Encrypted user model updated: Name="${_userModel?.name}"',
-          );
-        } catch (e) {
-          debugPrint('❌ Failed to decrypt user data: $e');
-          if (publicInfo != null) {
-            _userModel = UserModel.fromRealtimeDatabase(
-              Map<String, dynamic>.from(publicInfo),
-            );
-          }
+      if (decryptedData != null) {
+        final combinedData = Map<String, dynamic>.from(decryptedData);
+        if (publicInfo != null) {
+          combinedData.addAll(Map<String, dynamic>.from(publicInfo));
         }
-      } else {
-        _userModel = UserModel.fromRealtimeDatabase(data);
-        debugPrint('✅ User model updated: Name="${_userModel?.name}"');
-      }
 
-      notifyListeners();
-    } catch (e) {
-      debugPrint('❌ Error handling user data update: $e');
+        _userModel = UserModel.fromRealtimeDatabase(combinedData);
+        debugPrint('✅ Encrypted user model updated: Name="${_userModel?.name}"');
+      } else {
+        // Fall back to public info only if decryption fails
+        if (publicInfo != null) {
+          _userModel = UserModel.fromRealtimeDatabase(
+            Map<String, dynamic>.from(publicInfo),
+          );
+          debugPrint('⚠️ Using public info only due to decryption failure');
+        }
+      }
+    } else {
+      _userModel = UserModel.fromRealtimeDatabase(data);
+      debugPrint('✅ User model updated: Name="${_userModel?.name}"');
     }
+
+    notifyListeners();
+  } catch (e) {
+    debugPrint('❌ Error handling user data update: $e');
+    _setError('Failed to load user profile. Please try again.');
   }
+}
 
   void _stopUserProfileListener() {
     _userStreamSubscription?.cancel();

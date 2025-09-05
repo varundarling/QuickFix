@@ -85,7 +85,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
       // ✅ CRITICAL: Load initial data with provider details
       await bookingProvider.loadUserBookingsWithProviderData(currentUser.uid);
 
-      // ✅ CRITICAL: Set up real-time listener with proper error handling
+      // ✅ Set up real-time listener with enhanced error handling
       _bookingsSubscription?.cancel();
       _bookingsSubscription = FirebaseFirestore.instance
           .collection('bookings')
@@ -103,23 +103,27 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               try {
                 List<BookingModel> bookingsWithProviderDetails = [];
 
-                // ✅ Process bookings in batches to avoid overwhelming the system
+                // ✅ Process bookings with enhanced provider fetching
                 for (var doc in snapshot.docs) {
                   try {
                     BookingModel booking = BookingModel.fromFireStore(doc);
 
-                    // ✅ CRITICAL: Always fetch provider details for real-time updates
+                    // ✅ CRITICAL: Always fetch provider details with encryption handling
                     debugPrint(
                       '🔍 [CUSTOMER] Fetching provider for: ${booking.providerId}',
                     );
+
+                    // Use enhanced provider fetching method
                     final providerDetails = await bookingProvider
                         .fetchProviderDetailsForCustomer(booking.providerId);
 
                     if (providerDetails != null) {
                       booking = booking.copyWith(
-                        providerName: providerDetails['providerName'],
-                        providerPhone: providerDetails['providerPhone'],
-                        providerEmail: providerDetails['providerEmail'],
+                        providerName:
+                            providerDetails['providerName'] ??
+                            'Service Provider',
+                        providerPhone: providerDetails['providerPhone'] ?? '',
+                        providerEmail: providerDetails['providerEmail'] ?? '',
                       );
                       debugPrint(
                         '✅ [CUSTOMER] Provider details added: ${providerDetails['providerName']}',
@@ -128,10 +132,10 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                       debugPrint(
                         '⚠️ [CUSTOMER] No provider details found for: ${booking.providerId}',
                       );
-                      // Still add the booking even without provider details
+                      // Create fallback provider info
                       booking = booking.copyWith(
-                        providerName: 'Loading provider...',
-                        providerPhone: '',
+                        providerName: 'Service Provider',
+                        providerPhone: '', // Hidden for privacy
                         providerEmail: '',
                       );
                     }
@@ -139,7 +143,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                     bookingsWithProviderDetails.add(booking);
                   } catch (e) {
                     debugPrint('❌ [CUSTOMER] Error processing booking: $e');
-                    // Add booking without provider details rather than skipping
+                    // Add booking with minimal provider info rather than skipping
                     BookingModel booking = BookingModel.fromFireStore(doc);
                     booking = booking.copyWith(
                       providerName: 'Error loading provider',
@@ -390,7 +394,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
     );
   }
 
-  // ✅ NULL-SAFE: Build booking card
   // In CustomerBookingsScreen - Enhanced booking card with provider details
   Widget _buildBookingCard(BookingModel booking) {
     final statusColor = Helpers.getStatusColor(booking.status.toString());
@@ -473,11 +476,11 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                     ),
                     const SizedBox(height: 6),
 
-                    // Provider Name
+                    // Provider Business Name
                     Row(
                       children: [
                         Icon(
-                          Icons.person,
+                          Icons.store,
                           size: 14,
                           color: Colors.grey.shade600,
                         ),
@@ -516,47 +519,59 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                       ],
                     ),
 
-                    // Provider Phone (only if available and service is active)
+                    // ✅ ENHANCED: Provider Phone with better visibility
                     if (booking.providerPhone != null &&
                         booking.providerPhone!.isNotEmpty &&
                         (booking.status == BookingStatus.confirmed ||
+                            booking.status == BookingStatus.inProgress ||
                             booking.status == BookingStatus.completed)) ...[
-                      const SizedBox(height: 4),
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.phone,
-                            size: 14,
-                            color: Colors.grey.shade600,
-                          ),
-                          const SizedBox(width: 6),
-                          Expanded(
-                            child: Text(
-                              booking.providerPhone!,
-                              style: TextStyle(
-                                fontSize: 13,
-                                color: Colors.grey.shade700,
+                      const SizedBox(height: 6),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 14,
+                              color: AppColors.primary,
+                            ),
+                            const SizedBox(width: 6),
+                            Expanded(
+                              child: Text(
+                                booking.providerPhone!,
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppColors.primary,
+                                ),
                               ),
                             ),
-                          ),
-                          // Call button
-                          InkWell(
-                            onTap: () =>
-                                Helpers.launchPhone(booking.providerPhone!),
-                            child: Container(
-                              padding: const EdgeInsets.all(4),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: const Icon(
-                                Icons.call,
-                                size: 12,
-                                color: Colors.white,
+                            // Call button
+                            InkWell(
+                              onTap: () =>
+                                  Helpers.launchPhone(booking.providerPhone!),
+                              child: Container(
+                                padding: const EdgeInsets.all(4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: const Icon(
+                                  Icons.call,
+                                  size: 12,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ],
                   ],

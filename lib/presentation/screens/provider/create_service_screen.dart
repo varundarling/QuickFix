@@ -572,9 +572,18 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       final authProvider = context.read<AuthProvider>();
       final currentUser = FirebaseAuth.instance.currentUser!;
 
+      // ✅ CRITICAL: Get complete user profile data BEFORE creating service
+      final userModel = authProvider.userModel;
+      if (userModel == null) {
+        throw Exception(
+          'Please complete your profile before creating services',
+        );
+      }
+
       await _createOrUpdateProviderProfile(currentUser.uid, authProvider);
 
-      final success = await serviceProvider.addService(
+      // ✅ ENHANCED: Pass provider details to service creation
+      final success = await serviceProvider.addServiceWithProviderDetails(
         name: _nameController.text.trim(),
         description: _descriptionController.text.trim(),
         category: _selectedCategory,
@@ -585,25 +594,13 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         latitude: _latitude!,
         longitude: _longitude!,
         address: _addressController.text.trim(),
+        // ✅ NEW: Include provider business details
+        providerBusinessName: userModel.businessName ?? userModel.name,
+        providerName: userModel.name,
+        providerEmail: userModel.email ?? currentUser.email ?? '',
       );
 
-      await AdService.instance.showRewarded(
-        onReward: (amount) {
-          debugPrint('🎉 Provider earned reward: $amount');
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  '🎉 You earned $amount coins for creating a service!',
-                ),
-                backgroundColor: AppColors.success,
-              ),
-            );
-          }
-        },
-      );
-
-      // ✅ UPDATED: Use the new notification method for Spark plan
+      // ... rest of your existing notification and success logic
       if (success) {
         await NotificationService.instance.notifyAllCustomersOfNewService(
           serviceName: _nameController.text.trim(),

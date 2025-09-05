@@ -31,6 +31,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   ProviderModel? _provider;
   bool _isLoadingProvider = false;
   DateTime? _selectedDate;
+  double _selectedRating = 5.0;
 
   final TextEditingController _locationController = TextEditingController();
   bool _isFetchingLocation = false;
@@ -899,36 +900,16 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       );
     }
 
-    // No Provider State
-    if (_provider == null) {
-      return Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(Icons.business_center, size: 48, color: Colors.grey),
-          const SizedBox(height: 12),
-          Text(
-            'Provider Information Not Available',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _fetchProviderData,
-            icon: const Icon(Icons.refresh, size: 16),
-            label: const Text('Retry'),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.primary,
-              foregroundColor: Colors.white,
-            ),
-          ),
-        ],
-      );
-    }
+    final providerBusinessName =
+        widget.service.providerBusinessName ??
+        _provider?.businessName ??
+        'Service Provider';
 
-    // Provider Data Available
+    final providerName =
+        widget.service.providerName ??
+        _provider?.businessName ??
+        'Service Provider';
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -954,15 +935,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           children: [
             // Provider Avatar
             CircleAvatar(
-              radius: 30,
+              radius: 32,
               backgroundColor: AppColors.primary,
               child: Text(
-                _provider!.businessName.isNotEmpty
-                    ? _provider!.businessName[0].toUpperCase()
+                providerBusinessName.isNotEmpty
+                    ? providerBusinessName[0].toUpperCase()
                     : '?',
                 style: const TextStyle(
                   color: Colors.white,
-                  fontSize: 20,
+                  fontSize: 22,
                   fontWeight: FontWeight.bold,
                 ),
               ),
@@ -976,9 +957,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 children: [
                   // Business Name
                   Text(
-                    _provider!.businessName.isNotEmpty
-                        ? _provider!.businessName
-                        : 'Service Provider',
+                    providerBusinessName,
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
@@ -986,9 +965,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                   ),
 
+                  const SizedBox(height: 8),
+
+                  // ✅ ENHANCED: Provider Rating from Analytics
+                  _buildProviderRating(),
+
+                  // Contact Person (if different)
+                  if (providerName != providerBusinessName &&
+                      providerName.isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Contact: $providerName',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey[600],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+
                   // Experience
-                  if (_provider!.experience?.isNotEmpty == true) ...[
-                    const SizedBox(height: 4),
+                  if (_provider?.experience?.isNotEmpty == true) ...[
+                    const SizedBox(height: 6),
                     Row(
                       children: [
                         Icon(
@@ -999,80 +997,17 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         const SizedBox(width: 4),
                         Text(
                           'Experience: ${_provider!.experience}',
-                          style: TextStyle(fontSize: 12, color: Colors.grey),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
                         ),
                       ],
                     ),
                   ],
-
-                  // // Address with Maps Integration
-                  // if (_provider!.address.isNotEmpty) ...[
-                  //   const SizedBox(height: 4),
-                  //   Row(
-                  //     children: [
-                  //       Icon(Icons.location_on, size: 14, color: Colors.grey),
-                  //       const SizedBox(width: 4),
-                  //       Expanded(
-                  //         child: Text(
-                  //           _provider!.address,
-                  //           style: TextStyle(fontSize: 12, color: Colors.grey),
-                  //           maxLines: 2,
-                  //           overflow: TextOverflow.ellipsis,
-                  //         ),
-                  //       ),
-                  //     ],
-                  //   ),
-                  // ],
-
-                  // // Rating
-                  // const SizedBox(height: 8),
-                  // Row(
-                  //   children: [
-                  //     RatingBarIndicator(
-                  //       rating: _provider!.raitng,
-                  //       itemBuilder: (context, index) =>
-                  //           const Icon(Icons.star, color: Colors.amber),
-                  //       itemCount: 5,
-                  //       itemSize: 16,
-                  //     ),
-                  //     const SizedBox(width: 8),
-                  //     Text(
-                  //       '${_provider!.raitng.toStringAsFixed(1)} (${_provider!.totalReviews} reviews)',
-                  //       style: const TextStyle(
-                  //         fontSize: 14,
-                  //         color: AppColors.textSecondary,
-                  //       ),
-                  //     ),
-                  //   ],
-                  // ),
                 ],
               ),
             ),
-
-            // // Verification Badge
-            // if (_provider!.isVerified)
-            //   Container(
-            //     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-            //     decoration: BoxDecoration(
-            //       color: AppColors.success.withValues(alpha: 0.1),
-            //       borderRadius: BorderRadius.circular(12),
-            //     ),
-            //     child: Row(
-            //       mainAxisSize: MainAxisSize.min,
-            //       children: [
-            //         Icon(Icons.verified, size: 14, color: AppColors.success),
-            //         const SizedBox(width: 4),
-            //         Text(
-            //           'Verified',
-            //           style: TextStyle(
-            //             fontSize: 10,
-            //             fontWeight: FontWeight.w600,
-            //             color: AppColors.success,
-            //           ),
-            //         ),
-            //       ],
-            //     ),
-            //   ),
           ],
         ),
       ],
@@ -1080,6 +1015,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   Widget _buildContactSection() {
+    // ✅ ENHANCED: Get phone number with proper priority
+    final servicePhone = widget.service.mobileNumber;
+    final providerPhone = _provider?.mobileNumber ?? '';
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -1104,8 +1043,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Service Mobile Number
-            if (widget.service.mobileNumber.isNotEmpty)
+            // ✅ ENHANCED: Service Mobile Number (Primary Contact)
+            if (servicePhone.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
@@ -1121,7 +1060,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Service Contact',
+                            'Primary Contact',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -1129,19 +1068,34 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            widget.service.mobileNumber,
+                            servicePhone,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: AppColors.textPrimary,
                             ),
                           ),
+                          // ✅ NEW: Show business name with phone
+                          if (widget.service.providerBusinessName != null &&
+                              widget
+                                  .service
+                                  .providerBusinessName!
+                                  .isNotEmpty) ...[
+                            const SizedBox(height: 2),
+                            Text(
+                              widget.service.providerBusinessName!,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.grey[600],
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: () =>
-                          _makePhoneCall(widget.service.mobileNumber),
+                      onPressed: () => _makePhoneCall(servicePhone),
                       icon: const Icon(Icons.call, size: 16),
                       label: const Text('Call'),
                       style: ElevatedButton.styleFrom(
@@ -1153,9 +1107,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 ),
               ),
 
-            // Provider Mobile Number (if different)
-            if (_provider?.mobileNumber.isNotEmpty == true &&
-                _provider!.mobileNumber != widget.service.mobileNumber) ...[
+            // ✅ NEW: Alternative contact (if provider phone is different)
+            if (providerPhone.isNotEmpty && providerPhone != servicePhone) ...[
               const SizedBox(height: 12),
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1172,7 +1125,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Provider Contact',
+                            'Alternative Contact',
                             style: TextStyle(
                               fontSize: 12,
                               color: AppColors.textSecondary,
@@ -1180,7 +1133,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            _provider!.mobileNumber,
+                            providerPhone,
                             style: TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
@@ -1191,7 +1144,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ),
                     ElevatedButton.icon(
-                      onPressed: () => _makePhoneCall(_provider!.mobileNumber),
+                      onPressed: () => _makePhoneCall(providerPhone),
                       icon: const Icon(Icons.call, size: 16),
                       label: const Text('Call'),
                       style: ElevatedButton.styleFrom(
@@ -1203,6 +1156,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 ),
               ),
             ],
+
+            // ✅ NEW: No contact available message
+            if (servicePhone.isEmpty && providerPhone.isEmpty)
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange.withValues(alpha: 0.05),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.orange, size: 20),
+                    const SizedBox(width: 12),
+                    const Expanded(
+                      child: Text(
+                        'Contact information will be available after booking confirmation',
+                        style: TextStyle(fontSize: 14, color: Colors.orange),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
           ],
         ),
       ),
@@ -1574,21 +1549,28 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       final authProvider = context.read<AuthProvider>();
       final bookingProvider = context.read<BookingProvider>();
 
+      String customerName = 'Customer';
+      String customerPhone = '';
+      String customerEmail = '';
+
       // ✅ ENSURE USER DATA IS AVAILABLE
-      if (authProvider.userModel == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Please complete your profile before booking'),
-              backgroundColor: Colors.orange,
-            ),
-          );
-        }
-        return;
+      if (authProvider.userModel != null) {
+        customerName = authProvider.userModel!.name;
+        customerPhone = authProvider.userModel!.phone;
+        customerEmail = authProvider.userModel!.email;
+      } else {
+        // Fallback: get from Firebase Auth
+        customerEmail = user.email ?? '';
+        // Try to get name from display name
+        customerName = user.displayName ?? 'Customer';
+      }
+
+      if (customerName.isEmpty || customerName == 'null') {
+        customerName = 'Customer';
       }
 
       // ✅ FIXED: Add required customer parameters
-      final booking = await bookingProvider.createBooking(
+      final booking = await bookingProvider.createBookingWithDetails(
         customerId: user.uid,
         providerId: widget.service.providerId,
         service: widget.service,
@@ -1603,10 +1585,17 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         customerLongitude: 0.0,
         totalAmount: widget.service.basePrice,
         selectedDate: _selectedDate,
-        // ✅ ADD THESE REQUIRED PARAMETERS
-        customerName: authProvider.userModel?.name ?? 'Customer',
-        customerPhone: authProvider.userModel?.phone ?? '',
-        customerEmail: authProvider.userModel?.email ?? '',
+        customerName: customerName,
+        customerPhone: customerPhone,
+        customerEmail: customerEmail,
+        providerName:
+            widget.service.providerBusinessName ??
+            widget.service.providerName ??
+            'Service Provider',
+        providerPhone: widget.service.mobileNumber,
+        providerEmail: widget.service.providerEmail ?? '',
+        serviceName: widget.service.name,
+        serviceCategory: widget.service.category,
       );
 
       if (!mounted) return;
@@ -1773,6 +1762,200 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildProviderRating() {
+    if (widget.service.providerId.isEmpty) return const SizedBox.shrink();
+
+    return StreamBuilder<DocumentSnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('providers')
+          .doc(widget.service.providerId)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return Row(
+            children: [
+              SizedBox(
+                width: 12,
+                height: 12,
+                child: CircularProgressIndicator(strokeWidth: 1.5),
+              ),
+              const SizedBox(width: 4),
+              Text(
+                'Loading rating...',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          );
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return Row(
+            children: [
+              Icon(Icons.star_outline, color: Colors.grey, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                'New Provider',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          );
+        }
+
+        final data = snapshot.data!.data() as Map<String, dynamic>?;
+
+        if (data == null) {
+          return Row(
+            children: [
+              Icon(Icons.star_outline, color: Colors.grey, size: 16),
+              const SizedBox(width: 4),
+              Text(
+                'No data',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ],
+          );
+        }
+
+        // ✅ CRITICAL: Fetch rating from analytics nested object
+        double? rating;
+        int? totalReviews;
+        int? totalServices;
+        double? completionRate;
+
+        // ✅ Method 1: Check for analytics object (primary)
+        if (data.containsKey('analytics')) {
+          final analytics = data['analytics'] as Map<String, dynamic>?;
+          debugPrint('📊 [ANALYTICS] Found analytics data: $analytics');
+
+          if (analytics != null) {
+            // Try different rating field names in analytics
+            if (analytics.containsKey('rating')) {
+              rating = (analytics['rating'] as num?)?.toDouble();
+            } else if (analytics.containsKey('averageRating')) {
+              rating = (analytics['averageRating'] as num?)?.toDouble();
+            } else if (analytics.containsKey('raitng')) {
+              rating = (analytics['raitng'] as num?)?.toDouble();
+            }
+
+            // Get review/service counts from analytics
+            if (analytics.containsKey('totalReviews')) {
+              totalReviews = (analytics['totalReviews'] as num?)?.toInt();
+            } else if (analytics.containsKey('reviewCount')) {
+              totalReviews = (analytics['reviewCount'] as num?)?.toInt();
+            }
+
+            if (analytics.containsKey('totalServices')) {
+              totalServices = (analytics['totalServices'] as num?)?.toInt();
+            }
+
+            if (analytics.containsKey('completionRate')) {
+              completionRate = (analytics['completionRate'] as num?)
+                  ?.toDouble();
+            }
+
+            debugPrint(
+              '📊 [ANALYTICS] Extracted - Rating: $rating, Reviews: $totalReviews, Services: $totalServices',
+            );
+          }
+        }
+
+        // ✅ Method 2: Fallback to root-level fields
+        if (rating == null || rating == 0.0) {
+          if (data.containsKey('rating')) {
+            rating = (data['rating'] as num?)?.toDouble();
+          } else if (data.containsKey('raitng')) {
+            rating = (data['raitng'] as num?)?.toDouble();
+          }
+
+          if (data.containsKey('totalReviews')) {
+            totalReviews = (data['totalReviews'] as num?)?.toInt();
+          }
+
+          debugPrint(
+            '📊 [FALLBACK] Root-level - Rating: $rating, Reviews: $totalReviews',
+          );
+        }
+
+        final bool hasRating = rating != null && rating > 0;
+        final displayRating = rating ?? 0.0;
+        final displayReviews = totalReviews ?? 0;
+        final displayServices = totalServices ?? 0;
+
+        debugPrint(
+          '🎯 [FINAL] Rating: $displayRating, Has Rating: $hasRating, Reviews: $displayReviews',
+        );
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // ✅ Main Rating Display
+            Row(
+              children: [
+                Icon(
+                  hasRating ? Icons.star : Icons.star_outline,
+                  color: hasRating ? Colors.amber : Colors.grey,
+                  size: 18,
+                ),
+                const SizedBox(width: 6),
+                Text(
+                  hasRating ? displayRating.toStringAsFixed(1) : 'New Provider',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: hasRating ? AppColors.textPrimary : Colors.grey[600],
+                  ),
+                ),
+                if (hasRating && displayReviews > 0) ...[
+                  const SizedBox(width: 6),
+                  Text(
+                    '($displayReviews ${displayReviews == 1 ? 'review' : 'reviews'})',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+
+            // ✅ Additional Analytics Info (if available)
+            if (hasRating) ...[
+              const SizedBox(height: 4),
+              Row(
+                children: [
+                  // Services completed
+                  if (displayServices > 0) ...[
+                    Icon(
+                      Icons.check_circle,
+                      size: 14,
+                      color: AppColors.success,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '$displayServices ${displayServices == 1 ? 'service' : 'services'}',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+
+                  // Completion rate
+                  if (completionRate != null && completionRate > 0) ...[
+                    if (displayServices > 0) const SizedBox(width: 12),
+                    Icon(Icons.trending_up, size: 14, color: AppColors.primary),
+                    const SizedBox(width: 4),
+                    Text(
+                      '${(completionRate * 100).toInt()}% completion',
+                      style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ],
+        );
+      },
     );
   }
 

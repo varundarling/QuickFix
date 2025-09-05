@@ -93,149 +93,151 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
 
                 const SizedBox(height: 16),
 
-                // Customer Information Card
-                if (currentBooking.status != BookingStatus.completed)
-                  Card(
-                    elevation: 4,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                Icons.person,
-                                color: AppColors.primary,
-                                size: 24,
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                'Customer Information',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const Spacer(),
-                              // ✅ Privacy indicator for cancelled/paid bookings
-                              if (currentBooking.status ==
-                                      BookingStatus.cancelled ||
-                                  currentBooking.status == BookingStatus.paid)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: _getPrivacyIndicatorColor(
-                                      currentBooking.status,
-                                    ),
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      Icon(
-                                        Icons.visibility_off,
-                                        size: 12,
-                                        color: Colors.white,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        'PRIVATE',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                            ],
-                          ),
-                          const SizedBox(height: 16),
+                // // Customer Information Card
+                // if (currentBooking.status != BookingStatus.completed)
+                //   Card(
+                //     elevation: 4,
+                //     shape: RoundedRectangleBorder(
+                //       borderRadius: BorderRadius.circular(12),
+                //     ),
+                //     child: Padding(
+                //       padding: const EdgeInsets.all(20),
+                //       child: Column(
+                //         crossAxisAlignment: CrossAxisAlignment.start,
+                //         children: [
+                //           Row(
+                //             children: [
+                //               Icon(
+                //                 Icons.person,
+                //                 color: AppColors.primary,
+                //                 size: 24,
+                //               ),
+                //               const SizedBox(width: 12),
+                //               Text(
+                //                 'Customer Information',
+                //                 style: TextStyle(
+                //                   fontSize: 18,
+                //                   fontWeight: FontWeight.bold,
+                //                   color: AppColors.primary,
+                //                 ),
+                //               ),
+                //               const Spacer(),
+                //               // ✅ Privacy indicator for cancelled/paid bookings
+                //               if (currentBooking.status ==
+                //                       BookingStatus.cancelled ||
+                //                   currentBooking.status == BookingStatus.paid)
+                //                 Container(
+                //                   padding: const EdgeInsets.symmetric(
+                //                     horizontal: 8,
+                //                     vertical: 4,
+                //                   ),
+                //                   decoration: BoxDecoration(
+                //                     color: _getPrivacyIndicatorColor(
+                //                       currentBooking.status,
+                //                     ),
+                //                     borderRadius: BorderRadius.circular(12),
+                //                   ),
+                //                   child: Row(
+                //                     mainAxisSize: MainAxisSize.min,
+                //                     children: [
+                //                       Icon(
+                //                         Icons.visibility_off,
+                //                         size: 12,
+                //                         color: Colors.white,
+                //                       ),
+                //                       const SizedBox(width: 4),
+                //                       Text(
+                //                         'PRIVATE',
+                //                         style: TextStyle(
+                //                           fontSize: 10,
+                //                           fontWeight: FontWeight.bold,
+                //                           color: Colors.white,
+                //                         ),
+                //                       ),
+                //                     ],
+                //                   ),
+                //                 ),
+                //             ],
+                //           ),
+                //           const SizedBox(height: 16),
 
-                          // ✅ Customer Name - Always show
-                          _buildDetailRowName(
-                            Icons.account_circle,
-                            'Customer Name',
-                            currentBooking.customerName ?? 'Loading...',
-                          ),
+                //           // ✅ Customer Name - Always show
+                //           _buildDetailRowName(
+                //             Icons.account_circle,
+                //             'Customer Name',
+                //             currentBooking.customerName ?? 'Loading...',
+                //           ),
 
-                          // ✅ CRITICAL: Privacy Logic - Hide contact details for cancelled/paid
-                          if (currentBooking.status !=
-                                  BookingStatus.cancelled &&
-                              currentBooking.status != BookingStatus.paid) ...[
-                            // Phone if valid and present (only for non-cancelled/paid)
-                            if (currentBooking.customerPhone != null &&
-                                currentBooking.customerPhone!.isNotEmpty &&
-                                currentBooking.customerPhone != 'No Phone')
-                              _buildDetailRowWithCall(
-                                Icons.phone,
-                                'Phone Number',
-                                currentBooking.customerPhone!,
-                              ),
+                //           // ✅ CRITICAL: Privacy Logic - Hide contact details for cancelled/paid
+                //           if (currentBooking.status !=
+                //                   BookingStatus.cancelled &&
+                //               currentBooking.status != BookingStatus.paid) ...[
+                //             // Phone if valid and present (only for non-cancelled/paid)
+                //             if (currentBooking.customerPhone != null &&
+                //                 currentBooking.customerPhone!.isNotEmpty &&
+                //                 currentBooking.customerPhone != 'No Phone')
+                //               _buildDetailRowWithCall(
+                //                 Icons.phone,
+                //                 'Phone Number',
+                //                 currentBooking.customerPhone!,
+                //               ),
 
-                            // Address if valid and present (only for non-cancelled/paid)
-                            if ((currentBooking.customerAddress ?? '')
-                                .isNotEmpty)
-                              _buildDetailRowWithNavigation(
-                                Icons.location_on,
-                                'Service Location',
-                                currentBooking.customerAddress!,
-                              ),
-                          ] else ...[
-                            // ✅ Privacy notice for cancelled/paid bookings
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: _getPrivacyNoticeColor(
-                                  currentBooking.status,
-                                ),
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: _getPrivacyNoticeBorderColor(
-                                    currentBooking.status,
-                                  ),
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 16,
-                                    color: _getPrivacyNoticeTextColor(
-                                      currentBooking.status,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Expanded(
-                                    child: Text(
-                                      'Customer contact details and service location are protected for privacy.',
-                                      style: TextStyle(
-                                        fontSize: 13,
-                                        color: _getPrivacyNoticeTextColor(
-                                          currentBooking.status,
-                                        ),
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+                //             // Address if valid and present (only for non-cancelled/paid)
+                //             if ((currentBooking.customerAddress ?? '')
+                //                 .isNotEmpty)
+                //               _buildDetailRowWithNavigation(
+                //                 Icons.location_on,
+                //                 'Service Location',
+                //                 currentBooking.customerAddress!,
+                //               ),
+                //           ] else ...[
+                //             // ✅ Privacy notice for cancelled/paid bookings
+                //             const SizedBox(height: 12),
+                //             Container(
+                //               padding: const EdgeInsets.all(12),
+                //               decoration: BoxDecoration(
+                //                 color: _getPrivacyNoticeColor(
+                //                   currentBooking.status,
+                //                 ),
+                //                 borderRadius: BorderRadius.circular(8),
+                //                 border: Border.all(
+                //                   color: _getPrivacyNoticeBorderColor(
+                //                     currentBooking.status,
+                //                   ),
+                //                 ),
+                //               ),
+                //               child: Row(
+                //                 children: [
+                //                   Icon(
+                //                     Icons.info_outline,
+                //                     size: 16,
+                //                     color: _getPrivacyNoticeTextColor(
+                //                       currentBooking.status,
+                //                     ),
+                //                   ),
+                //                   const SizedBox(width: 8),
+                //                   Expanded(
+                //                     child: Text(
+                //                       'Customer contact details and service location are protected for privacy.',
+                //                       style: TextStyle(
+                //                         fontSize: 13,
+                //                         color: _getPrivacyNoticeTextColor(
+                //                           currentBooking.status,
+                //                         ),
+                //                         fontWeight: FontWeight.w500,
+                //                       ),
+                //                     ),
+                //                   ),
+                //                 ],
+                //               ),
+                //             ),
+                //           ],
+                //         ],
+                //       ),
+                //     ),
+                //   ),
+                const SizedBox(height: 16),
+                _buildCustomerInfoCard(currentBooking),
 
                 const SizedBox(height: 16),
 
@@ -402,6 +404,145 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
             ),
           );
         },
+      ),
+    );
+  }
+
+  // ✅ FIXED: Customer Information Card with proper privacy logic
+  Widget _buildCustomerInfoCard(BookingModel booking) {
+    return Card(
+      elevation: 4,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.person, color: AppColors.primary, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Customer Information',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const Spacer(),
+                // ✅ FIXED: Show privacy indicator only for cancelled/paid/refunded
+                if (booking.status == BookingStatus.cancelled ||
+                    booking.status == BookingStatus.paid ||
+                    booking.status == BookingStatus.refunded)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _getPrivacyIndicatorColor(booking.status),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.visibility_off,
+                          size: 12,
+                          color: Colors.white,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'PRIVATE',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+            const SizedBox(height: 16),
+
+            // ✅ Customer Name - Always show (never private)
+            _buildDetailRowName(
+              Icons.account_circle,
+              'Customer Name',
+              booking.customerName ?? 'Loading customer...',
+            ),
+
+            // ✅ CRITICAL FIX: Show contact details for ALL active booking statuses
+            if (booking.status == BookingStatus.pending ||
+                booking.status == BookingStatus.confirmed ||
+                booking.status == BookingStatus.inProgress ||
+                booking.status == BookingStatus.completed) ...[
+              // Phone number with call button
+              if (booking.customerPhone != null &&
+                  booking.customerPhone!.isNotEmpty &&
+                  booking.customerPhone != 'No Phone')
+                _buildDetailRowWithCall(
+                  Icons.phone,
+                  'Phone Number',
+                  booking.customerPhone!,
+                ),
+
+              // Email if available
+              if (booking.customerEmail != null &&
+                  booking.customerEmail!.isNotEmpty &&
+                  booking.customerEmail != 'No Email')
+                _buildDetailRowName(
+                  Icons.email,
+                  'Email',
+                  booking.customerEmail!,
+                ),
+
+              // Service location
+              if (booking.customerAddress?.isNotEmpty == true)
+                _buildDetailRowWithNavigation(
+                  Icons.location_on,
+                  'Service Location',
+                  booking.customerAddress!,
+                ),
+            ] else ...[
+              // ✅ Privacy notice for finished bookings only
+              const SizedBox(height: 12),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: _getPrivacyNoticeColor(booking.status),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: _getPrivacyNoticeBorderColor(booking.status),
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      Icons.info_outline,
+                      size: 16,
+                      color: _getPrivacyNoticeTextColor(booking.status),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        'Customer contact details are now protected for privacy.',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: _getPrivacyNoticeTextColor(booking.status),
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }

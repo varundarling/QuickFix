@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/encryption_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/rating_model.dart';
@@ -77,20 +78,74 @@ class _CustomerBookingDetailScreenState
       debugPrint(
         '🔍 [CUSTOMER DETAIL] Provider ID: ${bookingToProcess.providerId}',
       );
-
-      // ✅ CRITICAL: Always fetch fresh provider details
-      final providerDetails = await _fetchProviderDetails(
-        bookingToProcess.providerId,
+      debugPrint(
+        '🔍 [CUSTOMER DETAIL] Existing provider phone: ${bookingToProcess.providerPhone}',
       );
 
+      // ✅ CRITICAL: Try multiple methods to get provider details
+      Map<String, dynamic>? providerDetails;
+
+      // Method 1: Use existing booking provider data if available
+      if (bookingToProcess.providerPhone?.isNotEmpty == true) {
+        debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
+        providerDetails = {
+          'name': bookingToProcess.providerName ?? 'Service Provider',
+          'businessName': bookingToProcess.providerName ?? 'Service Provider',
+          'phone': bookingToProcess.providerPhone!,
+          'mobileNumber': bookingToProcess.providerPhone!,
+          'email': bookingToProcess.providerEmail ?? '',
+        };
+      } else {
+        // Method 2: Fetch from service data
+        debugPrint(
+          '🔄 [CUSTOMER DETAIL] Fetching provider data from service...',
+        );
+        try {
+          final serviceDoc = await FirebaseFirestore.instance
+              .collection('services')
+              .doc(bookingToProcess.serviceId)
+              .get();
+
+          if (serviceDoc.exists && serviceDoc.data() != null) {
+            final serviceData = serviceDoc.data()!;
+            final serviceMobile = serviceData['mobileNumber'] as String?;
+            final serviceProviderName =
+                serviceData['providerBusinessName'] as String? ??
+                serviceData['providerName'] as String?;
+
+            if (serviceMobile?.isNotEmpty == true) {
+              debugPrint(
+                '✅ [CUSTOMER DETAIL] Provider data from service: $serviceMobile',
+              );
+              providerDetails = {
+                'name': serviceProviderName ?? 'Service Provider',
+                'businessName': serviceProviderName ?? 'Service Provider',
+                'phone': serviceMobile!,
+                'mobileNumber': serviceMobile,
+                'email': serviceData['providerEmail'] ?? '',
+              };
+            }
+          }
+        } catch (e) {
+          debugPrint('⚠️ [CUSTOMER DETAIL] Service data fetch error: $e');
+        }
+
+        // Method 3: Fallback to provider profile data
+        if (providerDetails == null) {
+          debugPrint('🔄 [CUSTOMER DETAIL] Fetching from provider profile...');
+          providerDetails = await _fetchProviderDetails(
+            bookingToProcess.providerId,
+          );
+        }
+      }
+
       debugPrint(
-        '🔍 [CUSTOMER DETAIL] Provider details result: $providerDetails',
+        '🔍 [CUSTOMER DETAIL] Final provider details: $providerDetails',
       );
 
       BookingModel updatedBooking;
 
       if (providerDetails != null) {
-        // ✅ ENHANCED: Proper field mapping with multiple fallbacks
         final providerName =
             providerDetails['businessName']?.toString() ??
             providerDetails['name']?.toString() ??
@@ -99,12 +154,11 @@ class _CustomerBookingDetailScreenState
         final providerPhone =
             providerDetails['phone']?.toString() ??
             providerDetails['mobileNumber']?.toString() ??
-            providerDetails['mobile']?.toString() ??
             '';
 
         final providerEmail = providerDetails['email']?.toString() ?? '';
 
-        debugPrint('✅ [CUSTOMER DETAIL] Mapped provider data:');
+        debugPrint('✅ [CUSTOMER DETAIL] Final mapped provider data:');
         debugPrint('   - Name: $providerName');
         debugPrint('   - Phone: $providerPhone');
         debugPrint('   - Email: $providerEmail');
@@ -131,7 +185,7 @@ class _CustomerBookingDetailScreenState
       });
 
       debugPrint(
-        '✅ [CUSTOMER DETAIL] Booking loaded with provider: ${updatedBooking.providerName}',
+        '✅ [CUSTOMER DETAIL] Booking loaded with provider phone: ${updatedBooking.providerPhone}',
       );
     } catch (e) {
       debugPrint('❌ [CUSTOMER DETAIL] Error loading booking: $e');
@@ -260,17 +314,86 @@ class _CustomerBookingDetailScreenState
             icon: Icons.person,
             children: [
               // Provider Name - Always show
-              if (booking.providerName == null)
+              if (booking.providerName == null || booking.providerName!.isEmpty)
                 _buildLoadingRow('Name', 'Loading provider details...')
               else
                 _buildDetailRow('Name', booking.providerName!),
 
-              // ✅ CRITICAL: Privacy Logic with Helper Messages
+              // ✅ ENHANCED: Debug info for troubleshooting (can be removed in production)
+              if (booking.providerPhone == null ||
+                  booking.providerPhone!.isEmpty) ...[
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  margin: const EdgeInsets.only(bottom: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.info,
+                            size: 16,
+                            color: Colors.orange.shade700,
+                          ),
+                          const SizedBox(width: 8),
+                          const Text(
+                            'Fetching Provider Data:',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Provider ID: ${booking.providerId}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      Text(
+                        'Service ID: ${booking.serviceId}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      Text(
+                        'Provider Name: ${booking.providerName ?? "null"}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      Text(
+                        'Provider Phone: ${booking.providerPhone ?? "null"}',
+                        style: const TextStyle(fontSize: 11),
+                      ),
+                      const SizedBox(height: 4),
+                      ElevatedButton(
+                        onPressed: () {
+                          debugPrint(
+                            '🔄 [CUSTOMER DETAIL] Manual provider data refresh',
+                          );
+                          _loadBooking();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.orange,
+                          minimumSize: const Size(double.infinity, 32),
+                        ),
+                        child: const Text(
+                          'Reload Provider Data',
+                          style: TextStyle(fontSize: 12),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              // ✅ CRITICAL: Enhanced Privacy Logic
               if (booking.status == BookingStatus.completed ||
                   booking.status == BookingStatus.paid ||
                   booking.status == BookingStatus.cancelled ||
                   booking.status == BookingStatus.refunded) ...[
-                // ✅ Privacy Notice Banner (matching provider side)
+                // Privacy Notice Banner
                 const SizedBox(height: 12),
                 Container(
                   padding: const EdgeInsets.all(12),
@@ -299,31 +422,13 @@ class _CustomerBookingDetailScreenState
                           ),
                         ),
                       ),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: _getProviderPrivacyTextColor(booking.status),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          'PRIVATE',
-                          style: TextStyle(
-                            fontSize: 9,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
               ] else ...[
-                // ✅ Show contact details for ACTIVE bookings only
+                // ✅ Show contact details for ACTIVE bookings (pending, confirmed, inProgress)
                 if (booking.providerPhone != null &&
-                    booking.providerPhone!.isNotEmpty)
+                    booking.providerPhone!.isNotEmpty) ...[
                   _buildDetailRowWithAction(
                     'Mobile Number',
                     booking.providerPhone!,
@@ -334,53 +439,39 @@ class _CustomerBookingDetailScreenState
                       );
                       Helpers.launchPhone(booking.providerPhone!);
                     },
-                  )
-                else
-                  _buildDetailRow('Contact', 'Contact info not available'),
-
-                // Debug info (remove in production) - Only for active bookings
-                if (booking.providerName == null ||
-                    booking.providerName == 'Loading...' ||
-                    booking.providerName == 'Provider information unavailable')
+                  ),
+                ] else ...[
+                  // ✅ Enhanced fallback with service data option
+                  _buildDetailRow('Contact', 'Phone number not available'),
+                  const SizedBox(height: 8),
                   Container(
                     padding: const EdgeInsets.all(8),
-                    margin: const EdgeInsets.only(top: 8),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withValues(alpha: 0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Row(
                       children: [
                         Icon(
-                          Icons.info,
-                          size: 16,
-                          color: Colors.orange.shade700,
+                          Icons.info_outline,
+                          size: 14,
+                          color: Colors.blue.shade700,
                         ),
-                        const SizedBox(width: 8),
-                        Expanded(
+                        const SizedBox(width: 6),
+                        const Expanded(
                           child: Text(
-                            'Provider ID: ${booking.providerId}',
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: Colors.orange.shade700,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            debugPrint(
-                              '🔄 [CUSTOMER DETAIL] Manual provider refresh',
-                            );
-                            _loadBooking();
-                          },
-                          child: const Text(
-                            'Retry',
-                            style: TextStyle(fontSize: 12),
+                            'Contact details will be available once the provider accepts your booking.',
+                            style: TextStyle(fontSize: 12, color: Colors.blue),
                           ),
                         ),
                       ],
                     ),
                   ),
+                ],
+
+                // Email if available
+                if (booking.providerEmail?.isNotEmpty == true)
+                  _buildDetailRow('Email', booking.providerEmail!),
               ],
             ],
           ),
@@ -389,7 +480,6 @@ class _CustomerBookingDetailScreenState
 
           _buildProgressSection(booking),
 
-          const SizedBox(height: 16),
 
           // Legacy OTP Card (keep for backward compatibility but hide if new OTP section is shown)
           if (booking.status == BookingStatus.confirmed) ...[
@@ -1078,7 +1168,44 @@ class _CustomerBookingDetailScreenState
         '🔍 [CUSTOMER DETAIL] Fetching provider details for: $providerId',
       );
 
-      // Method 1: Try Firebase Realtime Database first
+      // ✅ CRITICAL: Method 1 - Try to get from booking's existing provider data first
+      if (booking?.providerPhone?.isNotEmpty == true) {
+        debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
+        return {
+          'name': booking?.providerName ?? 'Service Provider',
+          'businessName': booking?.providerName ?? 'Service Provider',
+          'phone': booking?.providerPhone ?? '',
+          'mobileNumber': booking?.providerPhone ?? '',
+          'email': booking?.providerEmail ?? '',
+        };
+      }
+
+      // ✅ CRITICAL: Method 2 - Try to get from service data via booking
+      final serviceDoc = await FirebaseFirestore.instance
+          .collection('services')
+          .doc(booking?.serviceId ?? '')
+          .get();
+
+      if (serviceDoc.exists && serviceDoc.data() != null) {
+        final serviceData = serviceDoc.data()!;
+        final serviceMobile = serviceData['mobileNumber'] as String?;
+        final serviceProviderName =
+            serviceData['providerBusinessName'] as String? ??
+            serviceData['providerName'] as String?;
+
+        if (serviceMobile?.isNotEmpty == true) {
+          debugPrint('✅ [CUSTOMER DETAIL] Provider found via service data');
+          return {
+            'name': serviceProviderName ?? 'Service Provider',
+            'businessName': serviceProviderName ?? 'Service Provider',
+            'phone': serviceMobile!,
+            'mobileNumber': serviceMobile,
+            'email': serviceData['providerEmail'] ?? '',
+          };
+        }
+      }
+
+      // ✅ Method 3 - Try Firebase Realtime Database
       try {
         debugPrint('🔍 [CUSTOMER DETAIL] Trying Realtime Database...');
         final rtdbSnapshot = await FirebaseDatabase.instance
@@ -1089,46 +1216,36 @@ class _CustomerBookingDetailScreenState
         if (rtdbSnapshot.exists && rtdbSnapshot.value != null) {
           final userData = Map<String, dynamic>.from(rtdbSnapshot.value as Map);
           debugPrint('✅ [CUSTOMER DETAIL] Provider found in Realtime DB');
-          debugPrint('   - Data keys: ${userData.keys.toList()}');
-          debugPrint('   - Name: ${userData['name']}');
-          debugPrint('   - Business Name: ${userData['businessName']}');
-          debugPrint('   - Phone: ${userData['phone']}');
 
-          return userData;
-        } else {
-          debugPrint('⚠️ [CUSTOMER DETAIL] Provider not found in Realtime DB');
+          // ✅ ENHANCED: Better field mapping with multiple phone field options
+          final providerPhone =
+              userData['phone']?.toString() ??
+              userData['mobileNumber']?.toString() ??
+              userData['mobile']?.toString() ??
+              userData['phoneNumber']?.toString() ??
+              '';
+
+          final providerName =
+              userData['businessName']?.toString() ??
+              userData['name']?.toString() ??
+              'Service Provider';
+
+          debugPrint('✅ [CUSTOMER DETAIL] Mapped phone: $providerPhone');
+          debugPrint('✅ [CUSTOMER DETAIL] Mapped name: $providerName');
+
+          return {
+            'name': providerName,
+            'businessName': providerName,
+            'phone': providerPhone,
+            'mobileNumber': providerPhone,
+            'email': userData['email']?.toString() ?? '',
+          };
         }
       } catch (e) {
         debugPrint('⚠️ [CUSTOMER DETAIL] Realtime DB error: $e');
       }
 
-      // Method 2: Try Firestore users collection
-      try {
-        debugPrint('🔍 [CUSTOMER DETAIL] Trying Firestore users collection...');
-        final userDoc = await FirebaseFirestore.instance
-            .collection('users')
-            .doc(providerId)
-            .get();
-
-        if (userDoc.exists && userDoc.data() != null) {
-          final userData = userDoc.data()!;
-          debugPrint('✅ [CUSTOMER DETAIL] Provider found in Firestore users');
-          debugPrint('   - Data keys: ${userData.keys.toList()}');
-          debugPrint('   - Name: ${userData['name']}');
-          debugPrint('   - Business Name: ${userData['businessName']}');
-          debugPrint('   - Phone: ${userData['phone']}');
-
-          return userData;
-        } else {
-          debugPrint(
-            '⚠️ [CUSTOMER DETAIL] Provider not found in Firestore users',
-          );
-        }
-      } catch (e) {
-        debugPrint('⚠️ [CUSTOMER DETAIL] Firestore users error: $e');
-      }
-
-      // Method 3: Try Firestore providers collection
+      // ✅ Method 4 - Try Firestore providers collection
       try {
         debugPrint(
           '🔍 [CUSTOMER DETAIL] Trying Firestore providers collection...',
@@ -1143,26 +1260,66 @@ class _CustomerBookingDetailScreenState
           debugPrint(
             '✅ [CUSTOMER DETAIL] Provider found in Firestore providers',
           );
-          debugPrint('   - Data keys: ${providerData.keys.toList()}');
-          debugPrint('   - Business Name: ${providerData['businessName']}');
-          debugPrint('   - Mobile Number: ${providerData['mobileNumber']}');
 
-          return providerData;
-        } else {
-          debugPrint(
-            '⚠️ [CUSTOMER DETAIL] Provider not found in Firestore providers',
-          );
+          final providerPhone =
+              providerData['mobileNumber']?.toString() ??
+              providerData['phone']?.toString() ??
+              providerData['mobile']?.toString() ??
+              '';
+
+          return {
+            'name':
+                providerData['businessName']?.toString() ?? 'Service Provider',
+            'businessName':
+                providerData['businessName']?.toString() ?? 'Service Provider',
+            'phone': providerPhone,
+            'mobileNumber': providerPhone,
+            'email': providerData['email']?.toString() ?? '',
+          };
         }
       } catch (e) {
         debugPrint('⚠️ [CUSTOMER DETAIL] Firestore providers error: $e');
       }
 
+      // ✅ Method 5 - Try Firestore users collection
+      try {
+        debugPrint('🔍 [CUSTOMER DETAIL] Trying Firestore users collection...');
+        final userDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(providerId)
+            .get();
+
+        if (userDoc.exists && userDoc.data() != null) {
+          final userData = userDoc.data()!;
+          debugPrint('✅ [CUSTOMER DETAIL] Provider found in Firestore users');
+
+          final providerPhone =
+              userData['phone']?.toString() ??
+              userData['mobileNumber']?.toString() ??
+              userData['mobile']?.toString() ??
+              '';
+
+          return {
+            'name': userData['name']?.toString() ?? 'Service Provider',
+            'businessName':
+                userData['businessName']?.toString() ??
+                userData['name']?.toString() ??
+                'Service Provider',
+            'phone': providerPhone,
+            'mobileNumber': providerPhone,
+            'email': userData['email']?.toString() ?? '',
+          };
+        }
+      } catch (e) {
+        debugPrint('⚠️ [CUSTOMER DETAIL] Firestore users error: $e');
+      }
+
       debugPrint(
-        '❌ [CUSTOMER DETAIL] Provider not found in any collection: $providerId',
+        '❌ [CUSTOMER DETAIL] Provider not found in any source: $providerId',
       );
       return null;
     } catch (e) {
-      debugPrint('❌ [CUSTOMER DETAIL] Error fetching provider details: $e');
+      debugPrint('❌ [CUSTOMER DETAIL] Critical error fetching provider: $e');
       return null;
     }
   }
@@ -1536,4 +1693,5 @@ class _CustomerBookingDetailScreenState
       },
     );
   }
+
 }

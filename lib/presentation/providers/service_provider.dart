@@ -670,6 +670,113 @@ class ServiceProvider extends ChangeNotifier {
     }
   }
 
+  Future<bool> addServiceWithProviderDetails({
+    required String name,
+    required String description,
+    required String category,
+    required double basePrice,
+    String imageUrl = '',
+    List<String> subServices = const [],
+    required String mobileNumber,
+    required double latitude,
+    required double longitude,
+    required String address,
+    // ✅ NEW: Provider details parameters
+    required String providerBusinessName,
+    required String providerName,
+    required String providerEmail,
+  }) async {
+    _isLoading = true;
+    _errorMessage = null;
+
+    if (hasListeners) {
+      notifyListeners();
+    }
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        throw Exception('User not logged in');
+      }
+
+      // Generate unique ID
+      final serviceId = const Uuid().v4();
+
+      // ✅ ENHANCED: Create service model with provider details
+      final newService = ServiceModel(
+        id: serviceId,
+        name: name,
+        description: description,
+        category: category,
+        basePrice: basePrice,
+        imageUrl: imageUrl,
+        subServices: subServices,
+        availability: 'available',
+        mobileNumber: mobileNumber,
+        providerId: currentUser.uid,
+        createdAt: DateTime.now(),
+        latitude: latitude,
+        longitude: longitude,
+        address: address,
+        isBooked: false,
+        // ✅ NEW: Include provider details
+        providerBusinessName: providerBusinessName,
+        providerName: providerName,
+        providerEmail: providerEmail,
+        metadata: {
+          'latitude': latitude,
+          'longitude': longitude,
+          'address': address,
+          'providerBusinessName': providerBusinessName,
+          'providerName': providerName,
+          'providerEmail': providerEmail,
+        },
+      );
+
+      // ✅ BATCH WRITE: Create service and update provider services list
+      final batch = FirebaseFirestore.instance.batch();
+
+      // Add service with provider details
+      final serviceRef = FirebaseFirestore.instance
+          .collection('services')
+          .doc(serviceId);
+      batch.set(serviceRef, newService.toFireStore());
+
+      // Update provider's services list
+      final providerRef = FirebaseFirestore.instance
+          .collection('providers')
+          .doc(currentUser.uid);
+      batch.update(providerRef, {
+        'services': FieldValue.arrayUnion([serviceId]),
+        'updatedAt': Timestamp.fromDate(DateTime.now()),
+      });
+
+      await batch.commit();
+
+      // Add to local lists
+      _services.add(newService);
+      _providerServices.add(newService);
+
+      _isLoading = false;
+      if (hasListeners) {
+        notifyListeners();
+      }
+
+      debugPrint(
+        '✅ Service created with provider details: $providerBusinessName',
+      );
+      return true;
+    } catch (e) {
+      _isLoading = false;
+      _errorMessage = e.toString();
+      if (hasListeners) {
+        notifyListeners();
+      }
+      debugPrint('❌ Error creating service with provider details: $e');
+      return false;
+    }
+  }
+
   // ✅ Enhanced: Add booking fields to existing services
   Future<void> addBookingFieldsToExistingServices() async {
     try {

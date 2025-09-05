@@ -25,60 +25,101 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   final LocationService _locationService = LocationService.instance;
   LocationData? _currentLocation;
-  bool _isRefreshing = false; // ✅ NEW: Track refresh state
+  bool _isRefreshing = false;
+  bool _hasInitialized = false;
 
   @override
   void initState() {
     super.initState();
+    // ✅ SIMPLIFIED: Only load data once when page is first opened
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _init();
-      _requestPermissionIfNeeded();
+      if (mounted) {
+        _initializeOnce();
+      }
     });
   }
 
+  // ✅ SIMPLIFIED: Initialize only once
+  Future<void> _initializeOnce() async {
+    if (_hasInitialized || !mounted) return;
+
+    debugPrint('🚀 [HOME] Initializing for first time only');
+
+    await _requestPermissionIfNeeded();
+
+    if (mounted) {
+      await _loadData();
+      _hasInitialized = true;
+    }
+  }
+
   Future<void> _requestPermissionIfNeeded() async {
-    // Check if we should show the dialog (e.g., first time user)
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool hasAskedPermission =
-        prefs.getBool('has_asked_notification_permission') ?? false;
+    if (!mounted) return;
 
-    if (!hasAskedPermission) {
-      await NotificationPermissionHelper.requestPermissionWithDialog(context);
-      await prefs.setBool('has_asked_notification_permission', true);
+    try {
+      SharedPreferences prefs = await SharedPreferences.getInstance();
+      bool hasAskedPermission =
+          prefs.getBool('has_asked_notification_permission') ?? false;
+
+      if (!hasAskedPermission && mounted) {
+        await NotificationPermissionHelper.requestPermissionWithDialog(context);
+        if (mounted) {
+          await prefs.setBool('has_asked_notification_permission', true);
+        }
+      }
+    } catch (e) {
+      debugPrint('❌ [HOME] Permission error: $e');
     }
   }
 
-  Future<void> _init() async {
-    final sp = context.read<ServiceProvider>();
-
-    final loc = await _locationService.getCurrentLocation();
-    if (loc != null && mounted) {
-      setState(() => _currentLocation = loc);
-      await sp.loadAllServices(userLat: loc.latitude!, userLng: loc.longitude!);
-    } else {
-      sp.loadAllServices(userLat: 0, userLng: 0);
-    }
-  }
-
-  // ✅ ENHANCED: Better refresh handling with loading state
-  Future<void> _refresh() async {
-    if (_isRefreshing) return; // Prevent multiple simultaneous refreshes
+  // ✅ SIMPLIFIED: Basic data loading
+  Future<void> _loadData() async {
+    if (!mounted) return;
 
     setState(() => _isRefreshing = true);
 
     try {
-      if (_currentLocation != null) {
-        await context.read<ServiceProvider>().loadAllServices(
-          userLat: _currentLocation!.latitude!,
-          userLng: _currentLocation!.longitude!,
+      final sp = context.read<ServiceProvider>();
+
+      final loc = await _locationService.getCurrentLocation();
+      if (loc != null && mounted) {
+        setState(() => _currentLocation = loc);
+        await sp.loadAllServices(
+          userLat: loc.latitude!,
+          userLng: loc.longitude!,
         );
-      } else {
-        await _init();
+      } else if (mounted) {
+        await sp.loadAllServices(userLat: 0, userLng: 0);
       }
+
+      debugPrint('✅ [HOME] Data loaded successfully');
+    } catch (e) {
+      debugPrint('❌ [HOME] Error loading data: $e');
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
       }
+    }
+  }
+
+  // ✅ SIMPLIFIED: Manual refresh only
+  Future<void> _refresh() async {
+    if (_isRefreshing || !mounted) return;
+
+    debugPrint('🔄 [HOME] Manual refresh triggered');
+    await _loadData();
+  }
+
+  // ✅ SIMPLIFIED: Navigate with refresh on return
+  Future<void> _navigateWithRefreshOnReturn(String route) async {
+    if (!mounted) return;
+
+    await context.push(route);
+
+    // ✅ Refresh when returning to this page
+    if (mounted) {
+      debugPrint('🔄 [HOME] Refreshing after return from $route');
+      await _loadData();
     }
   }
 
@@ -88,10 +129,7 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: AppColors.background,
       body: Column(
         children: [
-          // ✅ NEW: Ad banner above everything
           const BannerAdWidget(),
-
-          // ✅ UPDATED: Main content with RefreshIndicator
           Expanded(
             child: SafeArea(
               child: RefreshIndicator(
@@ -101,7 +139,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Consumer<ServiceProvider>(
                   builder: (context, sp, child) {
                     return CustomScrollView(
-                      // ✅ FIXED: Always allow scrolling for RefreshIndicator to work
                       physics: const AlwaysScrollableScrollPhysics(),
                       slivers: [
                         _buildCompactAppBar(),
@@ -121,7 +158,6 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // ✅ UPDATED: Added refresh icon to app bar
   Widget _buildCompactAppBar() {
     return SliverAppBar(
       expandedHeight: 80,
@@ -152,12 +188,29 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                             ),
                             const SizedBox(height: 2),
-                            const Text(
-                              AppStrings.findServices,
-                              style: TextStyle(
-                                color: Colors.white70,
-                                fontSize: 16,
-                              ),
+                            Row(
+                              children: [
+                                const Text(
+                                  AppStrings.findServices,
+                                  style: TextStyle(
+                                    color: Colors.white70,
+                                    fontSize: 16,
+                                  ),
+                                ),
+                                if (_isRefreshing) ...[
+                                  const SizedBox(width: 8),
+                                  const SizedBox(
+                                    width: 12,
+                                    height: 12,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 1.5,
+                                      valueColor: AlwaysStoppedAnimation<Color>(
+                                        Colors.white70,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ],
                             ),
                           ],
                         ),
@@ -203,32 +256,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   color: AppColors.textPrimary,
                 ),
               ),
-              const Spacer(),
-              // ✅ NEW: Quick refresh hint
-              if (_isRefreshing)
-                Row(
-                  children: [
-                    SizedBox(
-                      width: 12,
-                      height: 12,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 1.5,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.primary,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      'Refreshing...',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: AppColors.primary,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                  ],
-                ),
             ],
           ),
           const SizedBox(height: 20),
@@ -238,7 +265,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _quickAccessButton(
                   icon: Icons.calendar_today_outlined,
                   label: 'Bookings',
-                  onTap: () => context.push('/customer-bookings'),
+                  onTap: () =>
+                      _navigateWithRefreshOnReturn('/customer-bookings'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -246,7 +274,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _quickAccessButton(
                   icon: Icons.favorite_outline,
                   label: 'Favorites',
-                  onTap: () => context.push('/favorites'),
+                  onTap: () => _navigateWithRefreshOnReturn('/favorites'),
                 ),
               ),
               const SizedBox(width: 12),
@@ -254,7 +282,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: _quickAccessButton(
                   icon: Icons.settings,
                   label: 'Settings',
-                  onTap: () => context.push('/customer-settings'), // ✅ UPDATED
+                  onTap: () =>
+                      _navigateWithRefreshOnReturn('/customer-settings'),
                 ),
               ),
             ],
@@ -321,6 +350,7 @@ class _HomeScreenState extends State<HomeScreen> {
           contentPadding: const EdgeInsets.symmetric(horizontal: 16),
         ),
         onTap: () {
+          // ✅ SIMPLIFIED: No refresh before search
           final sp = context.read<ServiceProvider>();
           Navigator.push(
             context,
@@ -372,7 +402,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _buildServicesContent() {
     return Consumer<ServiceProvider>(
       builder: (context, sp, child) {
-        if (sp.isLoading) {
+        if (sp.isLoading || _isRefreshing) {
           return SliverFillRemaining(
             hasScrollBody: false,
             child: Center(
@@ -410,7 +440,6 @@ class _HomeScreenState extends State<HomeScreen> {
           );
         }
 
-        // ✅ UPDATED: Always use SliverList for consistent scrolling
         return SliverList.builder(
           itemCount: services.length,
           itemBuilder: (context, index) {
@@ -420,12 +449,18 @@ class _HomeScreenState extends State<HomeScreen> {
               userLatitude: _currentLocation?.latitude,
               userLongitude: _currentLocation?.longitude,
               onTap: () {
+                // ✅ SIMPLIFIED: Direct navigation without refresh
                 Navigator.push(
                   context,
                   MaterialPageRoute(
                     builder: (_) => ServiceDetailScreen(service: s),
                   ),
-                );
+                ).then((_) {
+                  // ✅ Optional: Refresh when returning from service detail
+                  if (mounted) {
+                    _loadData();
+                  }
+                });
               },
               showFavoriteButton: true,
             );
@@ -472,9 +507,8 @@ class _HomeScreenState extends State<HomeScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            // ✅ NEW: Manual refresh button in location prompt
             ElevatedButton.icon(
-              onPressed: _isRefreshing ? null : _refresh,
+              onPressed: _isRefreshing ? null : _loadData,
               icon: _isRefreshing
                   ? const SizedBox(
                       width: 16,
@@ -542,9 +576,8 @@ class _HomeScreenState extends State<HomeScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 16),
-            // ✅ NEW: Manual refresh button in empty state
             ElevatedButton.icon(
-              onPressed: _isRefreshing ? null : _refresh,
+              onPressed: _isRefreshing ? null : _loadData,
               icon: _isRefreshing
                   ? const SizedBox(
                       width: 16,
@@ -566,5 +599,11 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    debugPrint('🔄 [HOME] Disposing screen');
+    super.dispose();
   }
 }

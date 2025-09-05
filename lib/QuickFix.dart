@@ -121,9 +121,8 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
     debugPrint('📱 Handling notification tap: ${message.data}');
 
     if (message.data.containsKey('screen')) {
-      String screen = message.data['screen'];
-      // Navigate to specific screen based on data
-      // AppRouter.navigateTo(navigatorKey.currentContext!, screen);
+      final screen = message.data['screen'];
+      navigatorKey.currentState?.pushNamed('/$screen');
     }
   }
 

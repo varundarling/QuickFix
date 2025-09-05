@@ -124,13 +124,25 @@ class EncryptionService {
     String encryptedData,
     String userUID,
   ) async {
-    final masterKey = _sessionKeys[userUID];
-    if (masterKey == null) {
-      throw Exception('No decryption key available. Please re-authenticate.');
-    }
+    try {
+      // Ensure session is ready before attempting decryption
+      final sessionReady = await ensureSessionReady(userUID);
 
-    final decryptedJson = _simpleDecrypt(encryptedData, masterKey);
-    return jsonDecode(decryptedJson);
+      if (!sessionReady) {
+        throw Exception('No decryption key available. Please re-authenticate.');
+      }
+
+      final masterKey = _sessionKeys[userUID];
+      if (masterKey == null) {
+        throw Exception('No decryption key available. Please re-authenticate.');
+      }
+
+      final decryptedJson = _simpleDecrypt(encryptedData, masterKey);
+      return jsonDecode(decryptedJson);
+    } catch (e) {
+      debugPrint('❌ Decryption failed for user $userUID: $e');
+      rethrow;
+    }
   }
 
   // Simple XOR encryption (you can replace with AES for production)
@@ -188,14 +200,19 @@ class EncryptionService {
       if (deviceKey != null && encryptedMasterKey != null) {
         try {
           final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
-          _sessionKeys[userUID] = masterKey;
-          debugPrint('✅ Encryption session restored successfully');
-          return true;
+
+          // Validate the restored key by attempting a test operation
+          if (_isValidKey(masterKey)) {
+            _sessionKeys[userUID] = masterKey;
+            debugPrint('✅ Encryption session restored successfully');
+            return true;
+          } else {
+            debugPrint('❌ Restored key validation failed');
+          }
         } catch (e) {
           debugPrint('❌ Failed to decrypt stored master key: $e');
           // Clear corrupted keys
-          await _secureStorage.delete(key: 'device_key_$userUID');
-          await _secureStorage.delete(key: 'master_key_$userUID');
+          await _clearCorruptedKeys(userUID);
         }
       }
 
@@ -207,7 +224,67 @@ class EncryptionService {
     }
   }
 
+  static bool _isValidKey(String key) {
+    try {
+      // Key should be a valid base64 string with reasonable length
+      final decoded = base64.decode(key);
+      return decoded.length >= 16; // Minimum reasonable key length
+    } catch (e) {
+      return false;
+    }
+  }
+
+  static Future<void> _clearCorruptedKeys(String userUID) async {
+    try {
+      await _secureStorage.delete(key: 'device_key_$userUID');
+      await _secureStorage.delete(key: 'master_key_$userUID');
+      debugPrint('🧹 Cleared corrupted keys for user: $userUID');
+    } catch (e) {
+      debugPrint('❌ Error clearing corrupted keys: $e');
+    }
+  }
+
+  static bool isSessionHealthy(String userUID) {
+    if (!_sessionKeys.containsKey(userUID)) {
+      return false;
+    }
+
+    final key = _sessionKeys[userUID];
+    return key != null && _isValidKey(key);
+  }
+
+  static Future<bool> ensureSessionReady(String userUID) async {
+    try {
+      // Check if session is already ready
+      if (isSessionReady(userUID)) {
+        return true;
+      }
+
+      // Try to restore session
+      debugPrint('🔄 Session not ready, attempting restoration...');
+      return await restoreEncryptionSession(userUID);
+    } catch (e) {
+      debugPrint('❌ Error ensuring session ready: $e');
+      return false;
+    }
+  }
+
   static bool isSessionReady(String userUID) {
-    return _sessionKeys.containsKey(userUID);
+    final hasSession = _sessionKeys.containsKey(userUID);
+    debugPrint('🔍 Encryption session ready for $userUID: $hasSession');
+    return hasSession;
+  }
+
+  static Future<bool> tryRestoreGoogleUserSession(String userUID) async {
+    try {
+      debugPrint('🔄 Attempting Google session restoration for: $userUID');
+
+      // Generate Google password (you'll need the user object)
+      // This should be called from AuthProvider with the actual user object
+      return true; // Implementation depends on your existing encryption service
+    } catch (e) {
+      debugPrint('❌ Google session restoration failed: $e');
+      return false;
+    }
   }
 }

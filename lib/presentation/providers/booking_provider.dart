@@ -10,6 +10,7 @@ import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/core/services/realtime_notification_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:uuid/uuid.dart';
 
 class BookingProvider extends ChangeNotifier {
@@ -33,6 +34,7 @@ class BookingProvider extends ChangeNotifier {
   double? _customerLatitude;
   double? _customerLongitude;
   double _totalAmount = 0.0;
+  double _selectedRating = 5.0;
 
   String? get selectedServiceId => _selectedServiceId;
   String? get selectedProviderId => _selectedProviderId;
@@ -40,6 +42,7 @@ class BookingProvider extends ChangeNotifier {
   String get description => _description;
   String get customerAddress => _customerAddress;
   double get totalAmount => _totalAmount;
+  double get selectedRating => _selectedRating;
 
   void setSelectedService(String serviceId) {
     _selectedServiceId = serviceId;
@@ -295,29 +298,85 @@ class BookingProvider extends ChangeNotifier {
 
       List<BookingModel> bookingsWithCustomerDetails = [];
 
-      // Process each booking and fetch customer details
-      for (var doc in bookingQuerySnapshot.docs) {
-        BookingModel booking = BookingModel.fromFireStore(doc);
+      // ✅ CRITICAL: Process bookings in parallel for faster loading
+      final futures = bookingQuerySnapshot.docs.map((doc) async {
+        try {
+          BookingModel booking = BookingModel.fromFireStore(doc);
 
-        // Fetch customer details for each booking
-        final customerDetails = await _fetchCustomerDetails(booking.customerId);
+          debugPrint(
+            '📋 [PROVIDER] Processing booking: ${booking.id} (${booking.status})',
+          );
 
-        if (customerDetails != null) {
-          booking = booking.copyWith(
-            customerName: customerDetails['customerName'],
-            customerPhone: customerDetails['customerPhone'],
-            customerEmail: customerDetails['customerEmail'],
-            customerAddressFromProfile: customerDetails['customerAddress'],
+          // ✅ ENHANCED: Check if booking already has customer data
+          bool hasValidCustomerData =
+              booking.customerName != null &&
+              booking.customerName!.isNotEmpty &&
+              booking.customerName != 'Unknown Customer' &&
+              booking.customerName != 'Loading...' &&
+              booking.customerName != 'null';
+
+          if (hasValidCustomerData) {
+            debugPrint(
+              '✅ [PROVIDER] Using existing customer data: ${booking.customerName}',
+            );
+            return booking;
+          }
+
+          // ✅ CRITICAL: Fetch customer details for all bookings without valid data
+          debugPrint(
+            '🔍 [PROVIDER] Fetching customer details for: ${booking.customerId}',
+          );
+          final customerDetails = await _fetchCustomerDetails(
+            booking.customerId,
+          );
+
+          if (customerDetails != null) {
+            booking = booking.copyWith(
+              customerName: customerDetails['customerName'],
+              customerPhone: customerDetails['customerPhone'],
+              customerEmail: customerDetails['customerEmail'],
+              customerAddressFromProfile: customerDetails['customerAddress'],
+            );
+
+            debugPrint(
+              '✅ [PROVIDER] Customer data loaded: ${booking.customerName}',
+            );
+          } else {
+            debugPrint('⚠️ [PROVIDER] No customer data found, using fallback');
+            booking = booking.copyWith(
+              customerName: 'Customer Info Unavailable',
+              customerPhone: 'Contact not available',
+              customerEmail: '',
+            );
+          }
+
+          return booking;
+        } catch (e) {
+          debugPrint('❌ [PROVIDER] Error processing booking: $e');
+          BookingModel fallbackBooking = BookingModel.fromFireStore(doc);
+          return fallbackBooking.copyWith(
+            customerName: 'Error Loading Customer',
+            customerPhone: 'Error loading contact',
+            customerEmail: '',
           );
         }
+      });
 
-        bookingsWithCustomerDetails.add(booking);
-      }
+      // ✅ Wait for all customer data to be loaded
+      bookingsWithCustomerDetails = await Future.wait(futures);
 
       _providerBookings = bookingsWithCustomerDetails;
+
       debugPrint(
         '✅ [PROVIDER] Loaded ${bookingsWithCustomerDetails.length} bookings with customer data',
       );
+
+      // ✅ DEBUG: Show sample of loaded customer data
+      for (var booking in bookingsWithCustomerDetails.take(3)) {
+        debugPrint(
+          '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
+        );
+      }
     } catch (e) {
       debugPrint('❌ [PROVIDER] Error loading bookings: $e');
       _setError('Failed to load bookings: $e');
@@ -327,93 +386,62 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
+  // ✅ ADD to BookingProvider class
   Future<void> loadUserBookingsWithProviderData(String userId) async {
-    _setLoading(true);
-    _setError(null);
-
     try {
       debugPrint(
-        '🔄 [CUSTOMER] Loading bookings with provider data for: $userId',
+        '🔄 [BOOKING PROVIDER] Loading bookings with provider data for: $userId',
       );
 
-      final querySnapshot = await FirebaseFirestore.instance
+      // First load bookings
+      final snapshot = await FirebaseFirestore.instance
           .collection('bookings')
           .where('customerId', isEqualTo: userId)
           .orderBy('createdAt', descending: true)
           .get();
 
-      List<BookingModel> bookingsWithProviderDetails = [];
+      List<BookingModel> bookingsWithProviders = [];
 
-      // ✅ Process bookings sequentially to avoid overwhelming the system
-      for (var doc in querySnapshot.docs) {
+      for (var doc in snapshot.docs) {
         try {
           BookingModel booking = BookingModel.fromFireStore(doc);
-          debugPrint(
-            '📋 [CUSTOMER] Processing booking: ${booking.serviceName} (Provider: ${booking.providerId})',
-          );
 
-          // ✅ CRITICAL: Always attempt to fetch provider details
+          // Fetch provider details
           final providerDetails = await fetchProviderDetailsForCustomer(
             booking.providerId,
           );
 
-          if (providerDetails != null &&
-              providerDetails['providerName'] != 'Error Loading Provider') {
+          if (providerDetails != null) {
             booking = booking.copyWith(
               providerName: providerDetails['providerName'],
               providerPhone: providerDetails['providerPhone'],
               providerEmail: providerDetails['providerEmail'],
             );
-            debugPrint(
-              '✅ [CUSTOMER] Provider details loaded: ${providerDetails['providerName']}',
-            );
-          } else {
-            debugPrint(
-              '⚠️ [CUSTOMER] Provider details not found, using fallback',
-            );
-            booking = booking.copyWith(
-              providerName: 'Provider information unavailable',
-              providerPhone: '',
-              providerEmail: '',
-            );
           }
 
-          bookingsWithProviderDetails.add(booking);
+          bookingsWithProviders.add(booking);
         } catch (e) {
-          debugPrint('❌ [CUSTOMER] Error processing individual booking: $e');
-          // Still add the booking even if provider details fail
-          try {
-            BookingModel booking = BookingModel.fromFireStore(doc);
-            booking = booking.copyWith(
-              providerName: 'Error loading provider details',
-              providerPhone: '',
-              providerEmail: '',
-            );
-            bookingsWithProviderDetails.add(booking);
-          } catch (parseError) {
-            debugPrint('❌ [CUSTOMER] Failed to parse booking: $parseError');
-          }
+          debugPrint('❌ [BOOKING PROVIDER] Error processing booking: $e');
+          // Add booking without provider details
+          bookingsWithProviders.add(BookingModel.fromFireStore(doc));
         }
       }
 
-      _userBookings = bookingsWithProviderDetails;
+      updateUserBookings(bookingsWithProviders);
       debugPrint(
-        '✅ [CUSTOMER] Loaded ${bookingsWithProviderDetails.length} bookings with provider data',
+        '✅ [BOOKING PROVIDER] Loaded ${bookingsWithProviders.length} bookings with provider data',
       );
-
-      // Debug output
-      for (var booking in bookingsWithProviderDetails.take(3)) {
-        debugPrint(
-          '   📋 ${booking.serviceName}: Provider = ${booking.providerName}',
-        );
-      }
-    } catch (error) {
-      debugPrint('❌ [CUSTOMER] Error loading user bookings: $error');
-      _setError('Failed to load bookings: $error');
-    } finally {
-      _setLoading(false);
-      notifyListeners();
+    } catch (e) {
+      debugPrint(
+        '❌ [BOOKING PROVIDER] Error loading bookings with provider data: $e',
+      );
     }
+  }
+
+  // ✅ ADD method to update user bookings
+  void updateUserBookings(List<BookingModel> bookings) {
+    _userBookings = bookings;
+    notifyListeners();
   }
 
   // ✅ ENHANCED: Update existing _fetchCustomerDetails to handle Firestore better
@@ -421,61 +449,120 @@ class BookingProvider extends ChangeNotifier {
     try {
       debugPrint('🔍 [PROVIDER] Fetching customer details for: $customerId');
 
-      // Try Firebase Realtime Database first (where user data is actually stored)
-      final userDoc = await FirebaseDatabase.instance
-          .ref('users')
-          .child(customerId)
-          .get();
+      // ✅ Method 1: Try Firebase Realtime Database first
+      try {
+        final userDoc = await FirebaseDatabase.instance
+            .ref('users')
+            .child(customerId)
+            .get();
 
-      if (userDoc.exists && userDoc.value != null) {
-        final userData = Map<String, dynamic>.from(userDoc.value as Map);
-        debugPrint(
-          '✅ [PROVIDER] Customer found in Realtime DB: ${userData['name']}',
-        );
+        if (userDoc.exists && userDoc.value != null) {
+          final userData = Map<String, dynamic>.from(userDoc.value as Map);
 
-        return {
-          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone': userData['phone']?.toString() ?? '',
-          'customerEmail': userData['email']?.toString() ?? '',
-          'customerAddress': userData['address']?.toString() ?? '',
-        };
-      }
-
-      // Fallback: Try Firestore users collection
-      final firestoreDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(customerId)
-          .get();
-
-      if (firestoreDoc.exists && firestoreDoc.data() != null) {
-        final userData = firestoreDoc.data()!;
-        debugPrint(
-          '✅ [PROVIDER] Customer found in Firestore: ${userData['name']}',
-        );
-
-        return {
-          'customerName': userData['name']?.toString() ?? 'Unknown Customer',
-          'customerPhone':
+          final customerName = userData['name']?.toString() ?? '';
+          final customerPhone =
               userData['phone']?.toString() ??
               userData['mobile']?.toString() ??
-              '',
-          'customerEmail': userData['email']?.toString() ?? '',
-          'customerAddress': userData['address']?.toString() ?? '',
-        };
+              userData['mobileNumber']?.toString() ??
+              '';
+
+          if (customerName.isNotEmpty) {
+            debugPrint(
+              '✅ [PROVIDER] Customer found in Realtime DB: $customerName',
+            );
+            return {
+              'customerName': customerName,
+              'customerPhone': customerPhone,
+              'customerEmail': userData['email']?.toString() ?? '',
+              'customerAddress': userData['address']?.toString() ?? '',
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PROVIDER] Realtime DB error: $e');
       }
 
-      debugPrint('❌ [PROVIDER] Customer not found: $customerId');
+      // ✅ Method 2: Try Firestore users collection
+      try {
+        final firestoreDoc = await FirebaseFirestore.instance
+            .collection('users')
+            .doc(customerId)
+            .get();
+
+        if (firestoreDoc.exists && firestoreDoc.data() != null) {
+          final userData = firestoreDoc.data()!;
+
+          final customerName =
+              userData['name']?.toString() ??
+              userData['displayName']?.toString() ??
+              '';
+          final customerPhone =
+              userData['phone']?.toString() ??
+              userData['mobile']?.toString() ??
+              userData['phoneNumber']?.toString() ??
+              '';
+
+          if (customerName.isNotEmpty) {
+            debugPrint(
+              '✅ [PROVIDER] Customer found in Firestore: $customerName',
+            );
+            return {
+              'customerName': customerName,
+              'customerPhone': customerPhone,
+              'customerEmail': userData['email']?.toString() ?? '',
+              'customerAddress': userData['address']?.toString() ?? '',
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PROVIDER] Firestore error: $e');
+      }
+
+      // ✅ Method 3: Try to get from existing bookings (fallback)
+      try {
+        final existingBookings = await FirebaseFirestore.instance
+            .collection('bookings')
+            .where('customerId', isEqualTo: customerId)
+            .where('customerName', isNotEqualTo: null)
+            .limit(1)
+            .get();
+
+        if (existingBookings.docs.isNotEmpty) {
+          final bookingData = existingBookings.docs.first.data();
+          final existingName = bookingData['customerName']?.toString();
+          final existingPhone = bookingData['customerPhone']?.toString();
+
+          if (existingName != null &&
+              existingName.isNotEmpty &&
+              existingName != 'Unknown Customer') {
+            debugPrint(
+              '✅ [PROVIDER] Customer found in existing bookings: $existingName',
+            );
+            return {
+              'customerName': existingName,
+              'customerPhone': existingPhone ?? '',
+              'customerEmail': bookingData['customerEmail']?.toString() ?? '',
+              'customerAddress':
+                  bookingData['customerAddress']?.toString() ?? '',
+            };
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [PROVIDER] Existing bookings error: $e');
+      }
+
+      debugPrint('❌ [PROVIDER] Customer not found anywhere: $customerId');
       return {
         'customerName': 'Customer Not Found',
-        'customerPhone': '',
+        'customerPhone': 'Contact not available',
         'customerEmail': '',
         'customerAddress': '',
       };
     } catch (e) {
-      debugPrint('❌ [PROVIDER] Error fetching customer: $e');
+      debugPrint('❌ [PROVIDER] Critical error fetching customer: $e');
       return {
         'customerName': 'Error Loading Customer',
-        'customerPhone': '',
+        'customerPhone': 'Contact unavailable',
         'customerEmail': '',
         'customerAddress': '',
       };
@@ -818,6 +905,7 @@ class BookingProvider extends ChangeNotifier {
     required String customerName,
     required String customerPhone,
     required DateTime scheduledDate,
+    required double rating,
     required String serviceTitle,
     Map<String, dynamic>? additionalData,
   }) async {
@@ -832,6 +920,7 @@ class BookingProvider extends ChangeNotifier {
             'customerName': customerName,
             'customerPhone': customerPhone,
             'scheduledDate': Timestamp.fromDate(scheduledDate),
+            'rating': rating,
             'serviceTitle': serviceTitle,
             'status': 'pending',
             'createdAt': FieldValue.serverTimestamp(),
@@ -946,7 +1035,6 @@ class BookingProvider extends ChangeNotifier {
               '🔔 [REAL-TIME] Received snapshot with ${snapshot.docs.length} documents',
             );
 
-            // ✅ CRITICAL: Check for system-protected bookings
             List<BookingModel> bookingsWithCustomerDetails = [];
 
             for (var doc in snapshot.docs) {
@@ -954,92 +1042,86 @@ class BookingProvider extends ChangeNotifier {
                 final data = doc.data();
                 final bookingId = doc.id;
                 final status = data['status']?.toString() ?? 'pending';
-                final lastUpdatedBy = data['lastUpdatedBy']?.toString() ?? '';
-                final systemProtected = data['systemProtected'] ?? false;
-                final systemProtectedUntil =
-                    data['systemProtectedUntil'] as Timestamp?;
 
-                debugPrint('🔍 [REAL-TIME] Processing booking $bookingId:');
-                debugPrint('   - Status: $status');
-                debugPrint('   - LastUpdatedBy: $lastUpdatedBy');
-                debugPrint('   - SystemProtected: $systemProtected');
-
-                // ✅ CRITICAL: Skip processing if system protected and still valid
-                if (systemProtected && systemProtectedUntil != null) {
-                  final protectedUntil = systemProtectedUntil.toDate();
-                  if (DateTime.now().isBefore(protectedUntil)) {
-                    debugPrint(
-                      '🛡️ [REAL-TIME] Skipping system-protected booking: $bookingId',
-                    );
-
-                    // Create booking model from existing data without overwriting
-                    BookingModel booking = BookingModel.fromFireStore(doc);
-                    final customerDetails = await _fetchCustomerDetails(
-                      booking.customerId,
-                    );
-                    if (customerDetails != null) {
-                      booking = booking.copyWith(
-                        customerName: customerDetails['customerName'],
-                        customerPhone: customerDetails['customerPhone'],
-                        customerEmail: customerDetails['customerEmail'],
-                        customerAddressFromProfile:
-                            customerDetails['customerAddress'],
-                      );
-                    }
-                    bookingsWithCustomerDetails.add(booking);
-                    continue;
-                  }
-                }
-
-                // ✅ CRITICAL: Also check local protection
-                if (isBookingSystemUpdated(bookingId)) {
-                  debugPrint(
-                    '🛡️ [REAL-TIME] Skipping locally protected booking: $bookingId',
-                  );
-
-                  // Use existing local data instead of snapshot data
-                  final existingBooking = _providerBookings
-                      .where((b) => b.id == bookingId)
-                      .firstOrNull;
-                  if (existingBooking != null) {
-                    bookingsWithCustomerDetails.add(existingBooking);
-                    continue;
-                  }
-                }
-
-                // Normal processing for non-protected bookings
-                BookingModel booking = BookingModel.fromFireStore(doc);
-                final customerDetails = await _fetchCustomerDetails(
-                  booking.customerId,
+                debugPrint(
+                  '🔍 [REAL-TIME] Processing booking $bookingId: $status',
                 );
-                if (customerDetails != null) {
-                  booking = booking.copyWith(
-                    customerName: customerDetails['customerName'],
-                    customerPhone: customerDetails['customerPhone'],
-                    customerEmail: customerDetails['customerEmail'],
-                    customerAddressFromProfile:
-                        customerDetails['customerAddress'],
+
+                // ✅ CRITICAL: Create booking model first
+                BookingModel booking = BookingModel.fromFireStore(doc);
+
+                // ✅ ENHANCED: Check if we already have customer data
+                bool hasCustomerData =
+                    booking.customerName != null &&
+                    booking.customerName!.isNotEmpty &&
+                    booking.customerName != 'Unknown Customer' &&
+                    booking.customerName != 'Loading...' &&
+                    booking.customerPhone != null &&
+                    booking.customerPhone!.isNotEmpty &&
+                    booking.customerPhone != 'No Phone';
+
+                if (hasCustomerData) {
+                  debugPrint(
+                    '✅ [REAL-TIME] Using existing customer data: ${booking.customerName}',
                   );
+                  bookingsWithCustomerDetails.add(booking);
+                } else {
+                  debugPrint(
+                    '🔍 [REAL-TIME] Fetching missing customer data for: ${booking.customerId}',
+                  );
+
+                  // ✅ CRITICAL: Always fetch customer details for bookings without data
+                  final customerDetails = await _fetchCustomerDetails(
+                    booking.customerId,
+                  );
+
+                  if (customerDetails != null) {
+                    booking = booking.copyWith(
+                      customerName: customerDetails['customerName'],
+                      customerPhone: customerDetails['customerPhone'],
+                      customerEmail: customerDetails['customerEmail'],
+                      customerAddressFromProfile:
+                          customerDetails['customerAddress'],
+                    );
+
+                    debugPrint(
+                      '✅ [REAL-TIME] Customer data loaded: ${booking.customerName}',
+                    );
+                  } else {
+                    debugPrint('❌ [REAL-TIME] Could not fetch customer data');
+                    // ✅ Set fallback data instead of leaving null
+                    booking = booking.copyWith(
+                      customerName: 'Customer Information Unavailable',
+                      customerPhone: '',
+                      customerEmail: '',
+                    );
+                  }
+
+                  bookingsWithCustomerDetails.add(booking);
                 }
-                bookingsWithCustomerDetails.add(booking);
               } catch (e) {
                 debugPrint('❌ [REAL-TIME] Error processing booking: $e');
+                // Add booking with fallback data
+                BookingModel fallbackBooking = BookingModel.fromFireStore(doc);
+                fallbackBooking = fallbackBooking.copyWith(
+                  customerName: 'Error Loading Customer',
+                  customerPhone: '',
+                  customerEmail: '',
+                );
+                bookingsWithCustomerDetails.add(fallbackBooking);
               }
             }
 
             _providerBookings = bookingsWithCustomerDetails;
             notifyListeners();
 
-            // ✅ DEBUG: Log final status distribution
-            debugPrint('✅ [REAL-TIME] Final booking states:');
-            for (var booking in bookingsWithCustomerDetails.take(5)) {
-              debugPrint('   - ${booking.serviceName}: ${booking.status}');
+            // ✅ DEBUG: Log final customer data status
+            debugPrint('✅ [REAL-TIME] Final booking customer data:');
+            for (var booking in bookingsWithCustomerDetails.take(3)) {
+              debugPrint(
+                '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
+              );
             }
-
-            final inProgressCount = bookingsWithCustomerDetails
-                .where((b) => b.status == BookingStatus.inProgress)
-                .length;
-            debugPrint('📊 [REAL-TIME] InProgress bookings: $inProgressCount');
           },
           onError: (error) {
             debugPrint('❌ [REAL-TIME] Error: $error');
@@ -1168,12 +1250,6 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  void updateUserBookings(List<BookingModel> bookings) {
-    _userBookings = bookings;
-    debugPrint('✅ Updated user bookings: ${_userBookings.length}');
-    notifyListeners();
-  }
-
   Future<void> _cancelAllListeners() async {
     _providerBookingsSubscription?.cancel();
     _providerBookingsSubscription = null;
@@ -1213,9 +1289,10 @@ class BookingProvider extends ChangeNotifier {
     required double customerLatitude,
     required double customerLongitude,
     required double totalAmount,
-    required String customerName, 
+    required String customerName,
     required String customerPhone,
     required String customerEmail,
+    required double rating,
     DateTime? selectedDate,
     DateTime? bookedDate,
   }) async {
@@ -1241,6 +1318,9 @@ class BookingProvider extends ChangeNotifier {
         createdAt: DateTime.now(),
         selectedDate: selectedDate,
       );
+
+      final firestoreData = booking.toFireStore();
+      firestoreData['rating'] = rating;
 
       final docRef = await FirebaseFirestore.instance
           .collection('bookings')
@@ -1284,6 +1364,109 @@ class BookingProvider extends ChangeNotifier {
       return null;
     } finally {
       _setLoading(false);
+    }
+  }
+
+  // ✅ FIXED: Enhanced booking creation with proper customer data storage
+  Future<BookingModel?> createBookingWithDetails({
+    required String customerId,
+    required String providerId,
+    required ServiceModel service,
+    required DateTime scheduledDateTime,
+    required String description,
+    required String customerAddress,
+    required double customerLatitude,
+    required double customerLongitude,
+    required double totalAmount,
+    DateTime? selectedDate,
+    required String customerName,
+    required String customerPhone,
+    required String customerEmail,
+    required String providerName,
+    required String providerPhone,
+    required String providerEmail,
+    required String serviceName,
+    required String serviceCategory,
+  }) async {
+    try {
+      _setLoading(true);
+      debugPrint('🔄 Creating enhanced booking...');
+
+      final bookingId = const Uuid().v4();
+
+      // ✅ CRITICAL FIX: Ensure customer data is properly stored
+      final customerDataMap = {
+        'customerName': customerName.isNotEmpty
+            ? customerName
+            : 'Unknown Customer',
+        'customerPhone': customerPhone.isNotEmpty ? customerPhone : 'No Phone',
+        'customerEmail': customerEmail.isNotEmpty ? customerEmail : 'No Email',
+      };
+
+      debugPrint('📋 [BOOKING CREATION] Customer data being saved:');
+      debugPrint('   - Name: ${customerDataMap['customerName']}');
+      debugPrint('   - Phone: ${customerDataMap['customerPhone']}');
+      debugPrint('   - Email: ${customerDataMap['customerEmail']}');
+
+      final booking = BookingModel(
+        id: bookingId,
+        customerId: customerId,
+        providerId: providerId,
+        serviceId: service.id,
+        serviceName: serviceName,
+        scheduledDateTime: scheduledDateTime,
+        description: description,
+        totalAmount: totalAmount,
+        status: BookingStatus.pending,
+        customerAddress: customerAddress,
+        customerLatitude: customerLatitude,
+        customerLongitude: customerLongitude,
+        createdAt: DateTime.now(),
+        selectedDate: selectedDate,
+        // ✅ CRITICAL: Store customer details properly
+        customerName: customerDataMap['customerName']!,
+        customerPhone: customerDataMap['customerPhone']!,
+        customerEmail: customerDataMap['customerEmail']!,
+        providerName: providerName,
+        providerPhone: providerPhone,
+        providerEmail: providerEmail,
+      );
+
+      // ✅ CRITICAL: Create booking with all customer data
+      await FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId)
+          .set(booking.toFireStore());
+
+      debugPrint('✅ [BOOKING CREATION] Booking saved with customer data:');
+      debugPrint('   - Customer: ${booking.customerName}');
+      debugPrint('   - Phone: ${booking.customerPhone}');
+
+      // Mark service as booked
+      final serviceProvider = ServiceProvider();
+      await serviceProvider.markServiceAsBooked(
+        service.id,
+        customerId,
+        customerName: customerName,
+        customerPhone: customerPhone,
+      );
+
+      // Add to local list
+      _userBookings.add(booking);
+
+      debugPrint('✅ Enhanced booking created successfully');
+      debugPrint('   - Customer: $customerName ($customerPhone)');
+      debugPrint('   - Provider: $providerName ($providerPhone)');
+
+      _setLoading(false);
+      notifyListeners();
+
+      return booking;
+    } catch (e) {
+      debugPrint('❌ Error creating enhanced booking: $e');
+      _setError('Failed to create booking: $e');
+      _setLoading(false);
+      return null;
     }
   }
 

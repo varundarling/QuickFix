@@ -381,7 +381,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   b.status == BookingStatus.completed ||
                   b.status == BookingStatus.paid,
             )
-            .fold(0.0, (total, booking) => total + (booking.totalAmount ?? 0));
+            .fold(0.0, (total, booking) => total + (booking.totalAmount));
 
         final paidEarnings = bookings
             .where((b) => b.status == BookingStatus.paid)
@@ -1736,103 +1736,8 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               ),
               const SizedBox(height: 8),
 
-              // ✅ UPDATED: Customer Details Section with Conditional Logic
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(Icons.person, size: 16, color: AppColors.primary),
-                        const SizedBox(width: 8),
-                        Text(
-                          'Customer Details',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-
-                    // ✅ MODIFIED: Show only customer name for cancelled/paid bookings
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.account_circle,
-                          size: 16,
-                          color: Colors.grey[600],
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            booking.customerName ?? 'Loading customer...',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: booking.customerName != null
-                                  ? AppColors.textPrimary
-                                  : Colors.grey[600],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    // ✅ CRITICAL: Only show phone details for statuses OTHER than cancelled/paid
-                    if (booking.status != BookingStatus.cancelled &&
-                        booking.status != BookingStatus.paid &&
-                        booking.customerPhone != null &&
-                        booking.customerPhone!.isNotEmpty) ...[
-                      const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Icon(Icons.phone, size: 16, color: Colors.grey[600]),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              booking.customerPhone!,
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: AppColors.textSecondary,
-                              ),
-                            ),
-                          ),
-                          // Call button
-                          InkWell(
-                            onTap: () {
-                              if (booking.customerPhone != null &&
-                                  booking.customerPhone != 'No Phone') {
-                                Helpers.launchPhone(booking.customerPhone!);
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.all(6),
-                              decoration: BoxDecoration(
-                                color: AppColors.primary,
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: const Icon(
-                                Icons.call,
-                                size: 16,
-                                color: Colors.white,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ],
-                ),
-              ),
+              _buildCustomerDetailsSection(booking),
+              
               const SizedBox(height: 4),
 
               _buildProviderNarrowProgressBar(booking),
@@ -1860,6 +1765,200 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         ),
       ),
     );
+  }
+
+  // ✅ FIXED: Enhanced customer details section in booking cards
+  Widget _buildCustomerDetailsSection(BookingModel booking) {
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.grey[50],
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(Icons.person, size: 16, color: AppColors.primary),
+              const SizedBox(width: 8),
+              Text(
+                'Customer Details',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+
+          // ✅ ENHANCED: Customer Name with better fallback display
+          Row(
+            children: [
+              Icon(Icons.account_circle, size: 16, color: Colors.grey[600]),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _getDisplayCustomerName(booking),
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: _getCustomerNameColor(booking),
+                      ),
+                    ),
+                    // ✅ Show refresh hint for error states
+                    if (_isCustomerDataError(booking))
+                      Text(
+                        'Pull to refresh to reload',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.orange.shade600,
+                          fontStyle: FontStyle.italic,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+
+          // ✅ CRITICAL: Show phone for ALL non-private booking statuses
+          if (booking.status != BookingStatus.cancelled &&
+              booking.status != BookingStatus.paid &&
+              booking.status != BookingStatus.refunded) ...[
+            if (_hasValidCustomerPhone(booking)) ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(Icons.phone, size: 16, color: Colors.grey[600]),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      booking.customerPhone!,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ),
+                  // Call button
+                  InkWell(
+                    onTap: () => Helpers.launchPhone(booking.customerPhone!),
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: const Icon(
+                        Icons.call,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ] else ...[
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Icon(Icons.phone_disabled, size: 14, color: Colors.grey[500]),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Phone not available',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[500],
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ] else ...[
+            // ✅ Privacy message for finished bookings
+            const SizedBox(height: 6),
+            Row(
+              children: [
+                Icon(Icons.privacy_tip, size: 14, color: Colors.grey[500]),
+                const SizedBox(width: 8),
+                Text(
+                  'Contact details protected',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey[500],
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  String _getDisplayCustomerName(BookingModel booking) {
+    if (booking.customerName == null || booking.customerName!.isEmpty) {
+      return 'Loading customer...';
+    }
+
+    if (booking.customerName == 'Unknown Customer' ||
+        booking.customerName == 'null' ||
+        booking.customerName == 'Loading...') {
+      return 'Customer information unavailable';
+    }
+
+    if (booking.customerName!.startsWith('Error') ||
+        booking.customerName!.startsWith('Customer Not Found')) {
+      return 'Error loading customer data';
+    }
+
+    return booking.customerName!;
+  }
+
+  Color _getCustomerNameColor(BookingModel booking) {
+    if (_isCustomerDataError(booking)) {
+      return Colors.orange.shade600;
+    }
+
+    if (_hasValidCustomerData(booking)) {
+      return AppColors.textPrimary;
+    }
+
+    return Colors.grey.shade600;
+  }
+
+  bool _hasValidCustomerData(BookingModel booking) {
+    return booking.customerName != null &&
+        booking.customerName!.isNotEmpty &&
+        booking.customerName != 'Unknown Customer' &&
+        booking.customerName != 'Loading...' &&
+        booking.customerName != 'null' &&
+        !booking.customerName!.startsWith('Error') &&
+        !booking.customerName!.startsWith('Customer Not Found');
+  }
+
+  bool _hasValidCustomerPhone(BookingModel booking) {
+    return booking.customerPhone != null &&
+        booking.customerPhone!.isNotEmpty &&
+        booking.customerPhone != 'No Phone' &&
+        booking.customerPhone != 'Contact not available' &&
+        booking.customerPhone != 'Contact unavailable' &&
+        !booking.customerPhone!.startsWith('Error');
+  }
+
+  bool _isCustomerDataError(BookingModel booking) {
+    return booking.customerName != null &&
+        (booking.customerName!.startsWith('Error') ||
+            booking.customerName!.startsWith('Customer Not Found'));
   }
 
   String _bookingStatusToString(BookingStatus status) {

@@ -33,7 +33,6 @@ class UserModel {
     this.specialization,
   });
 
-  // ✅ Add convenience getter methods
   bool get isProvider => userType.toLowerCase() == 'provider';
   bool get isCustomer => userType.toLowerCase() == 'customer';
 
