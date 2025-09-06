@@ -769,46 +769,48 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleUserDataUpdate(Map<String, dynamic> data) async {
-  try {
-    if (data.containsKey('encrypted_profile')) {
-      final encryptedProfile = data['encrypted_profile'] as String;
-      final publicInfo = data['public_info'] as Map<dynamic, dynamic>?;
+    try {
+      if (data.containsKey('encrypted_profile')) {
+        final encryptedProfile = data['encrypted_profile'] as String;
+        final publicInfo = data['public_info'] as Map<dynamic, dynamic>?;
 
-      // ✅ Use safe decryption method
-      final decryptedData = await _safeDecryptUserData(
-        encryptedProfile,
-        _user!.uid,
-        null, // No context available here
-      );
+        // ✅ Use safe decryption method
+        final decryptedData = await _safeDecryptUserData(
+          encryptedProfile,
+          _user!.uid,
+          null, // No context available here
+        );
 
-      if (decryptedData != null) {
-        final combinedData = Map<String, dynamic>.from(decryptedData);
-        if (publicInfo != null) {
-          combinedData.addAll(Map<String, dynamic>.from(publicInfo));
-        }
+        if (decryptedData != null) {
+          final combinedData = Map<String, dynamic>.from(decryptedData);
+          if (publicInfo != null) {
+            combinedData.addAll(Map<String, dynamic>.from(publicInfo));
+          }
 
-        _userModel = UserModel.fromRealtimeDatabase(combinedData);
-        debugPrint('✅ Encrypted user model updated: Name="${_userModel?.name}"');
-      } else {
-        // Fall back to public info only if decryption fails
-        if (publicInfo != null) {
-          _userModel = UserModel.fromRealtimeDatabase(
-            Map<String, dynamic>.from(publicInfo),
+          _userModel = UserModel.fromRealtimeDatabase(combinedData);
+          debugPrint(
+            '✅ Encrypted user model updated: Name="${_userModel?.name}"',
           );
-          debugPrint('⚠️ Using public info only due to decryption failure');
+        } else {
+          // Fall back to public info only if decryption fails
+          if (publicInfo != null) {
+            _userModel = UserModel.fromRealtimeDatabase(
+              Map<String, dynamic>.from(publicInfo),
+            );
+            debugPrint('⚠️ Using public info only due to decryption failure');
+          }
         }
+      } else {
+        _userModel = UserModel.fromRealtimeDatabase(data);
+        debugPrint('✅ User model updated: Name="${_userModel?.name}"');
       }
-    } else {
-      _userModel = UserModel.fromRealtimeDatabase(data);
-      debugPrint('✅ User model updated: Name="${_userModel?.name}"');
-    }
 
-    notifyListeners();
-  } catch (e) {
-    debugPrint('❌ Error handling user data update: $e');
-    _setError('Failed to load user profile. Please try again.');
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ Error handling user data update: $e');
+      _setError('Failed to load user profile. Please try again.');
+    }
   }
-}
 
   void _stopUserProfileListener() {
     _userStreamSubscription?.cancel();

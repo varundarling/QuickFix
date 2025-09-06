@@ -72,6 +72,7 @@ dependencies:
   crypto: ^3.0.6
   convert: ^3.1.2
   font_awesome_flutter: ^10.10.0
+  animated_text_kit: ^4.2.3
 
 dev_dependencies:
   flutter_test:

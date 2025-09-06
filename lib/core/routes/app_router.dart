@@ -1,4 +1,3 @@
-// lib/core/router/app_router.dart (Updated)
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +9,7 @@ import 'package:quickfix/presentation/screens/booking/customer_booking_screen.da
 import 'package:quickfix/presentation/screens/home/customer_settings-screen.dart';
 import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
+import 'package:quickfix/presentation/screens/onboarding/onboarding_main_screen.dart';
 import 'package:quickfix/presentation/screens/profile/profile_screen.dart';
 import 'package:quickfix/presentation/screens/profile/provider_profile_screen.dart';
 import 'package:quickfix/presentation/screens/provider/analytics_screen.dart';
@@ -21,218 +21,234 @@ import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
 import 'package:quickfix/quickFix.dart';
 
 class AppRouter {
-  static final GoRouter router = GoRouter(
-    initialLocation: '/splash',
-    navigatorKey: navigatorKey,
-    redirect: (context, state) {
-      final user = FirebaseAuth.instance.currentUser;
-      final isLoggedIn = user != null;
-      final isLoggingIn =
-          state.matchedLocation == '/login' ||
-          state.matchedLocation == '/signup' ||
-          state.matchedLocation == '/user-type-selection';
+  static GoRouter router({required bool showOnboarding}) {
+    return GoRouter(
+      initialLocation: showOnboarding ? '/onboarding' : '/splash',
+      navigatorKey: navigatorKey,
+      redirect: (context, state) {
+        final user = FirebaseAuth.instance.currentUser;
+        final isLoggedIn = user != null;
+        final isLoggingIn =
+            state.matchedLocation == '/login' ||
+            state.matchedLocation == '/signup' ||
+            state.matchedLocation == '/user-type-selection';
 
-      if (isLoggedIn && isLoggingIn) {
-        return '/home';
-      }
+        if (state.matchedLocation == '/onboarding') {
+          return null; // Allow onboarding to show
+        }
 
-      if (!isLoggedIn && !isLoggingIn && state.matchedLocation != '/splash') {
-        return '/user-type-selection';
-      }
+        if (isLoggedIn && isLoggingIn) {
+          return '/home';
+        }
 
-      return null;
-    },
+        if (!isLoggedIn && !isLoggingIn && state.matchedLocation != '/splash') {
+          return '/user-type-selection';
+        }
 
-    routes: [
-      // Splash Screen
-      GoRoute(
-        path: '/splash',
-        name: 'splash',
-        builder: (context, state) => const SplashScreen(),
-      ),
+        return null;
+      },
 
-      // Authentication Routes
-      GoRoute(
-        path: '/user-type-selection',
-        name: 'user-type-selection',
-        builder: (context, state) => const UserTypeSelectionScreen(),
-      ),
+      routes: [
+        GoRoute(
+          path: '/onboarding',
+          name: 'onboarding',
+          builder: (context, state) => const OnboardingMainScreen(),
+        ),
 
-      GoRoute(
-        path: '/login',
-        name: 'login',
-        builder: (context, state) {
-          final userType = state.uri.queryParameters['userType'] ?? 'customer';
-          return LoginScreen(preselectedUserType: userType);
-        },
-      ),
+        // Splash Screen
+        GoRoute(
+          path: '/splash',
+          name: 'splash',
+          builder: (context, state) => const SplashScreen(),
+        ),
 
-      GoRoute(
-        path: '/signup',
-        name: 'signup',
-        builder: (context, state) {
-          final userType = state.uri.queryParameters['userType'] ?? 'customer';
-          return SignUpScreen(preselectedUserType: userType);
-        },
-      ),
+        // Authentication Routes
+        GoRoute(
+          path: '/user-type-selection',
+          name: 'user-type-selection',
+          builder: (context, state) => const UserTypeSelectionScreen(),
+        ),
 
-      // Customer Routes
-      GoRoute(
-        path: '/home',
-        name: 'home',
-        builder: (context, state) => const HomeScreen(),
-      ),
+        GoRoute(
+          path: '/login',
+          name: 'login',
+          builder: (context, state) {
+            final userType =
+                state.uri.queryParameters['userType'] ?? 'customer';
+            return LoginScreen(preselectedUserType: userType);
+          },
+        ),
 
-      GoRoute(
-        path: '/profile',
-        name: 'profile',
-        builder: (context, state) => const ProfileScreen(),
-      ),
+        GoRoute(
+          path: '/signup',
+          name: 'signup',
+          builder: (context, state) {
+            final userType =
+                state.uri.queryParameters['userType'] ?? 'customer';
+            return SignUpScreen(preselectedUserType: userType);
+          },
+        ),
 
-      GoRoute(
-        path: '/customer-bookings',
-        name: 'customer-bookings',
-        builder: (context, state) => const CustomerBookingsScreen(),
-      ),
+        // Customer Routes
+        GoRoute(
+          path: '/home',
+          name: 'home',
+          builder: (context, state) => const HomeScreen(),
+        ),
 
-      GoRoute(
-        path: '/customer-booking-detail/:bookingId',
-        name: 'customer-booking-detail',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          return CustomerBookingDetailScreen(bookingId: bookingId);
-        },
-      ),
+        GoRoute(
+          path: '/profile',
+          name: 'profile',
+          builder: (context, state) => const ProfileScreen(),
+        ),
 
-      // ✅ NEW: Favorites Screen
-      GoRoute(
-        path: '/favorites',
-        name: 'favorites',
-        builder: (context, state) => const FavoritesScreen(),
-      ),
+        GoRoute(
+          path: '/customer-bookings',
+          name: 'customer-bookings',
+          builder: (context, state) => const CustomerBookingsScreen(),
+        ),
 
-      // Provider Routes
-      GoRoute(
-        path: '/provider-dashboard',
-        name: 'provider-dashboard',
-        builder: (context, state) => const ProviderDashboardScreen(),
-      ),
+        GoRoute(
+          path: '/customer-booking-detail/:bookingId',
+          name: 'customer-booking-detail',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            return CustomerBookingDetailScreen(bookingId: bookingId);
+          },
+        ),
 
-      GoRoute(
-        path: '/create-service',
-        name: 'create-service',
-        builder: (context, state) => const CreateServiceScreen(),
-      ),
+        // ✅ NEW: Favorites Screen
+        GoRoute(
+          path: '/favorites',
+          name: 'favorites',
+          builder: (context, state) => const FavoritesScreen(),
+        ),
 
-      GoRoute(
-        path: '/provider-profile',
-        name: 'provider-profile',
-        builder: (context, state) => const ProviderProfileScreen(),
-      ),
+        // Provider Routes
+        GoRoute(
+          path: '/provider-dashboard',
+          name: 'provider-dashboard',
+          builder: (context, state) => const ProviderDashboardScreen(),
+        ),
 
-      GoRoute(
-        path: '/provider-booking-detail/:bookingId',
-        name: 'provider-booking-detail',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          return BookingDetailForProvider(bookingId: bookingId);
-        },
-      ),
+        GoRoute(
+          path: '/create-service',
+          name: 'create-service',
+          builder: (context, state) => const CreateServiceScreen(),
+        ),
 
-      // Add this to your GoRouter routes:
-      GoRoute(
-        path: '/provider-dashboard/:tab',
-        name: 'provider-dashboard-tab',
-        builder: (context, state) {
-          final tabIndex =
-              int.tryParse(state.pathParameters['tab'] ?? '0') ?? 0;
-          return ProviderDashboardScreen(initialTabIndex: tabIndex);
-        },
-      ),
+        GoRoute(
+          path: '/provider-profile',
+          name: 'provider-profile',
+          builder: (context, state) => const ProviderProfileScreen(),
+        ),
 
-      // In app_router.dart - ADD these routes
-      GoRoute(
-        path: '/payment/:bookingId',
-        name: 'payment',
-        builder: (context, state) {
-          // You'll need to pass the booking object or fetch it
-          // For now, returning a placeholder
-          return const Scaffold(body: Center(child: Text('Payment Screen')));
-        },
-      ),
+        GoRoute(
+          path: '/provider-booking-detail/:bookingId',
+          name: 'provider-booking-detail',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            return BookingDetailForProvider(bookingId: bookingId);
+          },
+        ),
 
-      GoRoute(
-        path: '/customer-payment/:bookingId',
-        name: 'customer-payment',
-        builder: (context, state) {
-          // You'll need to pass the booking object or fetch it
-          return const Scaffold(
-            body: Center(child: Text('Customer Payment Screen')),
-          );
-        },
-      ),
+        // Add this to your GoRouter routes:
+        GoRoute(
+          path: '/provider-dashboard/:tab',
+          name: 'provider-dashboard-tab',
+          builder: (context, state) {
+            final tabIndex =
+                int.tryParse(state.pathParameters['tab'] ?? '0') ?? 0;
+            return ProviderDashboardScreen(initialTabIndex: tabIndex);
+          },
+        ),
 
-      GoRoute(
-        path: '/provider-analytics',
-        builder: (context, state) => const AnalyticsScreen(),
-      ),
-      GoRoute(
-        path: '/provider-settings',
-        builder: (context, state) => const ProviderSettingsScreen(),
-      ),
+        // In app_router.dart - ADD these routes
+        GoRoute(
+          path: '/payment/:bookingId',
+          name: 'payment',
+          builder: (context, state) {
+            // You'll need to pass the booking object or fetch it
+            // For now, returning a placeholder
+            return const Scaffold(body: Center(child: Text('Payment Screen')));
+          },
+        ),
 
-      GoRoute(
-        path: '/customer-settings',
-        builder: (context, state) => const CustomerSettingsScreen(),
-      ),
+        GoRoute(
+          path: '/customer-payment/:bookingId',
+          name: 'customer-payment',
+          builder: (context, state) {
+            // You'll need to pass the booking object or fetch it
+            return const Scaffold(
+              body: Center(child: Text('Customer Payment Screen')),
+            );
+          },
+        ),
 
-      GoRoute(
-        path: '/customer-otp/:bookingId',
-        name: 'customer-otp',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          // You'll need to fetch the booking or pass it through extra
-          return const Scaffold(
-            body: Center(child: Text('Customer OTP Screen')),
-          );
-        },
-      ),
+        GoRoute(
+          path: '/provider-analytics',
+          builder: (context, state) => const AnalyticsScreen(),
+        ),
+        GoRoute(
+          path: '/provider-settings',
+          builder: (context, state) => const ProviderSettingsScreen(),
+        ),
 
-      GoRoute(
-        path: '/otp-verification/:bookingId',
-        name: 'otp-verification',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          // You'll need to fetch the booking or pass it through extra
-          return const Scaffold(
-            body: Center(child: Text('OTP Verification Screen')),
-          );
-        },
-      ),
+        GoRoute(
+          path: '/customer-settings',
+          builder: (context, state) => const CustomerSettingsScreen(),
+        ),
 
-      GoRoute(
-        path: '/service-progress/:bookingId',
-        name: 'service-progress',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          // You'll need to fetch the booking or pass it through extra
-          return const Scaffold(
-            body: Center(child: Text('Service Progress Screen')),
-          );
-        },
-      ),
+        GoRoute(
+          path: '/customer-otp/:bookingId',
+          name: 'customer-otp',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            // You'll need to fetch the booking or pass it through extra
+            return const Scaffold(
+              body: Center(child: Text('Customer OTP Screen')),
+            );
+          },
+        ),
 
-      GoRoute(
-        path: '/real-time-payment/:bookingId',
-        name: 'real-time-payment',
-        builder: (context, state) {
-          final bookingId = state.pathParameters['bookingId']!;
-          // You'll need to fetch the booking or pass it through extra
-          return const Scaffold(
-            body: Center(child: Text('Real-time Payment Screen')),
-          );
-        },
-      ),
-    ],
-  );
+        GoRoute(
+          path: '/otp-verification/:bookingId',
+          name: 'otp-verification',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            // You'll need to fetch the booking or pass it through extra
+            return const Scaffold(
+              body: Center(child: Text('OTP Verification Screen')),
+            );
+          },
+        ),
+
+        GoRoute(
+          path: '/service-progress/:bookingId',
+          name: 'service-progress',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            // You'll need to fetch the booking or pass it through extra
+            return const Scaffold(
+              body: Center(child: Text('Service Progress Screen')),
+            );
+          },
+        ),
+
+        GoRoute(
+          path: '/real-time-payment/:bookingId',
+          name: 'real-time-payment',
+          builder: (context, state) {
+            final bookingId = state.pathParameters['bookingId']!;
+            // You'll need to fetch the booking or pass it through extra
+            return const Scaffold(
+              body: Center(child: Text('Real-time Payment Screen')),
+            );
+          },
+        ),
+      ],
+    );
+  }
+
+  static final GoRouter getrouter = router(showOnboarding: false);
 }

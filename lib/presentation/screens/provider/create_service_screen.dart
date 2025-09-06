@@ -597,7 +597,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         // ✅ NEW: Include provider business details
         providerBusinessName: userModel.businessName ?? userModel.name,
         providerName: userModel.name,
-        providerEmail: userModel.email ?? currentUser.email ?? '',
+        providerEmail: userModel.email,
       );
 
       // ... rest of your existing notification and success logic

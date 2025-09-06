@@ -175,3 +175,22 @@ class Helpers {
     }
   }
 }
+
+extension OpacitySafeExtension on double {
+  /// Ensures opacity values are always between 0.0 and 1.0
+  double get safeOpacity =>
+      clamp(0.0, 1.0).toDouble(); // ✅ FIXED: Convert to double
+}
+
+extension OpacitySafeNumExtension on num {
+  /// Ensures opacity values are always between 0.0 and 1.0 for num types
+  double get safeOpacity =>
+      clamp(0.0, 1.0).toDouble(); // ✅ FIXED: Convert to double
+}
+
+extension ColorSafeExtension on Color {
+  /// Safe withOpacity that clamps values
+  Color safeWithOpacity(double opacity) {
+    return withOpacity(opacity.clamp(0.0, 1.0).toDouble());
+  }
+}

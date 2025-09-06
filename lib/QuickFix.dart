@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/routes/app_router.dart';
 import 'package:quickfix/core/services/notification_service.dart';
@@ -22,14 +23,27 @@ class QuickFix extends StatefulWidget {
 }
 
 class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
+  bool? _showOnboarding; // ✅ ADD: Track onboarding state
+
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
+    _checkOnboardingStatus(); // ✅ ADD: Check onboarding status
     _setupAuthenticationListener();
     _setupForegroundMessageListener();
     _setupAppLifecycleHandling();
+  }
+
+  // ✅ ADD: Check if user has seen onboarding
+  Future<void> _checkOnboardingStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasSeenOnboarding = prefs.getBool('hasSeenOnboarding') ?? false;
+
+    setState(() {
+      _showOnboarding = !hasSeenOnboarding;
+    });
   }
 
   void _setupAuthenticationListener() {
@@ -144,6 +158,36 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
+    // ✅ MODIFY: Show loading while checking onboarding status
+    if (_showOnboarding == null) {
+      return MaterialApp(
+        title: 'QuickFix',
+        debugShowCheckedModeBanner: false,
+        home: Scaffold(
+          body: Container(
+            decoration: const BoxDecoration(
+              gradient: AppColors.primaryGradient,
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  CircularProgressIndicator(
+                    valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                  ),
+                  SizedBox(height: 20),
+                  Text(
+                    'Initializing...',
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(create: (_) => AuthProvider()),
@@ -187,7 +231,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
             );
           }
 
-          // ✅ Normal app flow
+          // ✅ FIXED: Call getRouter with showOnboarding parameter
           return MaterialApp.router(
             title: 'QuickFix',
             debugShowCheckedModeBanner: false,
@@ -231,7 +275,8 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
                 ),
               ),
             ),
-            routerConfig: AppRouter.router,
+            // ✅ THIS IS THE FIX: Call the method with parameter instead of using .router
+            routerConfig: AppRouter.router(showOnboarding: _showOnboarding!),
           );
         },
       ),

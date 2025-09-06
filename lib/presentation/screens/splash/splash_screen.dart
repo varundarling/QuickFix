@@ -94,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
     } else {
       debugPrint('❌ User not logged in, navigating to user type selection');
       if (mounted) {
-        context.go('/user-type-selection');
+        context.go('/onboarding');
       }
     }
   }
@@ -156,14 +156,14 @@ class _SplashScreenState extends State<SplashScreen>
                 const SizedBox(height: 50),
 
                 //loading indicator
-                const CircularProgressIndicator(
-                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                ),
-                const SizedBox(height: 20),
-                const Text(
-                  'Loading user data...',
-                  style: TextStyle(color: Colors.white70, fontSize: 16),
-                ),
+                // const CircularProgressIndicator(
+                //   valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                // ),
+                // const SizedBox(height: 20),
+                // const Text(
+                //   'Loading user data...',
+                //   style: TextStyle(color: Colors.white70, fontSize: 16),
+                // ),
               ],
             ),
           ),
