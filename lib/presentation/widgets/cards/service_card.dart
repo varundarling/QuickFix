@@ -1,6 +1,6 @@
 // lib/presentation/widgets/cards/service_card.dart
 import 'dart:ui';
-import 'dart:async'; // ✅ ADD: Import for StreamSubscription
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -37,16 +37,17 @@ class _ServiceCardState extends State<ServiceCard>
   late Animation<double> _fadeAnimation;
   bool _isPressed = false;
 
-  // ✅ Real-time rating fields
-  StreamSubscription<DocumentSnapshot>? _ratingSubscription;
+  // Real-time rating fields
+  StreamSubscription<DocumentSnapshot>? _providerRatingSub;
+  StreamSubscription<DocumentSnapshot>? _serviceRatingSub; // fallback
   double? _currentRating;
   int? _totalReviews;
   bool _isLoadingRating = true;
-  Map<String, dynamic>? _debugData; // For debugging
 
   @override
   void initState() {
     super.initState();
+
     _animationController = AnimationController(
       duration: const Duration(milliseconds: 200),
       vsync: this,
@@ -58,187 +59,113 @@ class _ServiceCardState extends State<ServiceCard>
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
-    // ✅ Setup real-time rating listener
-    _setupRatingListener();
+    // Seed from ServiceModel for instant paint (if present)
+    _currentRating = widget.service.providerRating;
+    _totalReviews = widget.service.providerTotalReviews;
+    _isLoadingRating = false; // we’ll immediately start streams below
+
+    _setupProviderRatingListener(); // primary source: providers/{providerId}
+    _setupServiceFallbackListener(); // fallback: services/{serviceId}
   }
 
-  // ✅ Enhanced Firestore listener with multiple field name support
-  void _setupRatingListener() {
-    debugPrint(
-      '🔍 [RATING] Setting up listener for service: ${widget.service.id}',
-    );
-
-    _ratingSubscription = FirebaseFirestore.instance
-        .collection('services')
-        .doc(widget.service.id)
+  void _setupProviderRatingListener() {
+    // Read exactly what analytics screen updates: providers.rating + providers.totalReviews
+    _providerRatingSub = FirebaseFirestore.instance
+        .collection('providers')
+        .doc(widget.service.providerId)
         .snapshots()
         .listen(
-          (DocumentSnapshot snapshot) {
-            debugPrint(
-              '🔔 [RATING] Snapshot received for ${widget.service.id}',
-            );
-            debugPrint('🔔 [RATING] Document exists: ${snapshot.exists}');
+          (snap) {
+            if (!mounted) return;
+            if (!snap.exists || snap.data() == null) return;
 
-            if (snapshot.exists && mounted) {
-              try {
-                final data = snapshot.data() as Map<String, dynamic>?;
-                debugPrint('🔍 [RATING] Raw document data: $data');
+            final data = snap.data() as Map<String, dynamic>;
+            final r = _parseRating(
+              data['rating'] ?? data['raitng'],
+            ); // accept legacy key
+            final c = _parseReviews(data['totalReviews']);
 
-                if (data != null) {
-                  double? rating;
-                  int? reviews;
-
-                  // ✅ Try different possible field names for rating
-                  if (data.containsKey('rating')) {
-                    rating = _parseRating(data['rating']);
-                    debugPrint(
-                      '✅ [RATING] Found "rating" field: ${data['rating']} -> $rating',
-                    );
-                  } else if (data.containsKey('averageRating')) {
-                    rating = _parseRating(data['averageRating']);
-                    debugPrint(
-                      '✅ [RATING] Found "averageRating" field: ${data['averageRating']} -> $rating',
-                    );
-                  } else if (data.containsKey('raitng')) {
-                    // Typo field from provider analytics
-                    rating = _parseRating(data['raitng']);
-                    debugPrint(
-                      '✅ [RATING] Found "raitng" field: ${data['raitng']} -> $rating',
-                    );
-                  } else if (data.containsKey('serviceRating')) {
-                    rating = _parseRating(data['serviceRating']);
-                    debugPrint(
-                      '✅ [RATING] Found "serviceRating" field: ${data['serviceRating']} -> $rating',
-                    );
-                  }
-
-                  // ✅ Try different review count field names
-                  if (data.containsKey('totalReviews')) {
-                    reviews = _parseReviews(data['totalReviews']);
-                    debugPrint(
-                      '✅ [RATING] Found "totalReviews" field: ${data['totalReviews']} -> $reviews',
-                    );
-                  } else if (data.containsKey('reviewCount')) {
-                    reviews = _parseReviews(data['reviewCount']);
-                    debugPrint(
-                      '✅ [RATING] Found "reviewCount" field: ${data['reviewCount']} -> $reviews',
-                    );
-                  } else if (data.containsKey('totalReviewCount')) {
-                    reviews = _parseReviews(data['totalReviewCount']);
-                    debugPrint(
-                      '✅ [RATING] Found "totalReviewCount" field: ${data['totalReviewCount']} -> $reviews',
-                    );
-                  } else if (data.containsKey('numReviews')) {
-                    reviews = _parseReviews(data['numReviews']);
-                    debugPrint(
-                      '✅ [RATING] Found "numReviews" field: ${data['numReviews']} -> $reviews',
-                    );
-                  }
-
-                  // ✅ Debug all available fields
-                  debugPrint(
-                    '🔍 [RATING] Available fields in document: ${data.keys.toList()}',
-                  );
-
-                  if (mounted) {
-                    setState(() {
-                      _currentRating = rating;
-                      _totalReviews = reviews;
-                      _isLoadingRating = false;
-                      _debugData = data;
-                    });
-
-                    debugPrint(
-                      '📊 [RATING] Updated UI - Rating: $rating, Reviews: $reviews',
-                    );
-                  }
-                } else {
-                  debugPrint('❌ [RATING] Document data is null');
-                  if (mounted) {
-                    setState(() {
-                      _currentRating = null;
-                      _totalReviews = null;
-                      _isLoadingRating = false;
-                      _debugData = null;
-                    });
-                  }
-                }
-              } catch (e, stackTrace) {
-                debugPrint('❌ [RATING] Error parsing rating data: $e');
-                debugPrint('❌ [RATING] Stack trace: $stackTrace');
-                if (mounted) {
-                  setState(() {
-                    _currentRating = null;
-                    _totalReviews = null;
-                    _isLoadingRating = false;
-                  });
-                }
-              }
-            } else if (mounted) {
-              debugPrint(
-                '⚠️ [RATING] Document does not exist or widget disposed',
-              );
+            // Prefer provider analytics if present
+            if (r != null && c != null) {
               setState(() {
-                _currentRating = null;
-                _totalReviews = null;
+                _currentRating = r;
+                _totalReviews = c;
                 _isLoadingRating = false;
-                _debugData = null;
               });
             }
           },
-          onError: (error) {
-            debugPrint('❌ [RATING] Firestore listener error: $error');
-            if (mounted) {
-              setState(() {
-                _currentRating = null;
-                _totalReviews = null;
-                _isLoadingRating = false;
-              });
-            }
+          onError: (_) {
+            if (!mounted) return;
+            setState(() => _isLoadingRating = false);
           },
         );
   }
 
-  // ✅ Helper method to safely parse rating values
+  void _setupServiceFallbackListener() {
+    // Fallback to denormalized fields on service doc if provider doc unavailable
+    _serviceRatingSub = FirebaseFirestore.instance
+        .collection('services')
+        .doc(widget.service.id)
+        .snapshots()
+        .listen(
+          (snap) {
+            if (!mounted) return;
+            if (!snap.exists || snap.data() == null) return;
+
+            final data = snap.data() as Map<String, dynamic>;
+            final r = _parseRating(
+              data['providerRating'] ??
+                  data['rating'] ??
+                  data['averageRating'] ??
+                  data['raitng'] ??
+                  data['serviceRating'],
+            );
+            final c = _parseReviews(
+              data['providerTotalReviews'] ??
+                  data['totalReviews'] ??
+                  data['reviewCount'] ??
+                  data['totalReviewCount'] ??
+                  data['numReviews'],
+            );
+
+            // Only apply fallback if provider values are missing
+            if ((_totalReviews == null || _totalReviews == 0) && c != null) {
+              setState(() {
+                _currentRating = r ?? _currentRating;
+                _totalReviews = c;
+                _isLoadingRating = false;
+              });
+            }
+          },
+          onError: (_) {
+            if (!mounted) return;
+            setState(() => _isLoadingRating = false);
+          },
+        );
+  }
+
   double? _parseRating(dynamic value) {
     if (value == null) return null;
-
     if (value is double) return value;
     if (value is int) return value.toDouble();
     if (value is num) return value.toDouble();
-    if (value is String) {
-      final parsed = double.tryParse(value);
-      return parsed;
-    }
-
-    debugPrint(
-      '⚠️ [RATING] Could not parse rating value: $value (${value.runtimeType})',
-    );
+    if (value is String) return double.tryParse(value);
     return null;
   }
 
-  // ✅ Helper method to safely parse review count
   int? _parseReviews(dynamic value) {
     if (value == null) return null;
-
     if (value is int) return value;
     if (value is double) return value.toInt();
     if (value is num) return value.toInt();
-    if (value is String) {
-      final parsed = int.tryParse(value);
-      return parsed;
-    }
-
-    debugPrint(
-      '⚠️ [RATING] Could not parse review count: $value (${value.runtimeType})',
-    );
+    if (value is String) return int.tryParse(value);
     return null;
   }
 
   @override
   void dispose() {
-    // ✅ CRITICAL: Cancel rating subscription to prevent memory leaks
-    _ratingSubscription?.cancel();
+    _providerRatingSub?.cancel();
+    _serviceRatingSub?.cancel();
     _animationController.dispose();
     super.dispose();
   }
@@ -280,12 +207,10 @@ class _ServiceCardState extends State<ServiceCard>
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Stack(
               children: [
-                // Main Card Content
                 Opacity(
                   opacity: widget.service.isBooked ? 0.7 : 1.0,
                   child: _buildCardContent(context, distance),
                 ),
-                // Booked Overlay
                 if (widget.service.isBooked)
                   _buildBookedOverlay(isBookedByCurrentUser),
               ],
@@ -325,9 +250,7 @@ class _ServiceCardState extends State<ServiceCard>
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // Enhanced Image Section
               _buildImageSection(),
-              // Content Section
               Padding(
                 padding: const EdgeInsets.all(24),
                 child: Column(
@@ -357,15 +280,14 @@ class _ServiceCardState extends State<ServiceCard>
   }
 
   Widget _buildImageSection() {
-    return Container(
+    return SizedBox(
       height: 200,
       width: double.infinity,
       child: Stack(
         children: [
-          // Main Image
           ClipRRect(
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-            child: Container(
+            child: SizedBox(
               width: double.infinity,
               height: 200,
               child: widget.service.imageUrl.isNotEmpty
@@ -382,8 +304,6 @@ class _ServiceCardState extends State<ServiceCard>
                   : _buildDefaultImage(),
             ),
           ),
-
-          // Gradient Overlay
           Container(
             height: 200,
             decoration: BoxDecoration(
@@ -402,8 +322,6 @@ class _ServiceCardState extends State<ServiceCard>
               ),
             ),
           ),
-
-          // Category Badge
           Positioned(
             top: 16,
             left: 16,
@@ -413,11 +331,7 @@ class _ServiceCardState extends State<ServiceCard>
               children: [_buildCategoryBadge(), _buildPriceBadge()],
             ),
           ),
-
-          // Status Badge
           Positioned(bottom: 16, left: 16, child: _buildStatusBadge()),
-
-          // ✅ UPDATED: Real-time Rating Badge
           Positioned(bottom: 16, right: 16, child: _buildRatingBadge()),
         ],
       ),
@@ -449,14 +363,17 @@ class _ServiceCardState extends State<ServiceCard>
             color: Colors.white,
           ),
           const SizedBox(width: 6),
-          Text(
-            widget.service.category,
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 13,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+          const Text('Plumbing') ==
+                  null // dead code guard for analyzer
+              ? const SizedBox.shrink()
+              : Text(
+                  widget.service.category,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
         ],
       ),
     );
@@ -480,10 +397,10 @@ class _ServiceCardState extends State<ServiceCard>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.currency_rupee, size: 18, color: AppColors.success),
+          const Icon(Icons.currency_rupee, size: 18, color: AppColors.success),
           Text(
             '${widget.service.basePrice.toInt()}',
-            style: TextStyle(
+            style: const TextStyle(
               color: AppColors.success,
               fontSize: 16,
               fontWeight: FontWeight.bold,
@@ -531,9 +448,8 @@ class _ServiceCardState extends State<ServiceCard>
     );
   }
 
-  // ✅ ENHANCED: Real-time Rating Badge with Debug Support
+  // Rating badge shows provider analytics; “New” only when totalReviews == 0
   Widget _buildRatingBadge() {
-    // ✅ Show loading state while fetching rating
     if (_isLoadingRating) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -550,7 +466,7 @@ class _ServiceCardState extends State<ServiceCard>
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
+          children: const [
             SizedBox(
               width: 14,
               height: 14,
@@ -559,8 +475,8 @@ class _ServiceCardState extends State<ServiceCard>
                 valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
               ),
             ),
-            const SizedBox(width: 4),
-            const Text(
+            SizedBox(width: 4),
+            Text(
               'Loading...',
               style: TextStyle(
                 fontSize: 12,
@@ -573,103 +489,59 @@ class _ServiceCardState extends State<ServiceCard>
       );
     }
 
-    // ✅ Determine rating display values
-    final displayRating = _currentRating ?? 0.0;
-    final hasRating = _currentRating != null && _currentRating! > 0;
-    final reviewCount = _totalReviews ?? 0;
+    final count = _totalReviews ?? 0;
+    final hasReviews = count > 0;
+    final rating = (_currentRating ?? 0.0);
 
-    // ✅ Choose colors based on rating availability
-    final gradientColors = hasRating
+    final gradientColors = hasReviews
         ? [Colors.amber, Colors.amber.shade600]
         : [Colors.grey.shade400, Colors.grey.shade600];
-
-    final shadowColor = hasRating
+    final shadowColor = hasReviews
         ? Colors.amber.withOpacity(0.4)
         : Colors.grey.withOpacity(0.3);
 
-    return GestureDetector(
-      // ✅ DEBUG: Add tap to show debug info
-      onTap: () {
-        if (_debugData != null) {
-          debugPrint('🔍 [DEBUG] Service ID: ${widget.service.id}');
-          debugPrint('🔍 [DEBUG] Full document data: $_debugData');
-          debugPrint('🔍 [DEBUG] Current rating: $_currentRating');
-          debugPrint('🔍 [DEBUG] Total reviews: $_totalReviews');
-
-          // Show debug dialog
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Debug Info'),
-              content: SingleChildScrollView(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Text('Service ID: ${widget.service.id}'),
-                    const SizedBox(height: 8),
-                    Text('Rating: $_currentRating'),
-                    const SizedBox(height: 8),
-                    Text('Reviews: $_totalReviews'),
-                    const SizedBox(height: 8),
-                    Text('Raw Data: ${_debugData.toString()}'),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('Close'),
-                ),
-              ],
-            ),
-          );
-        }
-      },
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(colors: gradientColors),
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: shadowColor,
-              blurRadius: 6,
-              offset: const Offset(0, 2),
-            ),
-          ],
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              hasRating ? Icons.star : Icons.star_outline,
-              size: 14,
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(colors: gradientColors),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: shadowColor,
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            hasReviews ? Icons.star : Icons.star_outline,
+            size: 14,
+            color: Colors.white,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            hasReviews ? rating.toStringAsFixed(1) : 'New',
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
               color: Colors.white,
             ),
-            const SizedBox(width: 4),
+          ),
+          if (hasReviews) ...[
+            const SizedBox(width: 2),
             Text(
-              hasRating ? displayRating.toStringAsFixed(1) : 'New',
+              '($count)',
               style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+                fontSize: 10,
                 color: Colors.white,
+                fontWeight: FontWeight.w500,
               ),
             ),
-            // ✅ Show review count if available
-            if (hasRating && reviewCount > 0) ...[
-              const SizedBox(width: 2),
-              Text(
-                '($reviewCount)',
-                style: const TextStyle(
-                  fontSize: 10,
-                  color: Colors.white,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ],
           ],
-        ),
+        ],
       ),
     );
   }
@@ -725,9 +597,9 @@ class _ServiceCardState extends State<ServiceCard>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            children: [
+            children: const [
               Icon(Icons.description, size: 18, color: AppColors.primary),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Description',
                 style: TextStyle(
@@ -771,9 +643,9 @@ class _ServiceCardState extends State<ServiceCard>
         children: [
           Container(
             padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
+            decoration: const BoxDecoration(
               color: AppColors.primary,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.all(Radius.circular(12)),
             ),
             child: const Icon(Icons.location_on, size: 18, color: Colors.white),
           ),
@@ -792,7 +664,7 @@ class _ServiceCardState extends State<ServiceCard>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  widget.service.address!,
+                  widget.service.address ?? '',
                   style: const TextStyle(
                     fontSize: 14,
                     color: AppColors.textPrimary,
@@ -808,9 +680,9 @@ class _ServiceCardState extends State<ServiceCard>
             const SizedBox(width: 12),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.primary,
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.all(Radius.circular(16)),
               ),
               child: Text(
                 '${distance.toStringAsFixed(1)} km',
@@ -856,7 +728,7 @@ class _ServiceCardState extends State<ServiceCard>
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: widget.service.subServices.take(6).map((subService) {
+            children: widget.service.subServices.take(6).map((s) {
               return Container(
                 padding: const EdgeInsets.symmetric(
                   horizontal: 12,
@@ -875,7 +747,7 @@ class _ServiceCardState extends State<ServiceCard>
                   ],
                 ),
                 child: Text(
-                  subService,
+                  s,
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.blue.shade700,
@@ -904,7 +776,6 @@ class _ServiceCardState extends State<ServiceCard>
   Widget _buildActionRow(BuildContext context) {
     return Row(
       children: [
-        // Main Action Button
         Expanded(
           flex: 3,
           child: Container(
@@ -949,23 +820,24 @@ class _ServiceCardState extends State<ServiceCard>
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  Text(
-                    widget.service.isBooked ? 'Not Available' : 'View Details',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
+                  const Text('View Details') == null
+                      ? const SizedBox.shrink()
+                      : Text(
+                          widget.service.isBooked
+                              ? 'Not Available'
+                              : 'View Details',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ],
               ),
             ),
           ),
         ),
-
         if (widget.showFavoriteButton) const SizedBox(width: 16),
-
-        // Favorite Button
         if (widget.showFavoriteButton)
           Consumer<FavoritesProvider>(
             builder: (context, favoritesProvider, child) {

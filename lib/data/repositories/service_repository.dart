@@ -140,11 +140,37 @@ class ServiceRepository {
 
   Future<void> createService(ServiceModel service) async {
     try {
-      await _firebaseService.createDocument(
-        'services',
-        service.id,
-        service.toFireStore(),
-      );
+      // 1) Load provider aggregates
+      final provRef = _firebaseService.firestore
+          .collection('providers')
+          .doc(service.providerId);
+      final provSnap = await provRef.get();
+
+      double seedRating = 0.0;
+      int seedCount = 0;
+
+      if (provSnap.exists && provSnap.data() != null) {
+        final data = provSnap.data() as Map<String, dynamic>;
+        // Accept both 'rating' and legacy 'raitng' just in case
+        final rawRating = (data['rating'] ?? data['raitng'] ?? 0.0);
+        final rawCount = (data['totalReviews'] ?? 0);
+        seedRating = (rawRating is num) ? rawRating.toDouble() : 0.0;
+        seedCount = (rawCount is num) ? rawCount.toInt() : 0;
+      }
+
+      // 2) Build service data with seeded aggregates
+      final Map<String, dynamic> data =
+          Map<String, dynamic>.from(service.toFireStore())..addAll({
+            'providerRating': seedRating,
+            'providerTotalReviews': seedCount,
+            'lastRatingUpdate': FieldValue.serverTimestamp(),
+          });
+
+      // 3) Write
+      await _firebaseService.firestore
+          .collection('services')
+          .doc(service.id)
+          .set(data);
     } catch (e) {
       rethrow;
     }
@@ -152,13 +178,89 @@ class ServiceRepository {
 
   Future<void> updateService(ServiceModel service) async {
     try {
-      await _firebaseService.updateDocument(
-        'services',
-        service.id,
-        service.toFireStore(),
-      );
+      final servicesRef = _firebaseService.firestore
+          .collection('services')
+          .doc(service.id);
+
+      // Check if missing denormalized fields
+      final existing = await servicesRef.get();
+      bool needsSeed = true;
+      if (existing.exists && existing.data() != null) {
+        final d = existing.data() as Map<String, dynamic>;
+        final hasRating = d.containsKey('providerRating');
+        final hasCount = d.containsKey('providerTotalReviews');
+        needsSeed = !(hasRating && hasCount);
+      }
+
+      double seedRating = service.providerRating ?? 0.0;
+      int seedCount = service.providerTotalReviews ?? 0;
+
+      if (needsSeed || seedRating == 0.0 && seedCount == 0) {
+        // Load from provider aggregates if not present on the model
+        final provSnap = await _firebaseService.firestore
+            .collection('providers')
+            .doc(service.providerId)
+            .get();
+        if (provSnap.exists && provSnap.data() != null) {
+          final d = provSnap.data() as Map<String, dynamic>;
+          final rawRating = (d['rating'] ?? d['raitng'] ?? 0.0);
+          final rawCount = (d['totalReviews'] ?? 0);
+          seedRating = (rawRating is num) ? rawRating.toDouble() : seedRating;
+          seedCount = (rawCount is num) ? rawCount.toInt() : seedCount;
+        }
+      }
+
+      final Map<String, dynamic> data =
+          Map<String, dynamic>.from(service.toFireStore())
+            ..putIfAbsent('providerRating', () => seedRating)
+            ..putIfAbsent('providerTotalReviews', () => seedCount)
+            ..putIfAbsent(
+              'lastRatingUpdate',
+              () => FieldValue.serverTimestamp(),
+            );
+
+      await _firebaseService.firestore
+          .collection('services')
+          .doc(service.id)
+          .set(data, SetOptions(merge: true));
     } catch (e) {
       rethrow;
+    }
+  }
+
+  Future<void> backfillServiceRatingsForAllProviders() async {
+    final fs = _firebaseService.firestore;
+
+    // Load providers with aggregates
+    final providers = await fs.collection('providers').get();
+
+    for (final p in providers.docs) {
+      final pdata = p.data() as Map<String, dynamic>;
+      final rawRating = (pdata['rating'] ?? pdata['raitng'] ?? 0.0);
+      final rawCount = (pdata['totalReviews'] ?? 0);
+      final avg = (rawRating is num) ? rawRating.toDouble() : 0.0;
+      final count = (rawCount is num) ? rawCount.toInt() : 0;
+
+      // Update all services for this provider that are missing fields
+      final servicesSnap = await fs
+          .collection('services')
+          .where('providerId', isEqualTo: p.id)
+          .get();
+
+      final batch = fs.batch();
+      for (final s in servicesSnap.docs) {
+        final sdata = s.data();
+        final hasRating = sdata.containsKey('providerRating');
+        final hasCount = sdata.containsKey('providerTotalReviews');
+        if (!hasRating || !hasCount) {
+          batch.set(s.reference, {
+            'providerRating': avg,
+            'providerTotalReviews': count,
+            'lastRatingUpdate': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      }
+      await batch.commit();
     }
   }
 

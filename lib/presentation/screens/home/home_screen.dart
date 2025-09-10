@@ -5,14 +5,12 @@ import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/constants/app_strings.dart';
 import 'package:quickfix/core/services/location_service.dart';
-import 'package:quickfix/core/notifications/notification_permission_helper.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
 import 'package:quickfix/presentation/screens/booking/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.passedLocation});
@@ -45,7 +43,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     debugPrint('🚀 [HOME] Initializing for first time only');
 
-    await _requestPermissionIfNeeded();
+    // await _requestPermissionIfNeeded();
 
     if (mounted) {
       await _loadData();
@@ -53,24 +51,24 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  Future<void> _requestPermissionIfNeeded() async {
-    if (!mounted) return;
+  // Future<void> _requestPermissionIfNeeded() async {
+  //   if (!mounted) return;
 
-    try {
-      SharedPreferences prefs = await SharedPreferences.getInstance();
-      bool hasAskedPermission =
-          prefs.getBool('has_asked_notification_permission') ?? false;
+  //   try {
+  //     SharedPreferences prefs = await SharedPreferences.getInstance();
+  //     bool hasAskedPermission =
+  //         prefs.getBool('has_asked_notification_permission') ?? false;
 
-      if (!hasAskedPermission && mounted) {
-        await NotificationPermissionHelper.requestPermissionWithDialog(context);
-        if (mounted) {
-          await prefs.setBool('has_asked_notification_permission', true);
-        }
-      }
-    } catch (e) {
-      debugPrint('❌ [HOME] Permission error: $e');
-    }
-  }
+  //     if (!hasAskedPermission && mounted) {
+  //       await NotificationPermissionHelper.requestPermissionWithDialog(context);
+  //       if (mounted) {
+  //         await prefs.setBool('has_asked_notification_permission', true);
+  //       }
+  //     }
+  //   } catch (e) {
+  //     debugPrint('❌ [HOME] Permission error: $e');
+  //   }
+  // }
 
   // ✅ SIMPLIFIED: Basic data loading
   Future<void> _loadData() async {

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
-import 'package:quickfix/core/services/encryption_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/rating_model.dart';
@@ -1034,7 +1033,7 @@ class _CustomerBookingDetailScreenState
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
-                            'Keep this code ready. Your provider will ask for it to start the service.',
+                            'Keep this code ready. Your provider will ask for it to start the work.',
                             style: TextStyle(fontSize: 12, color: Colors.blue),
                           ),
                         ),

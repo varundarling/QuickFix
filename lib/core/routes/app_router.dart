@@ -28,23 +28,28 @@ class AppRouter {
       redirect: (context, state) {
         final user = FirebaseAuth.instance.currentUser;
         final isLoggedIn = user != null;
-        final isLoggingIn =
+
+        // Treat onboarding as a safe/auth path
+        final isOnboardingPath = state.matchedLocation == '/onboarding';
+        final isAuthPath =
             state.matchedLocation == '/login' ||
             state.matchedLocation == '/signup' ||
-            state.matchedLocation == '/user-type-selection';
+            state.matchedLocation == '/user-type-selection' ||
+            isOnboardingPath;
 
-        if (state.matchedLocation == '/onboarding') {
-          return null; // Allow onboarding to show
+        if (isLoggedIn) {
+          // NEW: ensure splash goes to home once authenticated
+          if (state.matchedLocation == '/splash') return '/home';
+          if (isAuthPath) return '/home';
+          if (state.matchedLocation == '/onboarding') return '/home';
+          return null;
         }
 
-        if (isLoggedIn && isLoggingIn) {
-          return '/home';
+        // Not logged in → allow onboarding; otherwise send to onboarding or user-type
+        if (!isAuthPath && state.matchedLocation != '/splash') {
+          return showOnboarding ? '/onboarding' : '/user-type-selection';
         }
-
-        if (!isLoggedIn && !isLoggingIn && state.matchedLocation != '/splash') {
-          return '/user-type-selection';
-        }
-
+        
         return null;
       },
 

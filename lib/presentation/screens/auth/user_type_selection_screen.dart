@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/constants/app_strings.dart';
-import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
 
 class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key});
@@ -16,11 +15,10 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
     with TickerProviderStateMixin {
   late AnimationController _fadeController;
   late AnimationController _logoController;
-  late AnimationController
-  _buttonController; // ✅ NEW: Button animation controller
+  late AnimationController _buttonController;
   late Animation<double> _fadeAnimation;
   late Animation<double> _logoAnimation;
-  late Animation<double> _buttonAnimation; // ✅ NEW: Button pulse animation
+  late Animation<double> _buttonAnimation;
   String? _selectedUserType;
 
   @override

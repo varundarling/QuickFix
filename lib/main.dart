@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quickfix/core/notifications/notification_channel.dart';
+import 'package:quickfix/core/notifications/notification_permission_manager.dart'; // ✅ ADDED
+import 'package:quickfix/core/services/location_service.dart'; // ✅ ADDED
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/quickFix.dart';
@@ -25,15 +27,22 @@ Future<void> main() async {
     DeviceOrientation.portraitDown,
   ]);
 
+  // Core Firebase
   await FirebaseService.instance.initialize();
   FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
 
+  // Ads and Notification stack init
   await AdService.instance.initialize();
+  await NotificationChannels.createChannels(); // ensure channels exist before any local notif [high/urgent]
   await NotificationService.instance.initialize();
-  await NotificationChannels.createChannels();
 
+  // Request permissions at app open (notifications + location) and get FCM token
+  await _preflightPermissions(); // ✅ NEW
+
+  // Listen for token refresh events
   FCMTokenManager.initializeTokenListener();
 
+  // One-time provider setup (existing)
   try {
     final serviceProvider = ServiceProvider();
     await serviceProvider.addAvailabilityToExistingServices();
@@ -41,11 +50,43 @@ Future<void> main() async {
     debugPrint('❌ Error in one-time setup: $e');
   }
 
-  // ✅ STEP 5: Initialize RatingProvider here if needed
   debugPrint('🌟 Initializing rating system...');
 
   print('Connected to Firebase app → ${Firebase.app().name}');
   runApp(const QuickFix());
+}
+
+// Requests notification + location permissions up front and pre-fetches FCM token
+Future<void> _preflightPermissions() async {
+  try {
+    // Notifications
+    await NotificationPermissionManager.requestNotificationPermission();
+  } catch (e) {
+    debugPrint('⚠️ Notification permission request failed (non-fatal): $e');
+  }
+
+  try {
+    // Get FCM token early; user-specific save to Firestore will still occur post-login via AuthProvider
+    await FCMTokenManager.getToken();
+  } catch (e) {
+    debugPrint('⚠️ FCM token prefetch failed (non-fatal): $e');
+  }
+
+  try {
+    // Location
+    final granted = await LocationService.instance.requestPermission();
+    if (!granted) {
+      debugPrint('❌ Location permission denied at startup');
+    }
+
+    // Try to enable device location services if off
+    final isEnabled = await LocationService.instance.isLocationEnabled();
+    if (!isEnabled) {
+      await LocationService.instance.enableLocationService();
+    }
+  } catch (e) {
+    debugPrint('⚠️ Location preflight failed (non-fatal): $e');
+  }
 }
 
 // FCM Token Manager (keep your existing code)

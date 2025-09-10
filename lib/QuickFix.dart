@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -24,6 +25,7 @@ class QuickFix extends StatefulWidget {
 
 class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
   bool? _showOnboarding; // ✅ ADD: Track onboarding state
+  GoRouter? _router;
 
   @override
   void initState() {
@@ -43,13 +45,47 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
 
     setState(() {
       _showOnboarding = !hasSeenOnboarding;
+      _router = AppRouter.router(showOnboarding: _showOnboarding!);
     });
   }
 
   void _setupAuthenticationListener() {
-    FirebaseAuth.instance.authStateChanges().listen((User? user) {
+    FirebaseAuth.instance.authStateChanges().listen((User? user) async {
       if (user != null) {
-        _setupUserNotifications(user);
+        await _setupUserNotifications(user);
+
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('hasSeenOnboarding', true);
+
+        // Ensure current session hides onboarding instantly
+        if (mounted && _showOnboarding == true) {
+          setState(() {
+            _showOnboarding = false;
+            _router = AppRouter.router(showOnboarding: _showOnboarding!);
+          });
+        }
+
+        try {
+          final doc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(user.uid)
+              .get();
+          final userType =
+              (doc.data()?['userType'] as String?)?.toLowerCase() ?? 'customer';
+
+          final ctx = navigatorKey.currentContext;
+          if (ctx != null) {
+            if (userType == 'provider') {
+              GoRouter.of(ctx).go('/provider-dashboard');
+            } else {
+              GoRouter.of(ctx).go('/home');
+            }
+          }
+        } catch (_) {
+          // Fallback: at least go to customer home
+          final ctx = navigatorKey.currentContext;
+          if (ctx != null) GoRouter.of(ctx).go('/home');
+        }
       }
     });
   }
@@ -196,89 +232,61 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
         ChangeNotifierProvider(create: (_) => FavoritesProvider()),
         ChangeNotifierProvider(create: (_) => RatingProvider()),
       ],
-      child: Consumer<AuthProvider>(
-        builder: (context, authProvider, child) {
-          // ✅ Show loading screen while initializing
-          if (authProvider.user != null &&
-              (!authProvider.isInitialized || authProvider.userModel == null)) {
-            return MaterialApp(
-              title: 'QuickFix',
-              debugShowCheckedModeBanner: false,
-              home: Scaffold(
-                body: Container(
-                  decoration: const BoxDecoration(
-                    gradient: AppColors.primaryGradient,
-                  ),
-                  child: const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        CircularProgressIndicator(
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 20),
-                        Text(
-                          'Loading your profile...',
-                          style: TextStyle(color: Colors.white, fontSize: 16),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+      child: MaterialApp.router(
+        title: 'QuickFix',
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          primarySwatch: Colors.blue,
+          primaryColor: AppColors.primary,
+          scaffoldBackgroundColor: AppColors.background,
+          fontFamily: 'Poppins',
+          appBarTheme: const AppBarTheme(
+            backgroundColor: AppColors.primary,
+            foregroundColor: Colors.white,
+            elevation: 0,
+          ),
+          elevatedButtonTheme: ElevatedButtonThemeData(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            );
-          }
-
-          // ✅ FIXED: Call getRouter with showOnboarding parameter
-          return MaterialApp.router(
-            title: 'QuickFix',
-            debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              primarySwatch: Colors.blue,
-              primaryColor: AppColors.primary,
-              scaffoldBackgroundColor: AppColors.background,
-              fontFamily: 'Poppins',
-              appBarTheme: const AppBarTheme(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-              ),
-              elevatedButtonTheme: ElevatedButtonThemeData(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primary,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 12,
-                  ),
-                ),
-              ),
-              inputDecorationTheme: InputDecorationTheme(
-                filled: true,
-                fillColor: Colors.white,
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.divider),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                  borderSide: const BorderSide(color: AppColors.primary),
-                ),
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
             ),
-            // ✅ THIS IS THE FIX: Call the method with parameter instead of using .router
-            routerConfig: AppRouter.router(showOnboarding: _showOnboarding!),
-          );
-        },
+          ),
+          inputDecorationTheme: InputDecorationTheme(
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+            enabledBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.divider),
+            ),
+            focusedBorder: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: const BorderSide(color: AppColors.primary),
+            ),
+          ),
+          snackBarTheme: SnackBarThemeData(
+            backgroundColor: AppColors.snackbarBackground,
+            contentTextStyle: const TextStyle(
+              color: AppColors.snackbarText,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
+            actionTextColor: AppColors.snackbarText,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            elevation: 6,
+          ),
+        ),
+        routerConfig: _router!,
       ),
     );
   }

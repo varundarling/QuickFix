@@ -52,7 +52,52 @@ class RatingService {
       });
 
       // Update provider's overall rating
-      await _updateProviderRating(providerId);
+      final givenRating = rating; // capture for closure
+      double newAvg = 0.0;
+      int newCount = 0;
+
+      // 1) Atomic aggregate on providers/{providerId}
+      await _firestore.runTransaction((txn) async {
+        final ref = _firestore.collection('providers').doc(providerId);
+        final snap = await txn.get(ref);
+
+        final prevCount = (snap.data()?['totalReviews'] ?? 0) as int;
+        final prevAvg = ((snap.data()?['rating'] ?? 0.0) as num).toDouble();
+
+        newCount = prevCount + 1;
+        newAvg = ((prevAvg * prevCount) + givenRating) / newCount;
+
+        txn.set(ref, {
+          'rating': newAvg,
+          'totalReviews': newCount,
+          'lastRatingUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      });
+
+      // 2) Optional: mirror to users/{providerId} for profile pages that read there
+      await _firestore.collection('users').doc(providerId).set({
+        'rating': newAvg,
+        'totalReviews': newCount,
+        'lastRatingUpdate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      // 3) Denormalize onto all services for customer list cards
+      final servicesSnap = await _firestore
+          .collection('services')
+          .where('providerId', isEqualTo: providerId)
+          .get();
+
+      if (servicesSnap.docs.isNotEmpty) {
+        final batch = _firestore.batch();
+        for (final doc in servicesSnap.docs) {
+          batch.update(doc.reference, {
+            'providerRating': newAvg,
+            'providerTotalReviews': newCount,
+            'lastRatingUpdate': FieldValue.serverTimestamp(),
+          });
+        }
+        await batch.commit();
+      }
 
       return true;
     } catch (e) {
@@ -98,33 +143,6 @@ class RatingService {
     }
   }
 
-  // Update provider's overall rating
-  Future<void> _updateProviderRating(String providerId) async {
-    try {
-      final ratings = await getProviderRatings(providerId);
-
-      if (ratings.isNotEmpty) {
-        final averageRating =
-            ratings.map((r) => r.rating).reduce((a, b) => a + b) /
-            ratings.length;
-
-        // Update in providers collection
-        await _firestore.collection('providers').doc(providerId).update({
-          'rating': averageRating,
-          'totalReviews': ratings.length,
-          'lastRatingUpdate': FieldValue.serverTimestamp(),
-        });
-
-        // Also update in users collection for backward compatibility
-        await _firestore.collection('users').doc(providerId).update({
-          'rating': averageRating,
-          'totalReviews': ratings.length,
-        });
-      }
-    } catch (e) {
-      debugPrint('❌ Error updating provider rating: $e');
-    }
-  }
 
   // Get provider's average rating
   Future<Map<String, dynamic>> getProviderRatingStats(String providerId) async {

@@ -84,13 +84,13 @@ class _SplashScreenState extends State<SplashScreen>
       if (!mounted) return;
 
       // Navigate based on user type
-      if (userType == 'provider') {
-        debugPrint('🏢 Navigating to provider dashboard');
-        context.go('/provider-dashboard');
-      } else {
-        debugPrint('🏠 Navigating to customer home');
-        context.go('/home');
-      }
+      // if (userType == 'provider') {
+      //   debugPrint('🏢 Navigating to provider dashboard');
+      //   context.go('/provider-dashboard');
+      // } else {
+      //   debugPrint('🏠 Navigating to customer home');
+      //   context.go('/home');
+      // }
     } else {
       debugPrint('❌ User not logged in, navigating to user type selection');
       if (mounted) {

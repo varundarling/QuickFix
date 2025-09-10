@@ -55,144 +55,144 @@ class AuthProvider extends ChangeNotifier {
   }
 
   // ✅ FIXED: Correct initialization for v7.1.1
-  Future<void> _ensureGoogleInitialized() async {
-    if (_isGoogleInitialized) return;
+  // Future<void> _ensureGoogleInitialized() async {
+  //   if (_isGoogleInitialized) return;
 
-    try {
-      // ✅ CRITICAL: Replace with your actual Web Client ID
-      await _googleSignIn.initialize(
-        clientId:
-            '638985318949-42ehidfh5rsdoapvmnd4rsvt6v86bjlo.apps.googleusercontent.com',
-        serverClientId:
-            '638985318949-42ehidfh5rsdoapvmnd4rsvt6v86bjlo.apps.googleusercontent.com',
-      );
-      _isGoogleInitialized = true;
-      debugPrint('✅ Google Sign-In initialized successfully');
-    } catch (e) {
-      debugPrint('❌ Error initializing Google Sign-In: $e');
-      throw e;
-    }
-  }
+  //   try {
+  //     // ✅ CRITICAL: Replace with your actual Web Client ID
+  //     await _googleSignIn.initialize(
+  //       clientId:
+  //           '638985318949-42ehidfh5rsdoapvmnd4rsvt6v86bjlo.apps.googleusercontent.com',
+  //       serverClientId:
+  //           '638985318949-42ehidfh5rsdoapvmnd4rsvt6v86bjlo.apps.googleusercontent.com',
+  //     );
+  //     _isGoogleInitialized = true;
+  //     debugPrint('✅ Google Sign-In initialized successfully');
+  //   } catch (e) {
+  //     debugPrint('❌ Error initializing Google Sign-In: $e');
+  //     throw e;
+  //   }
+  // }
 
   // ✅ FIXED: Complete Google Sign-In method for v7.1.1
 
-  Future<bool> signInWithGoogle({required bool isSignUp}) async {
-    try {
-      _setGoogleSignInLoading(true);
-      _clearError();
+  // Future<bool> signInWithGoogle({required bool isSignUp}) async {
+  //   try {
+  //     _setGoogleSignInLoading(true);
+  //     _clearError();
 
-      debugPrint('🔄 Starting Google ${isSignUp ? "Sign-Up" : "Login"}...');
+  //     debugPrint('🔄 Starting Google ${isSignUp ? "Sign-Up" : "Login"}...');
 
-      await _ensureGoogleInitialized();
+  //     await _ensureGoogleInitialized();
 
-      GoogleSignInAccount? googleUser;
+  //     GoogleSignInAccount? googleUser;
 
-      if (_googleSignIn.supportsAuthenticate()) {
-        googleUser = await _googleSignIn.authenticate();
-      } else {
-        throw Exception(
-          'Google Sign-In authentication not supported on this platform',
-        );
-      }
+  //     if (_googleSignIn.supportsAuthenticate()) {
+  //       googleUser = await _googleSignIn.authenticate();
+  //     } else {
+  //       throw Exception(
+  //         'Google Sign-In authentication not supported on this platform',
+  //       );
+  //     }
 
-      if (googleUser == null) {
-        debugPrint(
-          '❌ Google ${isSignUp ? "Sign-Up" : "Login"} cancelled by user',
-        );
-        return false;
-      }
+  //     if (googleUser == null) {
+  //       debugPrint(
+  //         '❌ Google ${isSignUp ? "Sign-Up" : "Login"} cancelled by user',
+  //       );
+  //       return false;
+  //     }
 
-      debugPrint('✅ Google user obtained: ${googleUser.email}');
+  //     debugPrint('✅ Google user obtained: ${googleUser.email}');
 
-      // ✅ CRITICAL: Check if user exists in YOUR database
-      final userExists = await _checkUserExistsInDatabase(googleUser.email!);
+  //     // ✅ CRITICAL: Check if user exists in YOUR database
+  //     final userExists = await _checkUserExistsInDatabase(googleUser.email!);
 
-      // ✅ VALIDATION: Sign Up flow - user should NOT exist
-      if (isSignUp && userExists) {
-        debugPrint('❌ User already exists: ${googleUser.email}');
-        _setError('Account already exists. Please login instead.');
-        await _googleSignIn.signOut();
-        return false;
-      }
+  //     // ✅ VALIDATION: Sign Up flow - user should NOT exist
+  //     if (isSignUp && userExists) {
+  //       debugPrint('❌ User already exists: ${googleUser.email}');
+  //       _setError('Account already exists. Please login instead.');
+  //       await _googleSignIn.signOut();
+  //       return false;
+  //     }
 
-      // ✅ VALIDATION: Login flow - user MUST exist
-      if (!isSignUp && !userExists) {
-        debugPrint('❌ User not found: ${googleUser.email}');
-        _setError('Account not found. Please Sign Up.');
-        await _googleSignIn.signOut();
-        return false;
-      }
+  //     // ✅ VALIDATION: Login flow - user MUST exist
+  //     if (!isSignUp && !userExists) {
+  //       debugPrint('❌ User not found: ${googleUser.email}');
+  //       _setError('Account not found. Please Sign Up.');
+  //       await _googleSignIn.signOut();
+  //       return false;
+  //     }
 
-      // Proceed with Firebase authentication
-      final GoogleSignInAuthentication googleAuth =
-          await googleUser.authentication;
+  //     // Proceed with Firebase authentication
+  //     final GoogleSignInAuthentication googleAuth =
+  //         await googleUser.authentication;
 
-      if (googleAuth.idToken == null) {
-        debugPrint('❌ Failed to get Google ID token');
-        return false;
-      }
+  //     if (googleAuth.idToken == null) {
+  //       debugPrint('❌ Failed to get Google ID token');
+  //       return false;
+  //     }
 
-      debugPrint('✅ Google tokens obtained successfully');
+  //     debugPrint('✅ Google tokens obtained successfully');
 
-      final credential = GoogleAuthProvider.credential(
-        idToken: googleAuth.idToken,
-      );
+  //     final credential = GoogleAuthProvider.credential(
+  //       idToken: googleAuth.idToken,
+  //     );
 
-      final UserCredential userCredential = await _firebaseService.auth
-          .signInWithCredential(credential);
+  //     final UserCredential userCredential = await _firebaseService.auth
+  //         .signInWithCredential(credential);
 
-      if (userCredential.user != null) {
-        _user = userCredential.user;
+  //     if (userCredential.user != null) {
+  //       _user = userCredential.user;
 
-        // ✅ Handle based on flow type
-        if (isSignUp) {
-          // New user setup
-          await _handleFirstTimeGoogleUser(userCredential.user!, googleUser);
-          debugPrint('✅ Google Sign-Up successful for new user');
-        } else {
-          // Existing user setup
-          await _handleExistingGoogleUser(userCredential.user!);
-          debugPrint('✅ Google Login successful for existing user');
-        }
+  //       // ✅ Handle based on flow type
+  //       if (isSignUp) {
+  //         // New user setup
+  //         await _handleFirstTimeGoogleUser(userCredential.user!, googleUser);
+  //         debugPrint('✅ Google Sign-Up successful for new user');
+  //       } else {
+  //         // Existing user setup
+  //         await _handleExistingGoogleUser(userCredential.user!);
+  //         debugPrint('✅ Google Login successful for existing user');
+  //       }
 
-        await _loadUserModel();
-        await _setupNotifications();
-        return true;
-      }
+  //       await _loadUserModel();
+  //       await _setupNotifications();
+  //       return true;
+  //     }
 
-      return false;
-    } catch (e) {
-      debugPrint('❌ Google ${isSignUp ? "Sign-Up" : "Login"} error: $e');
-      _setError(
-        'Google ${isSignUp ? "Sign-Up" : "Login"} failed: ${e.toString()}',
-      );
-      return false;
-    } finally {
-      _setGoogleSignInLoading(false);
-    }
-  }
+  //     return false;
+  //   } catch (e) {
+  //     debugPrint('❌ Google ${isSignUp ? "Sign-Up" : "Login"} error: $e');
+  //     _setError(
+  //       'Google ${isSignUp ? "Sign-Up" : "Login"} failed: ${e.toString()}',
+  //     );
+  //     return false;
+  //   } finally {
+  //     _setGoogleSignInLoading(false);
+  //   }
+  // }
 
   // ✅ Helper method: Check if user exists in your database
-  Future<bool> _checkUserExistsInDatabase(String email) async {
-    try {
-      debugPrint('🔍 Checking if user exists in database: $email');
+  // Future<bool> _checkUserExistsInDatabase(String email) async {
+  //   try {
+  //     debugPrint('🔍 Checking if user exists in database: $email');
 
-      // Method 1: Check in Firebase Realtime Database by email
-      final query = await FirebaseDatabase.instance
-          .ref('users')
-          .orderByChild('email')
-          .equalTo(email)
-          .once();
+  //     // Method 1: Check in Firebase Realtime Database by email
+  //     final query = await FirebaseDatabase.instance
+  //         .ref('users')
+  //         .orderByChild('email')
+  //         .equalTo(email)
+  //         .once();
 
-      final exists = query.snapshot.exists;
-      debugPrint('📊 User exists in database: $exists');
-      return exists;
-    } catch (e) {
-      debugPrint('❌ Error checking user existence: $e');
-      // In case of error, assume user doesn't exist to be safe
-      return false;
-    }
-  }
+  //     final exists = query.snapshot.exists;
+  //     debugPrint('📊 User exists in database: $exists');
+  //     return exists;
+  //   } catch (e) {
+  //     debugPrint('❌ Error checking user existence: $e');
+  //     // In case of error, assume user doesn't exist to be safe
+  //     return false;
+  //   }
+  // }
 
   // ✅ Alternative method using Firebase's built-in approach
   Future<bool> signInWithGoogleAlternative() async {
@@ -235,92 +235,98 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleFirstTimeFirebaseGoogleUser(User user) async {
-    try {
-      debugPrint('🆕 Setting up first-time Firebase Google user');
+    // 1) Initialize encryption
+    final generatedPassword = _generatePasswordFromGoogleData(user);
+    await EncryptionService.initializeUserEncryption(
+      generatedPassword,
+      user.uid,
+    );
 
-      final generatedPassword = _generatePasswordFromGoogleData(user);
-      await EncryptionService.initializeUserEncryption(
-        generatedPassword,
-        user.uid,
-      );
+    // 2) Encrypt sensitive profile and save to RTDB
+    final sensitiveData = {
+      'name': user.displayName ?? '',
+      'email': user.email ?? '',
+      'phone': '',
+      'address': '',
+    };
+    final encryptedData = await EncryptionService.encryptUserData(
+      sensitiveData,
+      user.uid,
+    );
 
-      final sensitiveData = {
-        'name': user.displayName ?? '',
-        'email': user.email ?? '',
-        'phone': '',
-        'address': '',
-      };
+    await FirebaseDatabase.instance.ref('users/${user.uid}').set({
+      'encrypted_profile': encryptedData,
+      'public_info': {
+        'userType': 'customer',
+        'isActive': true,
+        'joinDate': ServerValue.timestamp,
+        'provider': 'google',
+        'hasCompletedProfile': false,
+        'photoUrl': user.photoURL ?? '',
+      },
+      'access_requests': {},
+    });
 
-      final encryptedData = await EncryptionService.encryptUserData(
-        sensitiveData,
-        user.uid,
-      );
+    // 3) (Optional) Minimal Firestore user doc for immediate presence
+    await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+      'name': user.displayName ?? '',
+      'email': user.email ?? '',
+      'userType': 'customer',
+      'photoUrl': user.photoURL ?? '',
+      'isActive': true,
+      'provider': 'google',
+      'createdAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
 
-      await FirebaseDatabase.instance.ref('users/${user.uid}').set({
-        'encrypted_profile': encryptedData,
-        'public_info': {
-          'userType': 'customer',
-          'isActive': true,
-          'joinDate': ServerValue.timestamp,
-          'provider': 'google',
-          'hasCompletedProfile': false,
-          'photoUrl': user.photoURL ?? '',
-        },
-        'access_requests': {},
-      });
-
-      await _saveUserType('customer');
-      debugPrint('✅ First-time Firebase Google user setup completed');
-    } catch (e) {
-      debugPrint('❌ Error setting up first-time Firebase Google user: $e');
-      throw e;
-    }
+    // 4) Mark onboarding as seen
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', true);
   }
 
-  Future<void> _handleFirstTimeGoogleUser(
-    User user,
-    GoogleSignInAccount googleUser,
-  ) async {
-    try {
-      debugPrint('🆕 Setting up first-time Google user');
+  // Future<void> _handleFirstTimeGoogleUser(
+  //   User user,
+  //   GoogleSignInAccount googleUser,
+  // ) async {
+  //   try {
+  //     debugPrint('🆕 Setting up first-time Google user');
 
-      final generatedPassword = _generatePasswordFromGoogleData(user);
-      await EncryptionService.initializeUserEncryption(
-        generatedPassword,
-        user.uid,
-      );
+  //     final generatedPassword = _generatePasswordFromGoogleData(user);
+  //     await EncryptionService.initializeUserEncryption(
+  //       generatedPassword,
+  //       user.uid,
+  //     );
 
-      final sensitiveData = {
-        'name': user.displayName ?? googleUser.displayName ?? '',
-        'email': user.email ?? '',
-        'phone': '',
-        'address': '',
-      };
+  //     final sensitiveData = {
+  //       'name': user.displayName ?? googleUser.displayName ?? '',
+  //       'email': user.email ?? '',
+  //       'phone': '',
+  //       'address': '',
+  //     };
 
-      final encryptedData = await EncryptionService.encryptUserData(
-        sensitiveData,
-        user.uid,
-      );
+  //     final encryptedData = await EncryptionService.encryptUserData(
+  //       sensitiveData,
+  //       user.uid,
+  //     );
 
-      await FirebaseDatabase.instance.ref('users/${user.uid}').set({
-        'encrypted_profile': encryptedData,
-        'public_info': {
-          'userType': 'customer',
-          'isActive': true,
-          'joinDate': ServerValue.timestamp,
-          'provider': 'google',
-          'hasCompletedProfile': false,
-        },
-        'access_requests': {},
-      });
+  //     await FirebaseDatabase.instance.ref('users/${user.uid}').set({
+  //       'encrypted_profile': encryptedData,
+  //       'public_info': {
+  //         'userType': 'customer',
+  //         'isActive': true,
+  //         'joinDate': ServerValue.timestamp,
+  //         'provider': 'google',
+  //         'hasCompletedProfile': false,
+  //       },
+  //       'access_requests': {},
+  //     });
 
-      await _saveUserType('customer');
-      debugPrint('✅ First-time Google user setup completed');
-    } catch (e) {
-      debugPrint('❌ Error setting up first-time Google user: $e');
-      throw e;
-    }
-  }
+  //     await _saveUserType('customer');
+  //     debugPrint('✅ First-time Google user setup completed');
+  //   } catch (e) {
+  //     debugPrint('❌ Error setting up first-time Google user: $e');
+  //     throw e;
+  //   }
+  // }
 
   Future<void> _handleExistingGoogleUser(User user) async {
     try {
@@ -354,7 +360,6 @@ class AuthProvider extends ChangeNotifier {
     return digest.toString();
   }
 
-  // ✅ FIXED: Updated signOut for v7.1.1
   Future<void> signOut() async {
     try {
       if (_user != null) {
@@ -362,7 +367,7 @@ class AuthProvider extends ChangeNotifier {
         EncryptionService.clearSession(_user!.uid);
       }
 
-      await _ensureGoogleInitialized();
+      // await _ensureGoogleInitialized();
       await _googleSignIn.signOut();
       await _firebaseService.signOut();
 
@@ -861,14 +866,8 @@ class AuthProvider extends ChangeNotifier {
         await EncryptionService.getMasterKey(_user!.uid, password: password);
       }
 
-      await _loadUserModel();
-      if (_userModel?.userType != null) {
-        await _saveUserType(_userModel!.userType);
-        debugPrint(
-          '✅ Sign-in successful for user type: ${_userModel!.userType}',
-        );
-        await _setupNotifications();
-      }
+      // Shared after-auth work for identical UX
+      await postAuthBootstrap();
       return true;
     } catch (e) {
       _setError(_getErrorMessage(e));
@@ -893,38 +892,45 @@ class AuthProvider extends ChangeNotifier {
         email,
         password,
       );
+      if (userCredential?.user == null) return false;
 
-      if (userCredential?.user != null) {
-        _user = userCredential!.user;
+      _user = userCredential!.user;
 
-        await EncryptionService.initializeUserEncryption(password, _user!.uid);
+      // Encryption + RTDB encrypted profile
+      await EncryptionService.initializeUserEncryption(password, _user!.uid);
+      final sensitiveData = {'name': name, 'email': email, 'phone': phone};
+      final encryptedData = await EncryptionService.encryptUserData(
+        sensitiveData,
+        _user!.uid,
+      );
 
-        final sensitiveData = {'name': name, 'email': email, 'phone': phone};
+      await FirebaseDatabase.instance.ref('users/${_user!.uid}').set({
+        'encrypted_profile': encryptedData,
+        'public_info': {
+          'userType': userType,
+          'isActive': true,
+          'joinDate': ServerValue.timestamp,
+          'provider': 'email',
+          'hasCompletedProfile': false,
+        },
+        'access_requests': {},
+      });
 
-        final encryptedData = await EncryptionService.encryptUserData(
-          sensitiveData,
-          _user!.uid,
-        );
+      // Minimal Firestore presence for parity with Google and downstream queries
+      await FirebaseFirestore.instance.collection('users').doc(_user!.uid).set({
+        'name': name,
+        'email': email,
+        'userType': userType,
+        'isActive': true,
+        'provider': 'email',
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
 
-        await FirebaseDatabase.instance.ref('users/${_user!.uid}').set({
-          'encrypted_profile': encryptedData,
-          'public_info': {
-            'userType': userType,
-            'isActive': true,
-            'joinDate': ServerValue.timestamp,
-            'provider': 'email',
-            'hasCompletedProfile': false,
-          },
-          'access_requests': {},
-        });
+      await _saveUserType(userType);
 
-        await _saveUserType(userType);
-        debugPrint('✅ Sign-up successful for user type: $userType');
-        await _setupNotifications();
-
-        return true;
-      }
-      return false;
+      // Shared after-auth work for identical UX
+      await postAuthBootstrap();
+      return true;
     } catch (e) {
       _setError(_getErrorMessage(e));
       return false;
@@ -932,6 +938,85 @@ class AuthProvider extends ChangeNotifier {
       _setSignUpLoading(false);
     }
   }
+
+  Future<bool> signUpWithGoogle() => continueWithGoogle();
+
+  Future<bool> loginWithGoogle() => continueWithGoogle();
+
+  Future<void> postAuthBootstrap() async {
+    try {
+      // Load user profile from RTDB (with retry) → populates _userModel
+      await _loadUserModelWithRetry();
+
+      // Persist role locally for correct dashboard routing after app restarts
+      if (_userModel?.userType != null) {
+        await _saveUserType(_userModel!.userType);
+      }
+
+      // Set up FCM token + topic subscriptions without blocking the first frame
+      unawaited(_setupNotifications());
+
+      // Permanently skip onboarding after first successful auth
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setBool('hasSeenOnboarding', true);
+
+      _isInitialized = true;
+      notifyListeners();
+    } catch (e) {
+      debugPrint('❌ postAuthBootstrap failed: $e');
+      _isInitialized = true; // don’t block UI on errors
+    }
+  }
+
+  Future<bool> continueWithGoogle() async {
+    _setGoogleSignInLoading(true);
+    _clearError();
+    try {
+      final googleProvider = GoogleAuthProvider()
+        ..addScope('email')
+        ..addScope('profile');
+
+      final UserCredential cred = await FirebaseAuth.instance
+          .signInWithProvider(googleProvider);
+
+      final user = cred.user;
+      if (user == null) {
+        _setError('Google Sign-In failed.');
+        return false;
+      }
+
+      // First-time vs returning — keep your existing handlers
+      if (cred.additionalUserInfo?.isNewUser ?? false) {
+        await _handleFirstTimeFirebaseGoogleUser(user);
+      } else {
+        await _handleExistingGoogleUser(user);
+      }
+
+      // Shared after-auth work for identical UX
+      await postAuthBootstrap();
+      return true;
+    } catch (e) {
+      _setError('Google Sign-In failed: ${e.toString()}');
+      return false;
+    } finally {
+      _setGoogleSignInLoading(false);
+    }
+  }
+
+  // Future<bool> _userProfileExists(String uid) async {
+  //   try {
+  //     final rtdb = await FirebaseDatabase.instance.ref('users/$uid').get();
+  //     if (rtdb.exists) return true;
+
+  //     final fs = await FirebaseFirestore.instance
+  //         .collection('users')
+  //         .doc(uid)
+  //         .get();
+  //     return fs.exists;
+  //   } catch (_) {
+  //     return false;
+  //   }
+  // }
 
   Future<bool> updateProfile({
     String? name,

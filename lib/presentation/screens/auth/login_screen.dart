@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/constants/app_strings.dart';
 import 'package:quickfix/core/utils/validators.dart';
@@ -159,18 +158,12 @@ class _LoginScreenState extends State<LoginScreen> {
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton.icon(
-                        onPressed: authProvider.isGoogleSigningIn
-                            ? null
-                            : _handleGoogleSignIn,
                         icon: authProvider.isGoogleSigningIn
                             ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
-                                  ),
                                 ),
                               )
                             : Image.asset(
@@ -178,6 +171,28 @@ class _LoginScreenState extends State<LoginScreen> {
                                 width: 20,
                                 height: 20,
                               ),
+                        onPressed: authProvider.isGoogleSigningIn
+                            ? null
+                            : () async {
+                                final ok = await context
+                                    .read<AuthProvider>()
+                                    .loginWithGoogle();
+                                if (ok && context.mounted) {
+                                  await context
+                                      .read<AuthProvider>()
+                                      .reloadUserData();
+                                  // await NavigationHelper.navigateBasedOnRole(
+                                  //   context,
+                                  // );
+                                } else if (context.mounted &&
+                                    authProvider.errorMessage != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text("Login Failed..."),
+                                    ),
+                                  );
+                                }
+                              },
                         label: Text(
                           authProvider.isGoogleSigningIn
                               ? 'Signing in...'
@@ -304,22 +319,5 @@ class _LoginScreenState extends State<LoginScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _handleGoogleSignIn() async {
-    final authProvider = context.read<AuthProvider>();
-
-    final success = await authProvider.signInWithGoogle(isSignUp: false);
-
-    if (success && mounted) {
-      await NavigationHelper.navigateBasedOnRole(context);
-    } else if (mounted && authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage!),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
   }
 }

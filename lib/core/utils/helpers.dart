@@ -194,3 +194,4 @@ extension ColorSafeExtension on Color {
     return withOpacity(opacity.clamp(0.0, 1.0).toDouble());
   }
 }
+

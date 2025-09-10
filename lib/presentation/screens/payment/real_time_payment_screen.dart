@@ -53,6 +53,14 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       'color': Colors.orange,
       'available': true,
     },
+    {
+      'id': 'cash',
+      'name': 'Cash Payment',
+      'description': 'Pay with cash directly to the Worker',
+      'icon': Icons.money,
+      'color': Colors.brown,
+      'available': true,
+    },
   ];
 
   @override

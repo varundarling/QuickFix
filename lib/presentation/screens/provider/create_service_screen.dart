@@ -5,7 +5,6 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
@@ -361,59 +360,59 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // Location Section
-              Card(
-                color: Colors.white,
-                elevation: 2,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        children: [
-                          Icon(Icons.location_on, color: AppColors.primary),
-                          const SizedBox(width: 8),
-                          const Text(
-                            'Service Location',
-                            style: TextStyle(
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const Spacer(),
-                          if (_isLoadingLocation)
-                            const SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          else
-                            IconButton(
-                              onPressed: _getCurrentLocation,
-                              icon: const Icon(Icons.refresh),
-                              tooltip: 'Refresh Location',
-                            ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      CustomTextField(
-                        controller: _addressController,
-                        label: 'Address',
-                        hintText: 'Enter your service area address',
-                        maxLines: 2,
-                        validator: (value) {
-                          if (value == null || value.isEmpty) {
-                            return 'Please enter service location';
-                          }
-                          return null;
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
+              // // Location Section
+              // Card(
+              //   color: Colors.white,
+              //   elevation: 2,
+              //   child: Padding(
+              //     padding: const EdgeInsets.all(16),
+              //     child: Column(
+              //       crossAxisAlignment: CrossAxisAlignment.start,
+              //       children: [
+              //         Row(
+              //           children: [
+              //             Icon(Icons.location_on, color: AppColors.primary),
+              //             const SizedBox(width: 8),
+              //             const Text(
+              //               'Service Location',
+              //               style: TextStyle(
+              //                 fontSize: 16,
+              //                 fontWeight: FontWeight.bold,
+              //               ),
+              //             ),
+              //             const Spacer(),
+              //             if (_isLoadingLocation)
+              //               const SizedBox(
+              //                 width: 20,
+              //                 height: 20,
+              //                 child: CircularProgressIndicator(strokeWidth: 2),
+              //               )
+              //             else
+              //               IconButton(
+              //                 onPressed: _getCurrentLocation,
+              //                 icon: const Icon(Icons.refresh),
+              //                 tooltip: 'Refresh Location',
+              //               ),
+              //           ],
+              //         ),
+              //         const SizedBox(height: 12),
+              //         CustomTextField(
+              //           controller: _addressController,
+              //           label: 'Address',
+              //           hintText: 'Enter your service area address',
+              //           maxLines: 2,
+              //           validator: (value) {
+              //             if (value == null || value.isEmpty) {
+              //               return 'Please enter service location';
+              //             }
+              //             return null;
+              //           },
+              //         ),
+              //       ],
+              //     ),
+              //   ),
+              // ),
+              // const SizedBox(height: 16),
 
               // Description
               CustomTextField(
@@ -448,50 +447,50 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               ),
               const SizedBox(height: 24),
 
-              // Sub Services Section
-              const Text(
-                'Sub Services (Optional)',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-              ),
-              const SizedBox(height: 8),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _subServiceController,
-                      decoration: const InputDecoration(
-                        hintText: 'Add sub service',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    onPressed: _addSubService,
-                    icon: const Icon(Icons.add),
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 16),
+              // // Sub Services Section
+              // const Text(
+              //   'Sub Services (Optional)',
+              //   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              // ),
+              // const SizedBox(height: 8),
+              // Row(
+              //   children: [
+              //     Expanded(
+              //       child: TextField(
+              //         controller: _subServiceController,
+              //         decoration: const InputDecoration(
+              //           hintText: 'Add sub service',
+              //           border: OutlineInputBorder(),
+              //         ),
+              //       ),
+              //     ),
+              //     const SizedBox(width: 8),
+              //     IconButton(
+              //       onPressed: _addSubService,
+              //       icon: const Icon(Icons.add),
+              //       style: IconButton.styleFrom(
+              //         backgroundColor: AppColors.primary,
+              //         foregroundColor: Colors.white,
+              //       ),
+              //     ),
+              //   ],
+              // ),
+              // const SizedBox(height: 16),
 
-              // Sub Services List
-              if (_subServices.isNotEmpty)
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: _subServices.map((service) {
-                    return Chip(
-                      label: Text(service),
-                      deleteIcon: const Icon(Icons.close, size: 18),
-                      onDeleted: () => _removeSubService(service),
-                    );
-                  }).toList(),
-                ),
-              const SizedBox(height: 32),
+              // // Sub Services List
+              // if (_subServices.isNotEmpty)
+              //   Wrap(
+              //     spacing: 8,
+              //     runSpacing: 8,
+              //     children: _subServices.map((service) {
+              //       return Chip(
+              //         label: Text(service),
+              //         deleteIcon: const Icon(Icons.close, size: 18),
+              //         onDeleted: () => _removeSubService(service),
+              //       );
+              //     }).toList(),
+              //   ),
+              // const SizedBox(height: 32),
 
               // Create Service Button
               SizedBox(

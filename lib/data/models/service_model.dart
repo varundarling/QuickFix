@@ -26,6 +26,8 @@ class ServiceModel {
   final DateTime? bookedAt;
   final String? customerName;
   final String? customerPhone;
+  final double? providerRating;
+  final int? providerTotalReviews;
 
   ServiceModel({
     required this.id,
@@ -52,6 +54,8 @@ class ServiceModel {
     this.providerBusinessName,
     this.providerName,
     this.providerEmail,
+    this.providerRating,
+    this.providerTotalReviews,
   });
 
   factory ServiceModel.fromFireStore(
@@ -91,6 +95,8 @@ class ServiceModel {
       providerBusinessName: data['providerBusinessName'],
       providerName: data['providerName'],
       providerEmail: data['providerEmail'],
+      providerRating: (data['providerRating'] as num?)?.toDouble(),
+      providerTotalReviews: (data['providerTotalReviews'] as num?)?.toInt(),
     );
   }
 
@@ -133,6 +139,8 @@ class ServiceModel {
       'providerBusinessName': providerBusinessName,
       'providerName': providerName,
       'providerEmail': providerEmail,
+      'providerRating': providerRating,
+      'providerTotalReviews': providerTotalReviews,
     };
   }
 

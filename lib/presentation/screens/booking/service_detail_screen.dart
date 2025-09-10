@@ -38,6 +38,34 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   bool _isLocationChanged = false;
   String _savedLocationText = '';
 
+  bool _isAfterCutoff([DateTime? now]) {
+    final n = now ?? DateTime.now();
+    return n.hour >= 9;
+  }
+
+  // Apply rule: if selected is "today" and now >= 9, move to tomorrow (preserve time-of-day)
+  DateTime _applyCutoffRule(DateTime selected, {DateTime? now}) {
+    final n = now ?? DateTime.now();
+    final isSameDay =
+        selected.year == n.year &&
+        selected.month == n.month &&
+        selected.day == n.day;
+
+    if (isSameDay && _isAfterCutoff(n)) {
+      return DateTime(
+        n.year,
+        n.month,
+        n.day + 1,
+        selected.hour,
+        selected.minute,
+        selected.second,
+        selected.millisecond,
+        selected.microsecond,
+      );
+    }
+    return selected;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -71,12 +99,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   Future<DateTime?> _selectConstrainedDate() async {
     final DateTime now = DateTime.now();
+    final DateTime minDate = _isAfterCutoff(now)
+        ? now.add(const Duration(days: 1)) // after 9 ⇒ start tomorrow
+        : now; // before 9 ⇒ same-day allowed
     final DateTime maxDate = now.add(const Duration(days: 30));
 
     final DateTime? pickedDate = await showDatePicker(
       context: context,
-      initialDate: now,
-      firstDate: now,
+      initialDate: minDate, // align initial selection with the rule
+      firstDate: minDate, // disallow selecting earlier than min
       lastDate: maxDate,
       helpText: 'Select service date',
       fieldLabelText: 'Service date',
@@ -190,16 +221,13 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   // ✅ NEW: Combined date and time picker with constraints
   Future<void> _selectConstrainedDateTime() async {
     try {
-      // First pick the date
       final DateTime? pickedDate = await _selectConstrainedDate();
-      if (pickedDate == null) return; // User cancelled
+      if (pickedDate == null) return;
 
-      // Then pick the time
       final TimeOfDay? pickedTime = await _selectConstrainedTime();
-      if (pickedTime == null) return; // User cancelled
+      if (pickedTime == null) return;
 
-      // Combine date and time
-      final DateTime selectedDateTime = DateTime(
+      final DateTime combined = DateTime(
         pickedDate.year,
         pickedDate.month,
         pickedDate.day,
@@ -207,17 +235,16 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         pickedTime.minute,
       );
 
-      // Update the selected date
+      // Apply 9AM cutoff shift if needed
+      final DateTime finalDt = _applyCutoffRule(combined);
+
       setState(() {
-        _selectedDate = selectedDateTime;
+        _selectedDate = finalDt;
       });
 
-      // Show success message
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            '✅ Scheduled for ${Helpers.formatDateTime(selectedDateTime)}',
-          ),
+          content: Text('✅ Scheduled for ${Helpers.formatDateTime(finalDt)}'),
           backgroundColor: AppColors.success,
           duration: const Duration(seconds: 2),
         ),
@@ -545,7 +572,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                     child: InkWell(
                       onTap:
-                          _selectConstrainedDateTime, // ✅ Use new constrained picker
+                          _selectConstrainedDateTime,
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -1269,7 +1296,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ...[
                         const SizedBox(height: 4),
                         Text(
-                          'Scheduled for: ${Helpers.formatDate(booking.scheduledDateTime)}',
+                          'Scheduled for: ${Helpers.formatDate(_applyCutoffRule(booking.scheduledDateTime))}',
                           style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w500,

@@ -2,6 +2,7 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:quickfix/core/utils/navigation_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -175,18 +176,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton.icon(
-                        onPressed: authProvider.isGoogleSigningIn
-                            ? null
-                            : _handleGoogleSignUp,
                         icon: authProvider.isGoogleSigningIn
                             ? SizedBox(
                                 width: 20,
                                 height: 20,
                                 child: CircularProgressIndicator(
                                   strokeWidth: 2,
-                                  valueColor: AlwaysStoppedAnimation<Color>(
-                                    AppColors.primary,
-                                  ),
+                                  color: Colors.white,
                                 ),
                               )
                             : Image.asset(
@@ -194,6 +190,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 width: 20,
                                 height: 20,
                               ),
+                        onPressed: authProvider.isGoogleSigningIn
+                            ? null
+                            : () async {
+                                final ok = await context
+                                    .read<AuthProvider>()
+                                    .signUpWithGoogle();
+                                if (ok && context.mounted) {
+                                  await context
+                                      .read<AuthProvider>()
+                                      .reloadUserData();
+                                  // await NavigationHelper.navigateBasedOnRole(
+                                  //   context,
+                                  // );
+                                } else if (context.mounted &&
+                                    authProvider.errorMessage != null) {
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text("SignUp Failed..."),
+                                    ),
+                                  );
+                                }
+                              },
                         label: Text(
                           authProvider.isGoogleSigningIn
                               ? 'Signing up...'
@@ -433,28 +451,6 @@ class _SignUpScreenState extends State<SignUpScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _handleGoogleSignUp() async {
-    final authProvider = context.read<AuthProvider>();
-
-    final success = await authProvider.signInWithGoogle(isSignUp: true);
-
-    if (success && mounted) {
-      final userType = await authProvider.getUserType();
-      if (userType == 'provider') {
-        context.go('/provider-dashboard');
-      } else {
-        context.go('/home');
-      }
-    } else if (mounted && authProvider.errorMessage != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(authProvider.errorMessage!),
-          backgroundColor: AppColors.error,
-        ),
-      );
-    }
   }
 
   // Method to open Terms & Conditions
