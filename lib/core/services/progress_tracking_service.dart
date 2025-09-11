@@ -12,7 +12,7 @@ class ProgressTrackingService {
 
   final Map<String, Timer> _progressTimers = {};
 
-  // ✅ Start automatic progress tracking (30+ minutes to reach 75%)
+  // ✅ Start automatic progress tracking (5% every 15 minutes, cap at 95%)
   Future<void> startProgressTracking(String bookingId) async {
     try {
       debugPrint('📈 Starting progress tracking for: $bookingId');
@@ -42,9 +42,9 @@ class ProgressTrackingService {
       // Cancel existing timer if any
       _progressTimers[bookingId]?.cancel();
 
-      // Start periodic progress updates (every 30 seconds)
+      // ✅ UPDATED: Start periodic progress updates (every 15 minutes)
       _progressTimers[bookingId] = Timer.periodic(
-        const Duration(seconds: 30),
+        const Duration(minutes: 15), // Changed from 30 seconds to 15 minutes
         (timer) => _updateProgress(bookingId, timer),
       );
       debugPrint('✅ Progress tracking started successfully for: $bookingId');
@@ -53,7 +53,7 @@ class ProgressTrackingService {
     }
   }
 
-  // ✅ Update progress based on elapsed time
+  // ✅ UPDATED: Update progress based on elapsed time (5% every 15 minutes)
   Future<void> _updateProgress(String bookingId, Timer timer) async {
     try {
       final bookingDoc = await FirebaseFirestore.instance
@@ -80,18 +80,15 @@ class ProgressTrackingService {
       // Calculate progress based on elapsed time
       final elapsed = DateTime.now().difference(workStartTime).inMinutes;
 
-      // Progress formula: 75% in 30 minutes, then slower to 90% in 45 minutes
+      // ✅ NEW FORMULA: 5% increase every 15 minutes, cap at 95%
       double progress;
-      if (elapsed <= 30) {
-        // 0% to 75% in first 30 minutes
-        progress = (elapsed / 30.0) * 0.75;
-      } else if (elapsed <= 45) {
-        // 75% to 90% in next 15 minutes
-        final extraMinutes = elapsed - 30;
-        progress = 0.75 + (extraMinutes / 15.0) * 0.15;
-      } else {
-        // Cap at 90% until manually completed
-        progress = 0.90;
+      final incrementsOf15Min =
+          elapsed ~/ 15; // Number of complete 15-minute intervals
+      progress = incrementsOf15Min * 0.05; // 5% per interval
+
+      // ✅ Cap at 95% instead of 90%
+      if (progress > 0.95) {
+        progress = 0.95;
       }
 
       // Update progress in Firestore
@@ -104,67 +101,70 @@ class ProgressTrackingService {
           });
 
       debugPrint(
-        '📈 Progress updated for $bookingId: ${(progress * 100).toInt()}%',
+        '📈 Progress updated for $bookingId: ${(progress * 100).toInt()}% (${elapsed}min elapsed, ${incrementsOf15Min} intervals)',
       );
 
-      // Stop timer if work is completed or cancelled
-      if (progress >= 0.90) {
+      // ✅ Stop timer if work reaches 95% cap
+      if (progress >= 0.95) {
         timer.cancel();
         _progressTimers.remove(bookingId);
+        debugPrint(
+          '🏁 Progress tracking stopped - reached 95% cap for: $bookingId',
+        );
       }
     } catch (e) {
       debugPrint('❌ Error updating progress: $e');
     }
   }
 
-  // ✅ ENHANCED: Manually complete work (set to 100%) - Called when provider clicks "Work Completed"
+  // ✅ ENHANCED: Complete work and hide progress bar
   Future<void> completeWork(String bookingId) async {
     try {
       debugPrint(
         '🎯 [COMPLETE WORK] Provider clicked Work Completed for: $bookingId',
       );
 
-      // Cancel timer immediately
+      // ✅ Cancel timer immediately to stop progress updates
       _progressTimers[bookingId]?.cancel();
       _progressTimers.remove(bookingId);
 
       debugPrint(
-        '🔄 [COMPLETE WORK] Setting progress to 100% and status to completed',
+        '🔄 [COMPLETE WORK] Setting status to completed and hiding progress bar',
       );
 
-      // ✅ CRITICAL: Update to completed status with 100% progress
+      // ✅ CRITICAL: Update to completed status and remove progress tracking
       await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
           .update({
             'status': 'completed',
-            'workProgress': 1.0, // ✅ SET TO 100%
+            'workProgress': 1.0, // Set to 100% for completion
             'workEndTime': Timestamp.fromDate(DateTime.now()),
-            'isWorkInProgress': false,
+            'isWorkInProgress':
+                false, // ✅ This will hide the progress bar in UI
             'completedAt': Timestamp.fromDate(DateTime.now()),
             'progressUpdatedAt': Timestamp.fromDate(DateTime.now()),
-            'progressCompleted': true, // ✅ Mark progress as manually completed
-            'completedByProvider': true, // ✅ Indicate provider completed it
-            'lastUpdatedBy': 'provider_completion', // ✅ Track who updated it
+            'progressCompleted': true,
+            'completedByProvider': true,
+            'lastUpdatedBy': 'provider_completion',
+            'progressTrackingActive':
+                false, // ✅ Flag to indicate tracking stopped
           });
 
       debugPrint(
-        '✅ [COMPLETE WORK] Work completed with 100% progress for booking: $bookingId',
-      );
-      debugPrint(
-        '✅ [COMPLETE WORK] Status changed to completed, progress bar now shows 100%',
+        '✅ [COMPLETE WORK] Work completed, progress bar hidden for booking: $bookingId',
       );
     } catch (e) {
       debugPrint('❌ [COMPLETE WORK] Error completing work: $e');
-      rethrow; // Re-throw so calling code can handle the error
+      rethrow;
     }
   }
 
   // ✅ NEW: Set progress to specific percentage (for manual updates)
   Future<void> setProgress(String bookingId, double progress) async {
     try {
-      // Ensure progress is between 0.0 and 1.0
-      final clampedProgress = progress.clamp(0.0, 1.0);
+      // Ensure progress is between 0.0 and 0.95 (since we cap at 95%)
+      final clampedProgress = progress.clamp(0.0, 0.95);
 
       await FirebaseFirestore.instance
           .collection('bookings')
@@ -182,7 +182,7 @@ class ProgressTrackingService {
     }
   }
 
-  // ✅ Stop progress tracking
+  // ✅ Stop progress tracking and hide progress bar
   void stopProgressTracking(String bookingId) {
     _progressTimers[bookingId]?.cancel();
     _progressTimers.remove(bookingId);
