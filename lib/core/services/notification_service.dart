@@ -3,26 +3,20 @@ import 'dart:convert';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  debugPrint('📱 Background message: ${message.notification?.title}');
   final prefs = await SharedPreferences.getInstance();
   final enabled = prefs.getBool('notifications_enabled') ?? true;
 
   if (!enabled) {
-    debugPrint('🔕 Background notifications disabled - ignoring message');
     return;
   }
-
-  debugPrint('📱 Background message: ${message.notification?.title}');
 }
 
 class NotificationService {
@@ -64,9 +58,8 @@ class NotificationService {
       _startListeningForNotifications();
 
       _isInitialized = true;
-      debugPrint('✅ NotificationService initialized (Spark Plan Mode)');
     } catch (e) {
-      debugPrint('❌ NotificationService initialization failed: $e');
+      // Handle initialization errors
     }
   }
 
@@ -88,53 +81,6 @@ class NotificationService {
         ?.createNotificationChannel(channel);
   }
 
-  Future<void> _sendHybridNotification({
-    String? fcmToken,
-    String? targetTopic,
-    required String title,
-    required String body,
-    Map<String, dynamic>? data,
-  }) async {
-    // Validate input before sending
-    if ((fcmToken == null || fcmToken.isEmpty) &&
-        (targetTopic == null || targetTopic.isEmpty)) {
-      debugPrint(
-        '❌ Notification not sent: Both fcmToken and targetTopic are null/empty',
-      );
-      return;
-    }
-
-    try {
-      // Method 1: Create Firestore document (for active users)
-      await FirebaseFirestore.instance.collection('notifications').add({
-        'fcmToken': fcmToken,
-        'targetTopic': targetTopic,
-        'title': title,
-        'body': body,
-        'data': data ?? {},
-        'status': 'pending',
-        'createdAt': FieldValue.serverTimestamp(),
-      });
-
-      debugPrint('✅ Firestore notification document created');
-
-      // Method 2: Send via HTTP v1 API (for background/closed app users)
-      final httpSuccess = await FCMHttpService.instance.sendNotification(
-        fcmToken: fcmToken,
-        topic: targetTopic,
-        title: title,
-        body: body,
-        data: data,
-      );
-
-      if (httpSuccess) {
-        debugPrint('✅ HTTP v1 FCM notification sent');
-      }
-    } catch (e) {
-      debugPrint('❌ Error in hybrid notification: $e');
-    }
-  }
-
   Future<void> notifyAllCustomersOfNewService({
     required String serviceName,
     required String category,
@@ -142,10 +88,6 @@ class NotificationService {
     required String location,
   }) async {
     try {
-      debugPrint(
-        '🔔 [NOTIFICATION] Notifying customers of new service: $serviceName',
-      );
-
       // ✅ FIXED: Get all customer FCM tokens instead of using topic
       QuerySnapshot customersQuery = await FirebaseFirestore.instance
           .collection('users')
@@ -164,12 +106,7 @@ class NotificationService {
         }
       }
 
-      debugPrint(
-        '✅ [NOTIFICATION] Found ${customerTokens.length} customer tokens',
-      );
-
       if (customerTokens.isEmpty) {
-        debugPrint('⚠️ [NOTIFICATION] No customer tokens found');
         return;
       }
 
@@ -197,12 +134,9 @@ class NotificationService {
       }
 
       await batch.commit();
-      debugPrint(
-        '✅ [NOTIFICATION] Created ${customerTokens.length} customer notifications',
-      );
 
       // ✅ ALSO send via HTTP API for immediate delivery
-      final httpSuccess = await FCMHttpService.instance.sendBatchNotifications(
+      await FCMHttpService.instance.sendBatchNotifications(
         fcmTokens: customerTokens,
         title: 'New Service Available! 🔧',
         body: '$serviceName is now available in $location',
@@ -213,10 +147,8 @@ class NotificationService {
           'screen': 'service_details',
         },
       );
-
-      debugPrint('✅ [NOTIFICATION] HTTP notifications sent to customers');
     } catch (e) {
-      debugPrint('❌ [NOTIFICATION] Error notifying customers: $e');
+      // Handle errors
     }
   }
 
@@ -227,10 +159,6 @@ class NotificationService {
     required String bookingId,
   }) async {
     try {
-      debugPrint(
-        '🔔 [NOTIFICATION] Getting provider FCM token for: $providerId',
-      );
-
       // First try to get provider's FCM token from providers collection
       DocumentSnapshot providerDoc = await FirebaseFirestore.instance
           .collection('providers')
@@ -242,17 +170,10 @@ class NotificationService {
       if (providerDoc.exists && providerDoc.data() != null) {
         final providerData = providerDoc.data() as Map<String, dynamic>;
         fcmToken = providerData['fcmToken'] as String?;
-        debugPrint(
-          '✅ [NOTIFICATION] FCM token from providers collection: ${fcmToken?.substring(0, 20)}...',
-        );
       }
 
       // Fallback to users collection if token not found in providers
       if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint(
-          '⚠️ [NOTIFICATION] No token in providers, checking users collection...',
-        );
-
         DocumentSnapshot userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(providerId)
@@ -261,32 +182,20 @@ class NotificationService {
         if (userDoc.exists && userDoc.data() != null) {
           final userData = userDoc.data() as Map<String, dynamic>;
           fcmToken = userData['fcmToken'] as String?;
-          debugPrint(
-            '✅ [NOTIFICATION] FCM token from users collection: ${fcmToken?.substring(0, 20)}...',
-          );
         }
       }
 
       // ✅ CRITICAL: Get fresh FCM token if still not found
       if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint(
-          '⚠️ [NOTIFICATION] No stored token found, getting fresh token...',
-        );
         fcmToken = await FCMTokenManager.getToken();
 
         if (fcmToken != null) {
           // Save the fresh token to both collections
           await _saveFreshTokenToCollections(providerId, fcmToken);
-          debugPrint(
-            '✅ [NOTIFICATION] Fresh token saved: ${fcmToken.substring(0, 20)}...',
-          );
         }
       }
 
       if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint(
-          '❌ [NOTIFICATION] No FCM token available, notification aborted',
-        );
         return;
       }
 
@@ -306,8 +215,6 @@ class NotificationService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ [NOTIFICATION] Provider notification created successfully');
-
       // ✅ ALSO send via HTTP API for immediate delivery
       final httpSuccess = await FCMHttpService.instance
           .sendHighPriorityNotification(
@@ -323,10 +230,10 @@ class NotificationService {
           );
 
       if (httpSuccess) {
-        debugPrint('✅ [NOTIFICATION] HTTP notification sent successfully');
+        // Notification sent successfully
       }
     } catch (e) {
-      debugPrint('❌ [NOTIFICATION] Error notifying provider: $e');
+      // Handle errors
     }
   }
 
@@ -357,9 +264,8 @@ class NotificationService {
       }, SetOptions(merge: true));
 
       await batch.commit();
-      debugPrint('✅ [NOTIFICATION] Fresh token saved to both collections');
     } catch (e) {
-      debugPrint('❌ [NOTIFICATION] Error saving fresh token: $e');
+      // Handle errors
     }
   }
 
@@ -372,20 +278,17 @@ class NotificationService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      debugPrint('✅ Notification permissions granted');
+      // Permissions granted
     } else {
-      debugPrint('❌ Notification permissions denied');
+      // Handle errors
     }
   }
 
   Future<void> _handleForegroundMessage(RemoteMessage message) async {
-    debugPrint('📱 Foreground message: ${message.notification?.title}');
-
     // ✅ STEP 3: Check if notifications are enabled before showing
     final enabled = await areNotificationsEnabled();
 
     if (!enabled) {
-      debugPrint('🔕 Notifications disabled - ignoring foreground message');
       return;
     }
 
@@ -399,7 +302,6 @@ class NotificationService {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    debugPrint('📱 Notification tapped: ${message.data}');
     _navigateToRelevantScreen(message.data);
   }
 
@@ -422,10 +324,8 @@ class NotificationService {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
-
-      debugPrint('✅ FCM notification queued');
     } catch (e) {
-      debugPrint('❌ Error sending FCM notification: $e');
+      // Handle errors
     }
   }
 
@@ -449,7 +349,6 @@ class NotificationService {
     await _localNotifications.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        debugPrint('📱 Local notification tapped: ${response.payload}');
         _handleNotificationTap(response.payload as RemoteMessage);
       },
     );
@@ -459,7 +358,6 @@ class NotificationService {
     try {
       return await _fcm.getToken();
     } catch (e) {
-      debugPrint('❌ Error getting FCM token: $e');
       return null;
     }
   }
@@ -472,29 +370,25 @@ class NotificationService {
           'fcmToken': token,
           'lastTokenUpdate': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
-
-        debugPrint('✅ Updated FCM token for user: $userId');
       }
     } catch (e) {
-      debugPrint('❌ Error updating user token: $e');
+      // Handle errors
     }
   }
 
   Future<void> subscribeTo(String topic) async {
     try {
       await _fcm.subscribeToTopic(topic);
-      debugPrint('✅ Subscribed to topic: $topic');
     } catch (e) {
-      debugPrint('❌ Error subscribing to topic $topic: $e');
+      // Handle errors
     }
   }
 
   Future<void> unsubscribeFrom(String topic) async {
     try {
       await _fcm.unsubscribeFromTopic(topic);
-      debugPrint('✅ Unsubscribed from topic: $topic');
     } catch (e) {
-      debugPrint('❌ Error unsubscribing from topic $topic: $e');
+      // Handle errors
     }
   }
 
@@ -516,8 +410,6 @@ class NotificationService {
             }
           }
         });
-
-    debugPrint('🔄 Started listening for notifications');
   }
 
   Future<void> _processIncomingNotification(
@@ -527,7 +419,6 @@ class NotificationService {
     try {
       final enabled = await areNotificationsEnabled();
       if (!enabled) {
-        debugPrint('🔕 Notifications disabled - skipping processing');
         return;
       }
 
@@ -538,7 +429,6 @@ class NotificationService {
       final targetTopic = notification['targetTopic'] as String?;
       final title = notification['title'] as String? ?? 'Notification';
       final body = notification['body'] as String? ?? '';
-      
 
       // Check if this notification is for the current user
       bool isForThisUser = false;
@@ -553,7 +443,7 @@ class NotificationService {
             .get();
 
         // ✅ FIX: Cast to Map<String, dynamic> before accessing
-        final userData = userDoc.data() as Map<String, dynamic>?;
+        final userData = userDoc.data();
         final userType = userData?['userType'] as String?;
         isForThisUser = userType == 'customer';
       }
@@ -575,11 +465,9 @@ class NotificationService {
 
         // Mark notification as processed for this user
         await _markNotificationAsProcessed(notificationId, currentUser.uid);
-
-        debugPrint('✅ Processed notification: $title');
       }
     } catch (e) {
-      debugPrint('❌ Error processing notification: $e');
+      // Handle errors
     }
   }
 
@@ -598,14 +486,14 @@ class NotificationService {
       // Optionally, clean up old notifications
       _cleanupOldNotifications(notificationId);
     } catch (e) {
-      debugPrint('❌ Error marking notification as processed: $e');
+      // Handle errors
     }
   }
 
   Future<void> _cleanupOldNotifications(String notificationId) async {
     try {
       // Delete notifications older than 1 hour
-      final cutoff = DateTime.now().subtract(const Duration(hours: 1));
+      DateTime.now().subtract(const Duration(hours: 1));
 
       await FirebaseFirestore.instance
           .collection('notifications')
@@ -615,7 +503,7 @@ class NotificationService {
             'processedAt': FieldValue.serverTimestamp(),
           });
     } catch (e) {
-      debugPrint('❌ Error cleaning up notification: $e');
+      // Handle errors
     }
   }
 
@@ -686,9 +574,9 @@ class NotificationService {
   //       'createdAt': FieldValue.serverTimestamp(),
   //     });
 
-  //     debugPrint('✅ Booking notification created for provider');
+  //     
   //   } catch (e) {
-  //     debugPrint('❌ Error creating booking notification: $e');
+  //     // Handle errors
   //   }
   // }
 
@@ -733,9 +621,9 @@ class NotificationService {
         'createdAt': FieldValue.serverTimestamp(),
       });
 
-      debugPrint('✅ Status change notification created for customer');
+      
     } catch (e) {
-      debugPrint('❌ Error creating status notification: $e');
+      //Handle errors
     }
   }
 
@@ -747,13 +635,11 @@ class NotificationService {
     required double paymentAmount,
   }) async {
     try {
-      debugPrint('💰 [PAYMENT] Notifying provider of payment: $providerId');
 
       // Get provider FCM token
       String? fcmToken = await _getProviderFCMToken(providerId);
 
       if (fcmToken == null || fcmToken.isEmpty) {
-        debugPrint('❌ [PAYMENT] No FCM token available for provider');
         return;
       }
 
@@ -791,10 +677,10 @@ class NotificationService {
           );
 
       if (httpSuccess) {
-        debugPrint('✅ [PAYMENT] Payment notification sent successfully');
+        // Notification sent successfully
       }
     } catch (e) {
-      debugPrint('❌ [PAYMENT] Error notifying provider of payment: $e');
+      // Handle errors
     }
   }
 
@@ -837,7 +723,6 @@ class NotificationService {
 
       return fcmToken;
     } catch (e) {
-      debugPrint('❌ Error getting provider FCM token: $e');
       return null;
     }
   }
@@ -855,18 +740,15 @@ class NotificationService {
       // 3. Save preference locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notifications_enabled', false);
-
-      print('✅ Notifications completely disabled');
     } catch (e) {
-      print('❌ Error disabling notifications: $e');
+      // Handle errors
     }
   }
 
   static Future<void> enableNotifications() async {
     try {
       // 1. Generate new FCM token
-      final token = await _messaging.getToken();
-      print('🔑 New FCM token: $token');
+      await _messaging.getToken();
 
       // 2. Re-subscribe to topics
       await _messaging.subscribeToTopic('customers');
@@ -875,9 +757,8 @@ class NotificationService {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notifications_enabled', true);
 
-      print('✅ Notifications enabled');
     } catch (e) {
-      print('❌ Error enabling notifications: $e');
+      // Handle errors
     }
   }
 

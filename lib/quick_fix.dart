@@ -1,3 +1,5 @@
+// ignore_for_file: file_names, use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -54,8 +56,8 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
       if (user != null) {
         await _setupUserNotifications(user);
 
-        final prefs = await SharedPreferences.getInstance();
-        await prefs.setBool('hasSeenOnboarding', true);
+        // final prefs = await SharedPreferences.getInstance();
+        // await prefs.setBool('hasSeenOnboarding', true);
 
         // Ensure current session hides onboarding instantly
         if (mounted && _showOnboarding == true) {
@@ -92,9 +94,9 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
 
   void _setupForegroundMessageListener() {
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      debugPrint(
-        '📱 Foreground message received: ${message.notification?.title}',
-      );
+      // debugPrint(
+      //   '📱 Foreground message received: ${message.notification?.title}',
+      // );
 
       if (message.notification != null && mounted) {
         _showForegroundNotification(message);
@@ -102,7 +104,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
     });
 
     FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      debugPrint('📱 App opened from notification: ${message.data}');
+      //debugPrint('📱 App opened from notification: ${message.data}');
       _handleNotificationTap(message);
     });
   }
@@ -112,7 +114,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
       RemoteMessage? message,
     ) {
       if (message != null) {
-        debugPrint('📱 App opened from terminated state: ${message.data}');
+        //debugPrint('📱 App opened from terminated state: ${message.data}');
         _handleNotificationTap(message);
       }
     });
@@ -129,15 +131,15 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
 
       if (userType == 'customer') {
         await FirebaseMessaging.instance.subscribeToTopic('customer_updates');
-        debugPrint('✅ Customer notification setup complete');
+        //debugPrint('✅ Customer notification setup complete');
       } else if (userType == 'provider') {
         await FirebaseMessaging.instance.subscribeToTopic('provider_updates');
         debugPrint('✅ Provider notification setup complete');
       }
 
-      debugPrint('✅ User notifications configured for: $userType');
+      //debugPrint('✅ User notifications configured for: $userType');
     } catch (e) {
-      debugPrint('❌ Error setting up user notifications: $e');
+      //debugPrint('❌ Error setting up user notifications: $e');
     }
   }
 
@@ -168,7 +170,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
   }
 
   void _handleNotificationTap(RemoteMessage message) {
-    debugPrint('📱 Handling notification tap: ${message.data}');
+    //debugPrint('📱 Handling notification tap: ${message.data}');
 
     if (message.data.containsKey('screen')) {
       final screen = message.data['screen'];
@@ -181,7 +183,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
     super.didChangeAppLifecycleState(state);
 
     if (state == AppLifecycleState.resumed) {
-      debugPrint('📱 App resumed');
+      //debugPrint('📱 App resumed');
     }
   }
 

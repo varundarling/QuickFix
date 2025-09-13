@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:go_router/go_router.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
@@ -98,15 +97,15 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 // Only update if the value is different to prevent unnecessary updates
                 if (_nameController.text != user.name) {
                   _nameController.text = user.name;
-                  debugPrint('Updated name controller: ${user.name}');
+                  //debugPrint('Updated name controller: ${user.name}');
                 }
                 if (_phoneController.text != user.phone) {
                   _phoneController.text = user.phone;
-                  debugPrint('Updated phone controller: ${user.phone}');
+                  //debugPrint('Updated phone controller: ${user.phone}');
                 }
                 if (_addressController.text != (user.address ?? '')) {
                   _addressController.text = user.address ?? '';
-                  debugPrint('Updated address controller: ${user.address}');
+                  //debugPrint('Updated address controller: ${user.address}');
                 }
               }
             });
@@ -186,7 +185,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildStatisticsSection() {
     return Consumer<BookingProvider>(
       builder: (context, bookingProvider, child) {
-        final bookings = bookingProvider.userBookings ?? [];
+        final bookings = bookingProvider.userBookings;
 
         // ✅ Add loading state
         if (bookingProvider.isLoading) {
@@ -234,12 +233,11 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .where(
               (b) =>
                   (b.status == BookingStatus.completed ||
-                      b.status == BookingStatus.paid) &&
-                  b.totalAmount != null,
+                      b.status == BookingStatus.paid),
             )
             .fold<double>(
               0.0,
-              (sum, booking) => sum + (booking.totalAmount ?? 0.0),
+              (sum, booking) => sum + (booking.totalAmount),
             );
 
         // ✅ Calculate active bookings (pending + confirmed + in progress)

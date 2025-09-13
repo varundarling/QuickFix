@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_final_fields, use_build_context_synchronously
+
 import 'dart:async';
 import 'dart:convert';
 
@@ -13,6 +15,8 @@ import 'package:quickfix/core/services/firebase_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/data/models/user_model.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+enum GoogleAuthFlow { login, signup }
 
 class AuthProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
@@ -67,9 +71,9 @@ class AuthProvider extends ChangeNotifier {
   //           '638985318949-42ehidfh5rsdoapvmnd4rsvt6v86bjlo.apps.googleusercontent.com',
   //     );
   //     _isGoogleInitialized = true;
-  //     debugPrint('✅ Google Sign-In initialized successfully');
+  //     // ✅ CRITICAL: Request necessary permissions
   //   } catch (e) {
-  //     debugPrint('❌ Error initializing Google Sign-In: $e');
+  //     // Log but don’t block UI
   //     throw e;
   //   }
   // }
@@ -81,7 +85,7 @@ class AuthProvider extends ChangeNotifier {
   //     _setGoogleSignInLoading(true);
   //     _clearError();
 
-  //     debugPrint('🔄 Starting Google ${isSignUp ? "Sign-Up" : "Login"}...');
+  //     // 🔄 Starting Google Sign-In...
 
   //     await _ensureGoogleInitialized();
 
@@ -96,20 +100,18 @@ class AuthProvider extends ChangeNotifier {
   //     }
 
   //     if (googleUser == null) {
-  //       debugPrint(
-  //         '❌ Google ${isSignUp ? "Sign-Up" : "Login"} cancelled by user',
-  //       );
+  //       // User cancelled the sign-in
   //       return false;
   //     }
 
-  //     debugPrint('✅ Google user obtained: ${googleUser.email}');
+  //     // ✅ CRITICAL: Successfully obtained Google user
 
   //     // ✅ CRITICAL: Check if user exists in YOUR database
   //     final userExists = await _checkUserExistsInDatabase(googleUser.email!);
 
   //     // ✅ VALIDATION: Sign Up flow - user should NOT exist
   //     if (isSignUp && userExists) {
-  //       debugPrint('❌ User already exists: ${googleUser.email}');
+  //       // User already exists - cannot sign up again
   //       _setError('Account already exists. Please login instead.');
   //       await _googleSignIn.signOut();
   //       return false;
@@ -117,7 +119,7 @@ class AuthProvider extends ChangeNotifier {
 
   //     // ✅ VALIDATION: Login flow - user MUST exist
   //     if (!isSignUp && !userExists) {
-  //       debugPrint('❌ User not found: ${googleUser.email}');
+  //       // User does not exist - cannot log in
   //       _setError('Account not found. Please Sign Up.');
   //       await _googleSignIn.signOut();
   //       return false;
@@ -128,12 +130,11 @@ class AuthProvider extends ChangeNotifier {
   //         await googleUser.authentication;
 
   //     if (googleAuth.idToken == null) {
-  //       debugPrint('❌ Failed to get Google ID token');
+  //       // Failed to get ID token
   //       return false;
   //     }
 
-  //     debugPrint('✅ Google tokens obtained successfully');
-
+  //     // ✅ CRITICAL: Authenticate with Firebase using Google credentials
   //     final credential = GoogleAuthProvider.credential(
   //       idToken: googleAuth.idToken,
   //     );
@@ -148,11 +149,11 @@ class AuthProvider extends ChangeNotifier {
   //       if (isSignUp) {
   //         // New user setup
   //         await _handleFirstTimeGoogleUser(userCredential.user!, googleUser);
-  //         debugPrint('✅ Google Sign-Up successful for new user');
+  //         // Mark onboarding as seen
   //       } else {
   //         // Existing user setup
   //         await _handleExistingGoogleUser(userCredential.user!);
-  //         debugPrint('✅ Google Login successful for existing user');
+  //         // Load user profile
   //       }
 
   //       await _loadUserModel();
@@ -162,7 +163,7 @@ class AuthProvider extends ChangeNotifier {
 
   //     return false;
   //   } catch (e) {
-  //     debugPrint('❌ Google ${isSignUp ? "Sign-Up" : "Login"} error: $e');
+  //     // Log error
   //     _setError(
   //       'Google ${isSignUp ? "Sign-Up" : "Login"} failed: ${e.toString()}',
   //     );
@@ -175,7 +176,7 @@ class AuthProvider extends ChangeNotifier {
   // ✅ Helper method: Check if user exists in your database
   // Future<bool> _checkUserExistsInDatabase(String email) async {
   //   try {
-  //     debugPrint('🔍 Checking if user exists in database: $email');
+  //     // 🔍 Checking if user exists in database...
 
   //     // Method 1: Check in Firebase Realtime Database by email
   //     final query = await FirebaseDatabase.instance
@@ -185,10 +186,10 @@ class AuthProvider extends ChangeNotifier {
   //         .once();
 
   //     final exists = query.snapshot.exists;
-  //     debugPrint('📊 User exists in database: $exists');
+  //     // Log result
   //     return exists;
   //   } catch (e) {
-  //     debugPrint('❌ Error checking user existence: $e');
+  //     // Log error
   //     // In case of error, assume user doesn't exist to be safe
   //     return false;
   //   }
@@ -200,7 +201,7 @@ class AuthProvider extends ChangeNotifier {
       _setGoogleSignInLoading(true);
       _clearError();
 
-      debugPrint('🔄 Starting alternative Google Sign-In...');
+      // 🔄 Starting Alternative Google Sign-In...
 
       final GoogleAuthProvider googleProvider = GoogleAuthProvider();
       googleProvider.addScope('email');
@@ -220,13 +221,13 @@ class AuthProvider extends ChangeNotifier {
 
         await _loadUserModel();
         await _setupNotifications();
-        debugPrint('✅ Alternative Google Sign-In successful');
+        // SignIn successful
         return true;
       }
 
       return false;
     } catch (e) {
-      debugPrint('❌ Alternative Google Sign-In error: $e');
+      // SignIn failed
       _setError('Google Sign-In failed: ${e.toString()}');
       return false;
     } finally {
@@ -288,7 +289,7 @@ class AuthProvider extends ChangeNotifier {
   //   GoogleSignInAccount googleUser,
   // ) async {
   //   try {
-  //     debugPrint('🆕 Setting up first-time Google user');
+  //     // 🔄 Setting up first-time Google user
 
   //     final generatedPassword = _generatePasswordFromGoogleData(user);
   //     await EncryptionService.initializeUserEncryption(
@@ -321,16 +322,16 @@ class AuthProvider extends ChangeNotifier {
   //     });
 
   //     await _saveUserType('customer');
-  //     debugPrint('✅ First-time Google user setup completed');
+  //     //✅ First-time Google user setup completed
   //   } catch (e) {
-  //     debugPrint('❌ Error setting up first-time Google user: $e');
+  //     // ❌ Error setting up first-time Google user
   //     throw e;
   //   }
   // }
 
   Future<void> _handleExistingGoogleUser(User user) async {
     try {
-      debugPrint('🔄 Handling existing Google user');
+      // 🔄 Handling existing Google user
 
       final hasEncryption = await EncryptionService.hasEncryptionSetup(
         user.uid,
@@ -342,14 +343,14 @@ class AuthProvider extends ChangeNotifier {
           generatedPassword,
           user.uid,
         );
-        debugPrint('✅ Restored encryption for existing Google user');
+        //✅ Restored encryption for existing Google user;
       } else {
         await EncryptionService.getMasterKey(user.uid);
-        debugPrint('✅ Restored encryption session for existing Google user');
+        //✅ Restored encryption session for existing Google user
       }
     } catch (e) {
-      debugPrint('❌ Error handling existing Google user: $e');
-      throw e;
+      //❌ Error handling existing Google user
+      rethrow;
     }
   }
 
@@ -375,17 +376,17 @@ class AuthProvider extends ChangeNotifier {
       _userModel = null;
       _clearError();
 
-      debugPrint('👋 User signed out and user type cleared');
+      //👋 User signed out and user type cleared
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Sign out error: $e');
+      //❌ Sign out error
       _setError(_getErrorMessage(e));
     }
   }
 
   String? getCurrentUserId() {
     final userId = _user?.uid;
-    debugPrint('🔍 Getting current user ID: $userId');
+    //🔍 Getting current user ID: $userId
     return userId;
   }
 
@@ -403,14 +404,14 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = 'user_type_${_user!.uid}';
     await prefs.setString(key, userType);
-    debugPrint('✅ Saved user type: $userType');
+    //✅ Saved user type: $userType
   }
 
   Future<String?> _getSavedUserType() async {
     final prefs = await SharedPreferences.getInstance();
     final key = 'user_type_${_user!.uid}';
     final userType = prefs.getString(key);
-    debugPrint('📱 Loaded saved user type: $userType');
+    //📱 Loaded saved user type: $userType
     return userType;
   }
 
@@ -418,7 +419,7 @@ class AuthProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     final key = 'user_type_${_user!.uid}';
     await prefs.remove(key);
-    debugPrint('🗑️ Cleared saved user type');
+    //🗑️ Cleared saved user type
   }
 
   Future<void> _setupNotifications() async {
@@ -435,26 +436,26 @@ class AuthProvider extends ChangeNotifier {
       if (userType == 'provider') {
         await NotificationService.instance.subscribeTo('providers');
         await NotificationService.instance.unsubscribeFrom('customers');
-        debugPrint('✅ Provider subscribed to provider notifications');
+        //✅ Provider subscribed to provider notifications
       } else {
         await NotificationService.instance.subscribeTo('customers');
         await NotificationService.instance.unsubscribeFrom('providers');
-        debugPrint('✅ Customer subscribed to customer notifications');
+        //✅ Customer subscribed to customer notifications
       }
 
-      debugPrint('✅ Notifications setup completed for $userType');
+      //✅ Notifications setup completed for $userType
     } catch (e) {
-      debugPrint('❌ Error setting up notifications: $e');
+      //❌ Error setting up notifications
     }
   }
 
   AuthProvider() {
     _firebaseService.auth.authStateChanges().listen((User? user) async {
-      debugPrint('🔄 Auth state changed: ${user?.uid}');
+      //🔄 Auth state changed: ${user?.uid}
       _user = user;
 
       if (user != null) {
-        debugPrint('✅ User authenticated: ${user.email}');
+        //✅ User authenticated: ${user.email}
 
         // ✅ CRITICAL: Ensure proper initialization sequence
         await _initializeUserSession(user);
@@ -462,7 +463,7 @@ class AuthProvider extends ChangeNotifier {
         _stopUserProfileListener();
         _userModel = null;
         _isInitialized = true; // ✅ Mark as initialized even when logged out
-        debugPrint('❌ User logged out');
+        //❌ User logged out
       }
       notifyListeners();
     });
@@ -470,7 +471,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _initializeUserSession(User user) async {
     try {
-      debugPrint('🔄 Initializing user session for: ${user.uid}');
+      //🔄 Initializing user session for: ${user.uid}
 
       // ✅ STEP 1: Restore encryption session first
       await _restoreEncryptionSession(user);
@@ -485,9 +486,9 @@ class AuthProvider extends ChangeNotifier {
       await _setupNotifications();
 
       _isInitialized = true;
-      debugPrint('✅ User session initialized successfully');
+      //✅ User session initialized successfully
     } catch (e) {
-      debugPrint('❌ Error initializing user session: $e');
+      //❌ Error initializing user session: $e
       _isInitialized = true; // Mark as initialized to prevent infinite loading
     }
   }
@@ -500,13 +501,13 @@ class AuthProvider extends ChangeNotifier {
     try {
       // First, ensure encryption session is ready
       if (!EncryptionService.isSessionReady(userUID)) {
-        debugPrint('🔐 Session not ready, attempting to restore...');
+        // 🔐 Session not ready, attempting to restore...
         final restored = await EncryptionService.restoreEncryptionSession(
           userUID,
         );
 
         if (!restored) {
-          debugPrint('❌ Failed to restore encryption session');
+          // ❌ Failed to restore encryption session
           await _handleEncryptionFailure(context);
           return null;
         }
@@ -514,8 +515,7 @@ class AuthProvider extends ChangeNotifier {
 
       return await EncryptionService.decryptUserData(encryptedData, userUID);
     } catch (e) {
-      debugPrint('❌ Decryption failed: $e');
-
+      // ❌ Decryption failed: $e
       if (e.toString().contains('No decryption key')) {
         await _handleEncryptionFailure(context);
         return null;
@@ -525,23 +525,23 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleEncryptionFailure(BuildContext? context) async {
-    debugPrint('🔑 Handling encryption failure...');
+    // 🔑 Handling encryption failure...
 
     try {
       // For Google users, try to regenerate encryption
       if (_user?.providerData.any((info) => info.providerId == 'google.com') ==
           true) {
-        debugPrint('🔄 Attempting to regenerate Google user encryption...');
+        //🔄 Attempting to regenerate Google user encryption...
         final generatedPassword = _generatePasswordFromGoogleData(_user!);
         await EncryptionService.initializeUserEncryption(
           generatedPassword,
           _user!.uid,
         );
-        debugPrint('✅ Google user encryption regenerated');
+        //✅ Google user encryption regenerated
         return;
       }
     } catch (e) {
-      debugPrint('❌ Failed to regenerate encryption: $e');
+      //❌ Failed to regenerate encryption: $e
     }
 
     // Show user-friendly error and prompt re-authentication
@@ -587,7 +587,7 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _restoreEncryptionSession(User user) async {
     try {
-      debugPrint('🔐 Restoring encryption session for: ${user.uid}');
+      // 1) Check if session is already ready
 
       // Check if encryption is already set up
       final hasEncryption = await EncryptionService.hasEncryptionSetup(
@@ -598,38 +598,37 @@ class AuthProvider extends ChangeNotifier {
         // Try to restore from device storage
         final masterKey = await EncryptionService.getMasterKey(user.uid);
         if (masterKey != null) {
-          debugPrint('✅ Encryption session restored from device storage');
+          // Successfully restored session
           return;
         }
       }
 
       // ✅ For Google users, regenerate the password-based encryption
       if (user.providerData.any((info) => info.providerId == 'google.com')) {
-        debugPrint('🔄 Regenerating encryption for Google user');
+        // Regenerate encryption key
         final generatedPassword = _generatePasswordFromGoogleData(user);
         await EncryptionService.initializeUserEncryption(
           generatedPassword,
           user.uid,
         );
-        debugPrint('✅ Google user encryption restored');
+        // Successfully regenerated
       } else {
         // ✅ For email users, we need them to re-enter password if session is lost
-        debugPrint(
-          '⚠️ Email user encryption session lost - may need re-authentication',
-        );
+        // This is a security measure
+        throw Exception('Please Re-Login.');
       }
     } catch (e) {
-      debugPrint('❌ Error restoring encryption: $e');
+      // Log but don’t block UI
       // Don't throw - let the app continue and handle missing profile gracefully
     }
   }
 
   Future<void> _loadUserModelWithRetry({int maxRetries = 3}) async {
-    debugPrint('🔄 Loading user profile with retry logic...');
+    // Attempt to load user model with retries
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        debugPrint('🔄 Profile load attempt $attempt/$maxRetries');
+        // Log each attempt
 
         final doc = await _firebaseService.getUserData(_user!.uid);
         if (doc.exists) {
@@ -637,36 +636,34 @@ class AuthProvider extends ChangeNotifier {
           await _handleUserDataUpdate(Map<String, dynamic>.from(data));
 
           if (_userModel != null) {
-            debugPrint(
-              '✅ User profile loaded successfully on attempt $attempt',
-            );
+            // Successfully loaded user model
             return;
           }
         } else {
-          debugPrint('⚠️ No user data found in database');
+          // No user data found
           break; // Don't retry if no data exists
         }
       } catch (e) {
-        debugPrint('❌ Profile load attempt $attempt failed: $e');
+        // Log the error but continue to retry
 
         if (attempt < maxRetries) {
           // Wait before retrying, with exponential backoff
           final delay = Duration(milliseconds: 500 * attempt);
-          debugPrint('⏳ Waiting ${delay.inMilliseconds}ms before retry...');
+          // Log the delay
           await Future.delayed(delay);
         }
       }
     }
 
-    debugPrint('❌ All profile load attempts failed');
+    // If we reach here, all attempts failed
   }
 
   Future<bool> ensureUserAuthenticated() async {
-    debugPrint('🔍 Checking user authentication status...');
+    // If already authenticated and profile loaded, return true
 
     // Wait for initialization to complete
     if (!_isInitialized) {
-      debugPrint('⏳ Waiting for initialization to complete...');
+      // Wait max 10 seconds
       int waitCount = 0;
       while (!_isInitialized && waitCount < 20) {
         // Max 10 seconds
@@ -676,30 +673,26 @@ class AuthProvider extends ChangeNotifier {
     }
 
     if (_user == null) {
-      debugPrint('❌ User not authenticated');
+      // Not logged in
       return false;
     }
 
     if (_userModel == null) {
-      debugPrint(
-        '⚠️ User authenticated but profile not loaded, attempting to load...',
-      );
+      // Try loading user model if not already loaded
       await _loadUserModelWithRetry();
     }
 
     final isAuth = _user != null && _userModel != null;
-    debugPrint(
-      '✅ User authentication status: $isAuth (Profile: ${_userModel?.name})',
-    );
+    // Log final status
     return isAuth;
   }
 
   Future<String> getUserType() async {
-    debugPrint('🔍 Getting user type for user: ${_user?.uid}');
+    // Ensure user is authenticated first
 
     // Wait for initialization if not complete
     if (!_isInitialized && _user != null) {
-      debugPrint('⏳ Waiting for user initialization...');
+      // Wait max 10 seconds
       int waitCount = 0;
       while (!_isInitialized && waitCount < 20) {
         await Future.delayed(const Duration(milliseconds: 500));
@@ -709,7 +702,7 @@ class AuthProvider extends ChangeNotifier {
 
     // Try to get from loaded user model first
     if (_userModel?.userType != null) {
-      debugPrint('🔥 Got user type from loaded model: ${_userModel!.userType}');
+      // Save to cache
       await _saveUserType(_userModel!.userType);
       return _userModel!.userType;
     }
@@ -719,23 +712,23 @@ class AuthProvider extends ChangeNotifier {
       try {
         await _loadUserModelWithRetry(maxRetries: 2);
         if (_userModel?.userType != null) {
-          debugPrint('🔥 Got fresh user type: ${_userModel!.userType}');
+          // Save to cache
           await _saveUserType(_userModel!.userType);
           return _userModel!.userType;
         }
       } catch (e) {
-        debugPrint('❌ Failed to load from database: $e');
+        // Log but don’t block UI
       }
     }
 
     // Fallback to cached user type
     final savedUserType = await _getSavedUserType();
     if (savedUserType != null) {
-      debugPrint('💾 Using cached user type: $savedUserType');
+      // Use cached value
       return savedUserType;
     }
 
-    debugPrint('⚠️ Defaulting to customer');
+    // Default fallback
     return 'customer';
   }
 
@@ -743,7 +736,7 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return;
 
     await _userStreamSubscription?.cancel();
-    debugPrint('🔄 Starting Realtime DB listener for: ${_user!.uid}');
+    // Starting Realtime DB listener for: ${_user!.uid}
 
     _userStreamSubscription = FirebaseDatabase.instance
         .ref('users')
@@ -751,24 +744,24 @@ class AuthProvider extends ChangeNotifier {
         .onValue
         .listen(
           (DatabaseEvent event) {
-            debugPrint('🔄 Realtime update received from Firebase');
+            // Real-time update received
             final DataSnapshot snapshot = event.snapshot;
 
             if (snapshot.exists && snapshot.value != null) {
               try {
                 final data = Map<String, dynamic>.from(snapshot.value as Map);
-                debugPrint('📡 Raw Firebase data: $data');
+                // Handle the update
 
                 _handleUserDataUpdate(data);
               } catch (e) {
-                debugPrint('❌ Error parsing user data: $e');
+                // Log but don’t block UI
               }
             } else {
-              debugPrint('⚠️ No user data found in Realtime DB');
+              // No data exists
             }
           },
           onError: (error) {
-            debugPrint('❌ Realtime listener error: $error');
+            // Log but don’t block UI
           },
         );
   }
@@ -793,26 +786,24 @@ class AuthProvider extends ChangeNotifier {
           }
 
           _userModel = UserModel.fromRealtimeDatabase(combinedData);
-          debugPrint(
-            '✅ Encrypted user model updated: Name="${_userModel?.name}"',
-          );
+          // Full profile available
         } else {
           // Fall back to public info only if decryption fails
           if (publicInfo != null) {
             _userModel = UserModel.fromRealtimeDatabase(
               Map<String, dynamic>.from(publicInfo),
             );
-            debugPrint('⚠️ Using public info only due to decryption failure');
+            // Indicate limited profile
           }
         }
       } else {
         _userModel = UserModel.fromRealtimeDatabase(data);
-        debugPrint('✅ User model updated: Name="${_userModel?.name}"');
+        // No encryption present, use public info only
       }
 
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Error handling user data update: $e');
+      // Log but don’t block UI
       _setError('Failed to load user profile. Please try again.');
     }
   }
@@ -820,7 +811,7 @@ class AuthProvider extends ChangeNotifier {
   void _stopUserProfileListener() {
     _userStreamSubscription?.cancel();
     _userStreamSubscription = null;
-    debugPrint('🛑 Stopped Realtime DB listener');
+    // Stop notifications as well
   }
 
   Future<void> _loadUserModel() async {
@@ -834,7 +825,7 @@ class AuthProvider extends ChangeNotifier {
         await _setupNotifications();
       }
     } catch (e) {
-      debugPrint('❌ Error loading user model: $e');
+      // Log but don’t block UI
     }
   }
 
@@ -845,12 +836,12 @@ class AuthProvider extends ChangeNotifier {
 
       if (result.user != null) {
         await requestNotificationPermissionAfterLogin();
-        debugPrint('✅ User signed in successfully');
+        // Restore encryption session
         notifyListeners();
         return true;
       }
     } catch (e) {
-      debugPrint('❌ Sign in error: $e');
+      // Log but don’t block UI
     }
     return false;
   }
@@ -939,9 +930,25 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> signUpWithGoogle() => continueWithGoogle();
+  Future<bool> _userRecordExistsByEmail(String? email) async {
+    if (email == null || email.isEmpty) return false;
+    try {
+      final q = await FirebaseFirestore.instance
+          .collection('users')
+          .where('email', isEqualTo: email)
+          .limit(1)
+          .get();
+      return q.docs.isNotEmpty;
+    } catch (_) {
+      return false;
+    }
+  }
 
-  Future<bool> loginWithGoogle() => continueWithGoogle();
+  Future<bool> loginWithGoogleStrict() =>
+      continueWithGoogleStrict(flow: GoogleAuthFlow.login);
+
+  Future<bool> signUpWithGoogleStrict() =>
+      continueWithGoogleStrict(flow: GoogleAuthFlow.signup);
 
   Future<void> postAuthBootstrap() async {
     try {
@@ -963,12 +970,12 @@ class AuthProvider extends ChangeNotifier {
       _isInitialized = true;
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ postAuthBootstrap failed: $e');
+      // Log but don’t block UI
       _isInitialized = true; // don’t block UI on errors
     }
   }
 
-  Future<bool> continueWithGoogle() async {
+  Future<bool> continueWithGoogleStrict({required GoogleAuthFlow flow}) async {
     _setGoogleSignInLoading(true);
     _clearError();
     try {
@@ -976,6 +983,7 @@ class AuthProvider extends ChangeNotifier {
         ..addScope('email')
         ..addScope('profile');
 
+      // Signs in or creates the Firebase Auth user for Google provider
       final UserCredential cred = await FirebaseAuth.instance
           .signInWithProvider(googleProvider);
 
@@ -985,14 +993,46 @@ class AuthProvider extends ChangeNotifier {
         return false;
       }
 
-      // First-time vs returning — keep your existing handlers
+      final email = user.email;
+      final existsInDb = await _userRecordExistsByEmail(email);
+
+      // Guard 1: Login path requires an existing DB record
+      if (flow == GoogleAuthFlow.login && !existsInDb) {
+        _setError('Account not found. Please sign up first.');
+        // Cleanup the just-created auth account to avoid orphans
+        try {
+          await user.delete();
+        } catch (_) {}
+        await FirebaseAuth.instance.signOut();
+        return false;
+      }
+
+      // Guard 2: Signup path must not already exist in DB
+      if (flow == GoogleAuthFlow.signup && existsInDb) {
+        _setError('Account already exists. Please login first.');
+        // If Firebase just created the auth user for this attempt, delete it
+        if (cred.additionalUserInfo?.isNewUser ?? false) {
+          try {
+            await user.delete();
+          } catch (_) {}
+        }
+        await FirebaseAuth.instance.signOut();
+        return false;
+      }
+
+      // Proceed normally based on whether this Google auth is new or returning
       if (cred.additionalUserInfo?.isNewUser ?? false) {
-        await _handleFirstTimeFirebaseGoogleUser(user);
+        // First-time Google auth → run "new user" bootstrap only for signup flow
+        // If flow was login but DB had a record (edge case), fall back to existing handler
+        if (flow == GoogleAuthFlow.signup) {
+          await _handleFirstTimeFirebaseGoogleUser(user);
+        } else {
+          await _handleExistingGoogleUser(user);
+        }
       } else {
         await _handleExistingGoogleUser(user);
       }
 
-      // Shared after-auth work for identical UX
       await postAuthBootstrap();
       return true;
     } catch (e) {
@@ -1030,10 +1070,10 @@ class AuthProvider extends ChangeNotifier {
     String? experience,
     Map<String, dynamic>? profileData,
   }) async {
-    debugPrint('🔄 Starting profile update...');
+    // profileData can include any additional fields to update
 
     if (_user == null) {
-      debugPrint('❌ User not authenticated');
+      // User must be authenticated
       _setError('User not authenticated');
       return false;
     }
@@ -1074,8 +1114,8 @@ class AuthProvider extends ChangeNotifier {
         });
       }
 
-      debugPrint('📝 Sensitive update data: $sensitiveUpdateData');
-      debugPrint('📝 Public update data: $publicUpdateData');
+      // Save sensitive data encrypted in RTDB
+      // Public data to update
 
       if (sensitiveUpdateData.isNotEmpty) {
         final snapshot = await FirebaseDatabase.instance
@@ -1090,7 +1130,7 @@ class AuthProvider extends ChangeNotifier {
               _user!.uid,
             );
           } catch (e) {
-            debugPrint('❌ Failed to decrypt existing data: $e');
+            // If decryption fails, log but continue with empty existing data
           }
         }
 
@@ -1114,10 +1154,10 @@ class AuthProvider extends ChangeNotifier {
             .update(publicUpdateData);
       }
 
-      debugPrint('✅ Profile update completed successfully');
+      // Refresh local user model
       return true;
     } catch (e) {
-      debugPrint('❌ Profile update failed: $e');
+      // Log and set error state
       _setError('Failed to update profile: ${e.toString()}');
       return false;
     } finally {
@@ -1165,7 +1205,7 @@ class AuthProvider extends ChangeNotifier {
     if (_user == null) return;
 
     try {
-      debugPrint('🔄 Manually reloading user data...');
+      // Manually reloading user data...
 
       final snapshot = await FirebaseDatabase.instance
           .ref('users')
@@ -1175,12 +1215,12 @@ class AuthProvider extends ChangeNotifier {
       if (snapshot.exists && snapshot.value != null) {
         final data = Map<String, dynamic>.from(snapshot.value as Map);
         await _handleUserDataUpdate(data);
-        debugPrint('✅ Manual reload successful');
+        // Data reloaded successfully
       } else {
-        debugPrint('⚠️ No data found during manual reload');
+        // No data found during manual reload
       }
     } catch (e) {
-      debugPrint('❌ Manual reload failed: $e');
+      // Log but don’t throw
     }
   }
 
@@ -1190,26 +1230,26 @@ class AuthProvider extends ChangeNotifier {
       PermissionStatus status = await Permission.notification.status;
 
       if (status.isGranted) {
-        debugPrint('✅ Notification permission already granted');
+        // Permission already granted
         await _initializeFCMToken();
         return;
       }
 
       if (status.isDenied) {
-        debugPrint('🔔 Requesting notification permission...');
+        // Request permission
         PermissionStatus newStatus = await Permission.notification.request();
 
         if (newStatus.isGranted) {
-          debugPrint('✅ Notification permission granted');
+          // Permission granted
           await _initializeFCMToken();
         } else {
-          debugPrint('❌ Notification permission denied');
+          // User denied permission
         }
       } else if (status.isPermanentlyDenied) {
-        debugPrint('❌ Notification permission permanently denied');
+        // Cannot request permission directly
       }
     } catch (e) {
-      debugPrint('❌ Error requesting notification permission: $e');
+      // Log but don’t throw
     }
   }
 
@@ -1219,12 +1259,9 @@ class AuthProvider extends ChangeNotifier {
 
       if (fcmToken != null) {
         await _saveFCMTokenToFirestore(fcmToken);
-        debugPrint('✅ FCM token initialized and saved');
-      } else {
-        debugPrint('❌ Failed to get FCM token');
       }
     } catch (e) {
-      debugPrint('❌ Error initializing FCM token: $e');
+      // Log but don’t throw
     }
   }
 
@@ -1232,9 +1269,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       User? currentUser = FirebaseAuth.instance.currentUser;
       if (currentUser != null) {
-        debugPrint(
-          '💾 [AUTH] Saving FCM token: ${fcmToken.substring(0, 20)}...',
-        );
+        // Save token to both 'users' and 'providers' collections if applicable
 
         final batch = FirebaseFirestore.instance.batch();
 
@@ -1260,10 +1295,10 @@ class AuthProvider extends ChangeNotifier {
         }
 
         await batch.commit();
-        debugPrint('✅ [AUTH] FCM token saved to Firestore successfully');
+        // FCM Token saved successfully
       }
     } catch (e) {
-      debugPrint('❌ [AUTH] Error saving FCM token: $e');
+      // Log but don’t throw
     }
   }
 
@@ -1322,23 +1357,18 @@ class AuthProvider extends ChangeNotifier {
   Future<void> debugUserData() async {
     final currentUser = FirebaseAuth.instance.currentUser;
     if (currentUser == null) {
-      debugPrint('❌ No authenticated user');
       return;
     }
 
     try {
-      debugPrint('=== DATABASE DEBUG ===');
-      debugPrint('User ID: ${currentUser.uid}');
-      debugPrint('Email: ${currentUser.email}');
-
       final rtdbSnapshot = await FirebaseDatabase.instance
           .ref('users')
           .child(currentUser.uid)
           .get();
 
-      debugPrint('Realtime DB exists: ${rtdbSnapshot.exists}');
+      // Check if Realtime DB record exists
       if (rtdbSnapshot.exists) {
-        debugPrint('Realtime DB data: ${rtdbSnapshot.value}');
+        // Limit output size for readability
       }
 
       try {
@@ -1346,59 +1376,40 @@ class AuthProvider extends ChangeNotifier {
             .collection('users')
             .doc(currentUser.uid)
             .get();
-        debugPrint('Firestore doc exists: ${firestoreDoc.exists}');
+        // Check if Firestore document exists
         if (firestoreDoc.exists) {
-          debugPrint('Firestore data: ${firestoreDoc.data()}');
+          // Limit output size for readability
         }
       } catch (e) {
-        debugPrint('Firestore check failed (normal if not using it): $e');
+        // Handle Firestore access errors
       }
-
-      debugPrint('====================');
     } catch (e) {
-      debugPrint('❌ Debug failed: $e');
+      // Handle any errors that occur during the fetch
     }
   }
 
   Future<void> updateUserToken(String userId) async {
-    try {
-      final token = await NotificationService.instance.getToken();
-      if (token != null) {
-        await FirebaseFirestore.instance.collection('users').doc(userId).set({
-          'fcmToken': token,
-          'lastTokenUpdate': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        debugPrint('✅ Updated FCM token for user: $userId');
-      }
-    } catch (e) {
-      debugPrint('❌ Error updating user token: $e');
+    final token = await NotificationService.instance.getToken();
+    if (token != null) {
+      await FirebaseFirestore.instance.collection('users').doc(userId).set({
+        'fcmToken': token,
+        'lastTokenUpdate': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
     }
   }
 
   Future<void> subscribeTo(String topic) async {
-    try {
-      await NotificationService.instance.subscribeTo(topic);
-      debugPrint('✅ Subscribed to topic: $topic');
-    } catch (e) {
-      debugPrint('❌ Error subscribing to topic $topic: $e');
-    }
+    await NotificationService.instance.subscribeTo(topic);
   }
 
   Future<void> unsubscribeFrom(String topic) async {
-    try {
-      await NotificationService.instance.unsubscribeFrom(topic);
-      debugPrint('✅ Unsubscribed from topic: $topic');
-    } catch (e) {
-      debugPrint('❌ Error unsubscribing from topic $topic: $e');
-    }
+    await NotificationService.instance.unsubscribeFrom(topic);
   }
 
   Future<String?> getToken() async {
     try {
       return await NotificationService.instance.getToken();
     } catch (e) {
-      debugPrint('❌ Error getting FCM token: $e');
       return null;
     }
   }

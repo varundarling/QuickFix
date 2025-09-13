@@ -118,7 +118,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                             'Simple steps to get things done',
                             style: TextStyle(
                               fontSize: 17,
-                              color: Colors.white.withOpacity(0.9),
+                              color: Colors.white.withValues(alpha: 0.9),
                             ),
                           ),
 
@@ -201,7 +201,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                               borderRadius: BorderRadius.circular(20),
                               boxShadow: [
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(0.1),
+                                  color: AppColors.primary.withValues(alpha: 0.1),
                                   blurRadius: 15,
                                   offset: const Offset(0, 8),
                                 ),
@@ -212,7 +212,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                                 Container(
                                   padding: const EdgeInsets.all(8),
                                   decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
+                                    color: AppColors.primary.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: const Icon(
@@ -227,7 +227,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                                     'It\'s that simple! Join Now !',
                                     style: TextStyle(
                                       fontSize: 15,
-                                      color: AppColors.primary.withOpacity(0.8),
+                                      color: AppColors.primary.withValues(alpha: 0.8),
                                       fontWeight: FontWeight.w600,
                                     ),
                                   ),
@@ -264,7 +264,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 8),
           ),
@@ -281,7 +281,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
               borderRadius: BorderRadius.circular(30),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.primary.withOpacity(0.3),
+                  color: AppColors.primary.withValues(alpha: 0.3),
                   blurRadius: 10,
                   offset: const Offset(0, 5),
                 ),
@@ -324,7 +324,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                   description,
                   style: TextStyle(
                     fontSize: 13,
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: AppColors.primary.withValues(alpha: 0.7),
                     height: 1.3,
                   ),
                 ),

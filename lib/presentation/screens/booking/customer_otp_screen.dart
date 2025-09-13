@@ -32,9 +32,9 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
       final currentUserId = authProvider.getCurrentUserId();
 
       if (currentUserId != null) {
-        debugPrint(
-          '🔍 Loading customer OTP from Firestore for: $currentUserId',
-        );
+        // debugPrint(
+        //   '🔍 Loading customer OTP from Firestore for: $currentUserId',
+        // );
 
         // ✅ This now uses Firestore instead of Realtime Database
         final otp = await OTPService.instance.getCustomerOTP(currentUserId);
@@ -44,11 +44,11 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
             customerOTP = otp;
             isLoading = false;
           });
-          debugPrint('✅ Customer OTP loaded from Firestore: $otp');
+          //debugPrint('✅ Customer OTP loaded from Firestore: $otp');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error loading customer OTP from Firestore: $e');
+      //debugPrint('❌ Error loading customer OTP from Firestore: $e');
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -191,8 +191,8 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                               borderRadius: BorderRadius.circular(20),
                               gradient: LinearGradient(
                                 colors: [
-                                  AppColors.success.withOpacity(0.1),
-                                  AppColors.success.withOpacity(0.05),
+                                  AppColors.success.withValues(alpha: 0.1),
+                                  AppColors.success.withValues(alpha: 0.05),
                                 ],
                               ),
                             ),
@@ -232,10 +232,10 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.blue.withOpacity(0.1),
+                                    color: Colors.blue.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.blue.withOpacity(0.3),
+                                      color: Colors.blue.withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Row(
@@ -308,8 +308,8 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        AppColors.primary.withOpacity(0.2),
-                                        AppColors.primary.withOpacity(0.1),
+                                        AppColors.primary.withValues(alpha: 0.2),
+                                        AppColors.primary.withValues(alpha: 0.1),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(16),
@@ -393,10 +393,10 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                                 Container(
                                   padding: const EdgeInsets.all(16),
                                   decoration: BoxDecoration(
-                                    color: Colors.green.withOpacity(0.1),
+                                    color: Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.green.withOpacity(0.3),
+                                      color: Colors.green.withValues(alpha: 0.3),
                                     ),
                                   ),
                                   child: Row(

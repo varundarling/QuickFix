@@ -1,8 +1,9 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
-import 'package:quickfix/core/utils/navigation_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -195,7 +196,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             : () async {
                                 final ok = await context
                                     .read<AuthProvider>()
-                                    .signUpWithGoogle();
+                                    .signUpWithGoogleStrict();
                                 if (ok && context.mounted) {
                                   await context
                                       .read<AuthProvider>()

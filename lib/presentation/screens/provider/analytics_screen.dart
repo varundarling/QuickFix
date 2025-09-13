@@ -38,7 +38,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
         await ratingProvider.loadProviderRatingStats(currentUserId);
       }
     } catch (e) {
-      debugPrint('Error loading analytics data: $e');
+      // debugPrint('Error loading analytics data: $e');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -125,7 +125,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               b.status == BookingStatus.completed ||
               b.status == BookingStatus.paid,
         )
-        .fold(0.0, (sum, b) => sum + (b.totalAmount ?? 0.0));
+        .fold(0.0, (sum, b) => sum + (b.totalAmount));
     final avgRating = ratingStats?['averageRating']?.toDouble() ?? 0.0;
     final totalReviews = ratingStats?['totalReviews'] ?? 0;
     final activeServices = services.where((s) => s.isActive).length;
@@ -227,9 +227,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -280,11 +280,11 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
   Widget _buildFinancialSection(List<BookingModel> bookings) {
     final completedEarnings = bookings
         .where((b) => b.status == BookingStatus.completed)
-        .fold(0.0, (sum, b) => sum + (b.totalAmount ?? 0.0));
+        .fold(0.0, (sum, b) => sum + (b.totalAmount));
 
     final paidEarnings = bookings
         .where((b) => b.status == BookingStatus.paid)
-        .fold(0.0, (sum, b) => sum + (b.totalAmount ?? 0.0));
+        .fold(0.0, (sum, b) => sum + (b.totalAmount));
 
     final pendingEarnings = bookings
         .where(
@@ -292,7 +292,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               b.status == BookingStatus.pending ||
               b.status == BookingStatus.confirmed,
         )
-        .fold(0.0, (sum, b) => sum + (b.totalAmount ?? 0.0));
+        .fold(0.0, (sum, b) => sum + (b.totalAmount));
 
     return Card(
       elevation: 2,
@@ -331,7 +331,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
             _buildFinancialRow(
               'Paid Jobs',
               paidEarnings,
-               Colors.green,
+              Colors.green,
               Icons.payment_rounded,
             ),
             const SizedBox(height: 12),
@@ -460,7 +460,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
               (b.status == BookingStatus.completed ||
                   b.status == BookingStatus.paid),
         )
-        .fold(0.0, (sum, b) => sum + (b.totalAmount ?? 0.0));
+        .fold(0.0, (sum, b) => sum + (b.totalAmount));
 
     return Card(
       elevation: 2,
@@ -695,9 +695,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -753,8 +753,6 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     );
   }
 
-  
-
   Widget _buildFinancialRow(
     String label,
     double amount,
@@ -769,7 +767,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
+              color: color.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -807,9 +805,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -852,9 +850,9 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withOpacity(0.3)),
+        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [

@@ -98,12 +98,12 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
                           color: Colors.white,
                           borderRadius: BorderRadius.circular(110),
                           border: Border.all(
-                            color: AppColors.primary.withOpacity(0.2),
+                            color: AppColors.primary.withValues(alpha: 0.2),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.2),
+                              color: AppColors.primary.withValues(alpha: 0.2),
                               blurRadius: 25,
                               offset: const Offset(0, 10),
                             ),
@@ -116,7 +116,7 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
+                                  color: AppColors.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(25),
                                 ),
                                 child: const Icon(
@@ -216,7 +216,7 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
                         textAlign: TextAlign.center,
                         style: TextStyle(
                           fontSize: 18,
-                          color: Colors.white.withOpacity(0.9),
+                          color: Colors.white.withValues(alpha: 0.9),
                           height: 1.4,
                         ),
                       ),
@@ -278,7 +278,7 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -290,7 +290,7 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
             width: 50,
             height: 50,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, color: AppColors.primary, size: 24),
@@ -313,7 +313,7 @@ class _ProviderExplanationScreenState extends State<ProviderExplanationScreen>
                   description,
                   style: TextStyle(
                     fontSize: 14,
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: AppColors.primary.withValues(alpha: 0.7),
                   ),
                 ),
               ],

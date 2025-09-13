@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -70,16 +72,16 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
 
       final currentUser = authProvider.user;
       if (currentUser == null) {
-        debugPrint('❌ [CUSTOMER] No current user, cannot setup listener');
+        //debugPrint('❌ [CUSTOMER] No current user, cannot setup listener');
         setState(() {
           isLoading = false;
         });
         return;
       }
 
-      debugPrint(
-        '🔄 [CUSTOMER] Setting up enhanced listener: ${currentUser.uid}',
-      );
+      // debugPrint(
+      //   '🔄 [CUSTOMER] Setting up enhanced listener: ${currentUser.uid}',
+      // );
 
       // ✅ CRITICAL: Load initial data with provider details
       await bookingProvider.loadUserBookingsWithProviderData(currentUser.uid);
@@ -95,9 +97,9 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
             (snapshot) async {
               if (!mounted) return;
 
-              debugPrint(
-                '🔔 [CUSTOMER] Processing ${snapshot.docs.length} real-time updates',
-              );
+              // debugPrint(
+              //   '🔔 [CUSTOMER] Processing ${snapshot.docs.length} real-time updates',
+              // );
 
               try {
                 List<BookingModel> bookingsWithProviderDetails = [];
@@ -108,9 +110,9 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                     BookingModel booking = BookingModel.fromFireStore(doc);
 
                     // ✅ CRITICAL: Always fetch provider details with encryption handling
-                    debugPrint(
-                      '🔍 [CUSTOMER] Fetching provider for: ${booking.providerId}',
-                    );
+                    // debugPrint(
+                    //   '🔍 [CUSTOMER] Fetching provider for: ${booking.providerId}',
+                    // );
 
                     // Use enhanced provider fetching method
                     final providerDetails = await bookingProvider
@@ -124,13 +126,13 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                         providerPhone: providerDetails['providerPhone'] ?? '',
                         providerEmail: providerDetails['providerEmail'] ?? '',
                       );
-                      debugPrint(
-                        '✅ [CUSTOMER] Provider details added: ${providerDetails['providerName']}',
-                      );
+                      // debugPrint(
+                      //   '✅ [CUSTOMER] Provider details added: ${providerDetails['providerName']}',
+                      // );
                     } else {
-                      debugPrint(
-                        '⚠️ [CUSTOMER] No provider details found for: ${booking.providerId}',
-                      );
+                      // debugPrint(
+                      //   '⚠️ [CUSTOMER] No provider details found for: ${booking.providerId}',
+                      // );
                       // Create fallback provider info
                       booking = booking.copyWith(
                         providerName: 'Service Provider',
@@ -141,7 +143,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
 
                     bookingsWithProviderDetails.add(booking);
                   } catch (e) {
-                    debugPrint('❌ [CUSTOMER] Error processing booking: $e');
+                    //debugPrint('❌ [CUSTOMER] Error processing booking: $e');
                     // Add booking with minimal provider info rather than skipping
                     BookingModel booking = BookingModel.fromFireStore(doc);
                     booking = booking.copyWith(
@@ -160,12 +162,12 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                   setState(() {
                     isLoading = false;
                   });
-                  debugPrint(
-                    '✅ [CUSTOMER] Real-time update completed: ${bookingsWithProviderDetails.length} bookings',
-                  );
+                  // debugPrint(
+                  //   '✅ [CUSTOMER] Real-time update completed: ${bookingsWithProviderDetails.length} bookings',
+                  // );
                 }
               } catch (e) {
-                debugPrint('❌ [CUSTOMER] Error in real-time processing: $e');
+                // debugPrint('❌ [CUSTOMER] Error in real-time processing: $e');
                 if (mounted) {
                   setState(() {
                     isLoading = false;
@@ -174,7 +176,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               }
             },
             onError: (error) {
-              debugPrint('❌ [CUSTOMER] Real-time listener error: $error');
+              //debugPrint('❌ [CUSTOMER] Real-time listener error: $error');
               if (mounted) {
                 setState(() {
                   isLoading = false;
@@ -183,7 +185,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
             },
           );
     } catch (e) {
-      debugPrint('❌ [CUSTOMER] Setup error: $e');
+      //debugPrint('❌ [CUSTOMER] Setup error: $e');
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -206,7 +208,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
 
       final currentUser = authProvider.user;
       if (currentUser?.uid != null) {
-        debugPrint('🔄 [CUSTOMER] Manual refresh with provider data');
+        //debugPrint('🔄 [CUSTOMER] Manual refresh with provider data');
         // ✅ CRITICAL: Use the enhanced method that loads provider details
         await bookingProvider.loadUserBookingsWithProviderData(
           currentUser!.uid,
@@ -219,7 +221,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
         });
       }
     } catch (e) {
-      debugPrint('❌ [CUSTOMER] Load bookings error: $e');
+      //debugPrint('❌ [CUSTOMER] Load bookings error: $e');
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -305,9 +307,9 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               bookings = allBookings
                   .where((booking) => booking.status == BookingStatus.completed)
                   .toList();
-              debugPrint(
-                '🔍 Customer Completed tab: ${bookings.length} awaiting payment',
-              );
+              // debugPrint(
+              //   '🔍 Customer Completed tab: ${bookings.length} awaiting payment',
+              // );
               break;
 
             // ✅ FIXED: History tab shows paid and cancelled bookings
@@ -319,25 +321,25 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                         booking.status == BookingStatus.cancelled,
                   )
                   .toList();
-              debugPrint(
-                '🔍 Customer History tab: ${bookings.length} paid/cancelled bookings',
-              );
+              // debugPrint(
+              //   '🔍 Customer History tab: ${bookings.length} paid/cancelled bookings',
+              // );
               break;
 
             default:
               bookings = [];
           }
         } catch (e) {
-          debugPrint('❌ [CUSTOMER] Error filtering bookings: $e');
+         // debugPrint('❌ [CUSTOMER] Error filtering bookings: $e');
           bookings = [];
         }
 
         // Debug print for each tab
-        debugPrint(
-          '📊 Customer ${status.toString()} tab: ${bookings.length} bookings',
-        );
+        // debugPrint(
+        //   '📊 Customer ${status.toString()} tab: ${bookings.length} bookings',
+        // );
         for (var booking in bookings.take(3)) {
-          debugPrint('   - ${booking.serviceName}: ${booking.status}');
+          //debugPrint('   - ${booking.serviceName}: ${booking.status}');
         }
 
         // ... rest of the method remains the same
@@ -696,7 +698,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   }
 
   Future<void> onPaymentCompleted() async {
-    debugPrint('🔄 [CUSTOMER] Payment completed, refreshing bookings');
+    //debugPrint('🔄 [CUSTOMER] Payment completed, refreshing bookings');
     await _loadBookings();
 
     // Navigate to history tab to show the completed payment
@@ -894,8 +896,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
             colors: [
-              AppColors.primary.withOpacity(0.1),
-              AppColors.primary.withOpacity(0.05),
+              AppColors.primary.withValues(alpha: 0.1),
+              AppColors.primary.withValues(alpha: 0.05),
             ],
           ),
         ),
@@ -932,7 +934,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               'Provider is working on your service',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.primary.withOpacity(0.8),
+                color: AppColors.primary.withValues(alpha: 0.8),
                 fontSize: 14,
               ),
             ),
@@ -953,8 +955,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
           borderRadius: BorderRadius.circular(12),
           gradient: LinearGradient(
             colors: [
-              Colors.orange.withOpacity(0.1),
-              Colors.orange.withOpacity(0.05),
+              Colors.orange.withValues(alpha: 0.1),
+              Colors.orange.withValues(alpha: 0.05),
             ],
           ),
         ),
@@ -991,7 +993,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               'Provider needs your verification code',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Colors.orange.withOpacity(0.8),
+                color: Colors.orange.withValues(alpha: 0.8),
                 fontSize: 14,
               ),
             ),
@@ -1111,7 +1113,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   // ✅ NULL-SAFE: Cancel booking
   Future<void> _cancelBooking(BookingModel booking) async {
     if (booking.id.isEmpty) {
-      debugPrint('❌ [CUSTOMER] Cannot cancel booking with empty ID');
+      //debugPrint('❌ [CUSTOMER] Cannot cancel booking with empty ID');
       return;
     }
 
@@ -1156,7 +1158,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
           await _loadBookings();
         }
       } catch (e) {
-        debugPrint('❌ [CUSTOMER] Cancel error: $e');
+        //debugPrint('❌ [CUSTOMER] Cancel error: $e');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(

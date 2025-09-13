@@ -1,7 +1,5 @@
-// lib/core/services/otp_service.dart (Updated for Firestore)
 import 'dart:math';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
 class OTPService {
   static OTPService? _instance;
@@ -18,17 +16,13 @@ class OTPService {
   // ✅ MIGRATED: Create customer-based OTP using Firestore
   Future<String> createCustomerOTP(String customerId) async {
     try {
-      debugPrint('🔑 Creating customer OTP for: $customerId');
-
       // Check if customer already has an active OTP
       final existingOTP = await getCustomerOTP(customerId);
       if (existingOTP != null) {
-        debugPrint('✅ Customer already has OTP: $existingOTP');
         return existingOTP;
       }
 
       final otp = generateOTP();
-      final now = DateTime.now();
 
       // ✅ MIGRATED: Store in Firestore instead of Realtime Database
       final otpData = {
@@ -45,10 +39,8 @@ class OTPService {
           .doc(customerId) // Changed from child() to doc()
           .set(otpData); // Changed from set() to set()
 
-      debugPrint('✅ Customer OTP created successfully in Firestore: $otp');
       return otp;
     } catch (e) {
-      debugPrint('❌ Error creating customer OTP in Firestore: $e');
       rethrow;
     }
   }
@@ -56,15 +48,12 @@ class OTPService {
   // ✅ MIGRATED: Get customer OTP from Firestore
   Future<String?> getCustomerOTP(String customerId) async {
     try {
-      debugPrint('🔍 Getting customer OTP from Firestore for: $customerId');
-
       final docSnapshot = await FirebaseFirestore.instance
           .collection('customer_otps')
           .doc(customerId)
           .get();
 
       if (!docSnapshot.exists || docSnapshot.data() == null) {
-        debugPrint('❌ No OTP found in Firestore for customer: $customerId');
         return null;
       }
 
@@ -72,15 +61,13 @@ class OTPService {
       final isActive = data['isActive'] ?? false;
 
       if (!isActive) {
-        debugPrint('⚠️ Customer OTP is inactive: $customerId');
         return null;
       }
 
       final code = data['code'] as String?;
-      debugPrint('✅ Customer OTP retrieved from Firestore: $code');
       return code;
     } catch (e) {
-      debugPrint('❌ Error getting customer OTP from Firestore: $e');
+      // Handle errors
       return null;
     }
   }
@@ -92,17 +79,12 @@ class OTPService {
     String bookingId,
   ) async {
     try {
-      debugPrint('🔐 Verifying customer OTP in Firestore for: $customerId');
-
       final storedOTP = await getCustomerOTP(customerId);
       if (storedOTP == null) {
-        debugPrint('❌ No stored OTP found for customer in Firestore');
         return false;
       }
 
       if (storedOTP == enteredOTP) {
-        debugPrint('✅ Customer OTP verified successfully in Firestore');
-
         // ✅ MIGRATED: Update last used timestamp in Firestore
         await FirebaseFirestore.instance
             .collection('customer_otps')
@@ -117,11 +99,9 @@ class OTPService {
 
         return true;
       } else {
-        debugPrint('❌ Invalid customer OTP entered');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Error verifying customer OTP in Firestore: $e');
       return false;
     }
   }
@@ -142,18 +122,14 @@ class OTPService {
             'isWorkInProgress': true,
             'progressUpdatedAt': Timestamp.fromDate(now),
           });
-
-      debugPrint('✅ Work progress started for booking: $bookingId');
     } catch (e) {
-      debugPrint('❌ Error starting work progress: $e');
+      // Handle errors
     }
   }
 
   // ✅ MIGRATED: Create booking-specific OTP in Firestore
   Future<String> createOTPForBooking(String bookingId) async {
     try {
-      debugPrint('🔑 Creating OTP for booking in Firestore: $bookingId');
-
       final booking = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
@@ -180,13 +156,11 @@ class OTPService {
               ),
             });
 
-        debugPrint('✅ Booking OTP created in Firestore: $otpCode');
         return otpCode;
       }
 
       throw Exception('Booking not found');
     } catch (e) {
-      debugPrint('❌ Error creating OTP for booking in Firestore: $e');
       rethrow;
     }
   }
@@ -217,7 +191,6 @@ class OTPService {
 
       return null;
     } catch (e) {
-      debugPrint('❌ Error getting OTP for booking from Firestore: $e');
       return null;
     }
   }
@@ -225,49 +198,29 @@ class OTPService {
   // ✅ FIXED: Verify OTP and transition to inProgress
   Future<bool> verifyOTP(String bookingId, String enteredOTP) async {
     try {
-      debugPrint(
-        '🔐 [OTP VERIFICATION] Starting verification for booking: $bookingId',
-      );
-
       final booking = await FirebaseFirestore.instance
           .collection('bookings')
           .doc(bookingId)
           .get();
 
       if (!booking.exists) {
-        debugPrint('❌ [OTP VERIFICATION] Booking document not found');
         throw Exception('Booking not found');
       }
 
       final bookingData = booking.data()!;
       final customerId = bookingData['customerId'] as String;
-      final currentStatus = bookingData['status'] as String?;
-
-      debugPrint(
-        '🔍 [OTP VERIFICATION] Current booking status: $currentStatus',
-      );
 
       final storedOTP = await getCustomerOTP(customerId);
       if (storedOTP == null) {
-        debugPrint(
-          '❌ [OTP VERIFICATION] No OTP found for customer: $customerId',
-        );
         throw Exception('No OTP found for customer');
       }
 
-      debugPrint(
-        '🔍 [OTP VERIFICATION] Stored OTP: $storedOTP, Entered: $enteredOTP',
-      );
-
       if (storedOTP != enteredOTP.trim()) {
-        debugPrint('❌ [OTP VERIFICATION] OTP mismatch');
         throw Exception('Invalid OTP');
       }
 
       // ✅ CRITICAL: Multi-verification update with protection
       try {
-        debugPrint('🔄 [OTP VERIFICATION] Attempting protected update...');
-
         // First, use a transaction to ensure atomicity
         bool transactionSuccess = false;
 
@@ -283,8 +236,6 @@ class OTPService {
 
           final freshData = freshBookingDoc.data()!;
           final freshStatus = freshData['status'] as String?;
-
-          debugPrint('🔍 [OTP TRANSACTION] Fresh status: $freshStatus');
 
           if (freshStatus != 'confirmed') {
             throw Exception(
@@ -305,9 +256,7 @@ class OTPService {
             'otpVerifiedAt': FieldValue.serverTimestamp(),
             // ✅ PROTECTION: Add unique markers to prevent overwrites
             'otpTransactionId':
-                bookingId +
-                '_' +
-                DateTime.now().millisecondsSinceEpoch.toString(),
+                '${bookingId}_${DateTime.now().millisecondsSinceEpoch}',
             'systemProtected': true,
             'systemProtectedUntil': Timestamp.fromDate(
               DateTime.now().add(const Duration(minutes: 5)),
@@ -318,11 +267,8 @@ class OTPService {
         });
 
         if (!transactionSuccess) {
-          debugPrint('❌ [OTP VERIFICATION] Transaction failed');
           return false;
         }
-
-        debugPrint('✅ [OTP VERIFICATION] Transaction succeeded');
 
         // ✅ VERIFICATION: Wait and verify the update persisted
         for (int i = 0; i < 10; i++) {
@@ -339,28 +285,11 @@ class OTPService {
             final lastUpdatedBy = verifyData['lastUpdatedBy'] as String?;
             final otpTransactionId = verifyData['otpTransactionId'] as String?;
 
-            debugPrint(
-              '🔍 [OTP CHECK ${i + 1}] Status: $finalStatus, UpdatedBy: $lastUpdatedBy',
-            );
-            debugPrint(
-              '🔍 [OTP CHECK ${i + 1}] TransactionId: $otpTransactionId',
-            );
-
             if (finalStatus == 'inProgress' &&
                 lastUpdatedBy == 'system_otp_verification' &&
                 otpTransactionId != null) {
-              debugPrint(
-                '✅ [OTP VERIFICATION] Status verified and protected after ${i + 1} checks',
-              );
               return true;
             } else if (finalStatus != 'inProgress') {
-              debugPrint(
-                '❌ [OTP VERIFICATION] Status was overwritten! Expected: inProgress, Got: $finalStatus',
-              );
-              debugPrint(
-                '❌ [OTP VERIFICATION] This indicates another service is overwriting the status',
-              );
-
               // Try one more direct update
               await FirebaseFirestore.instance
                   .collection('bookings')
@@ -371,24 +300,15 @@ class OTPService {
                     'updatedAt': FieldValue.serverTimestamp(),
                     'forceProtected': true,
                   });
-
-              debugPrint(
-                '🔄 [OTP VERIFICATION] Applied force protection update',
-              );
             }
           }
         }
 
-        debugPrint(
-          '❌ [OTP VERIFICATION] Status verification failed after 10 attempts',
-        );
         return false;
       } catch (updateError) {
-        debugPrint('❌ [OTP VERIFICATION] Update failed: $updateError');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ [OTP VERIFICATION] Fatal error: $e');
       return false;
     }
   }

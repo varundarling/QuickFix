@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
@@ -39,7 +41,7 @@ class _SplashScreenState extends State<SplashScreen>
 
     if (!mounted) return;
 
-    debugPrint('🔍 Initializing app and checking auth state...');
+    //debugPrint('🔍 Initializing app and checking auth state...');
 
     final authProvider = context.read<AuthProvider>();
 
@@ -50,10 +52,10 @@ class _SplashScreenState extends State<SplashScreen>
         authProvider.isAuthenticated && authProvider.user != null;
 
     if (isLoggedIn) {
-      debugPrint('✅ User is logged in: ${authProvider.user!.email}');
+      //debugPrint('✅ User is logged in: ${authProvider.user!.email}');
 
       // ✅ CRITICAL: Wait for user session to be fully initialized
-      debugPrint('⏳ Waiting for user session initialization...');
+      //debugPrint('⏳ Waiting for user session initialization...');
 
       int waitCount = 0;
       while (!authProvider.isInitialized && waitCount < 40) {
@@ -63,23 +65,23 @@ class _SplashScreenState extends State<SplashScreen>
 
         if (waitCount % 4 == 0) {
           // Log every 2 seconds
-          debugPrint(
-            '⏳ Still waiting for initialization... (${waitCount * 0.5}s)',
-          );
+          // debugPrint(
+          //   '⏳ Still waiting for initialization... (${waitCount * 0.5}s)',
+          // );
         }
       }
 
       if (!authProvider.isInitialized) {
-        debugPrint('⚠️ Initialization timeout, proceeding with fallback');
+        // debugPrint('⚠️ Initialization timeout, proceeding with fallback');
       }
 
       // ✅ Get user type after initialization
       final userType = await authProvider.getUserType();
-      debugPrint('👤 User type determined: $userType');
+      // debugPrint('👤 User type determined: $userType');
 
       // ✅ Verify profile is loaded before navigation
       final hasProfile = authProvider.userModel != null;
-      debugPrint('📄 Profile loaded: $hasProfile');
+      // debugPrint('📄 Profile loaded: $hasProfile');
 
       if (!mounted) return;
 
@@ -92,7 +94,7 @@ class _SplashScreenState extends State<SplashScreen>
       //   context.go('/home');
       // }
     } else {
-      debugPrint('❌ User not logged in, navigating to user type selection');
+      //debugPrint('❌ User not logged in, navigating to user type selection');
       if (mounted) {
         context.go('/onboarding');
       }
@@ -178,7 +180,7 @@ class _SplashScreenState extends State<SplashScreen>
       width: 200,
       height: 200,
       errorBuilder: (context, error, stackTrace) {
-        debugPrint('❌ Failed to load logo: $error');
+        //debugPrint('❌ Failed to load logo: $error');
         return Container(
           width: 180,
           height: 180,

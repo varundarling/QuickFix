@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:flutter/foundation.dart';
 
 class AdService {
   static AdService? _instance;
@@ -30,15 +29,10 @@ class AdService {
   Future<void> initialize() async {
     if (_isInitialized) return;
 
-    try {
-      await MobileAds.instance.initialize();
-      _isInitialized = true;
-      loadInterstitial();
-      loadRewarded();
-      debugPrint('✅ AdService initialized successfully');
-    } catch (e) {
-      debugPrint('❌ AdService initialization failed: $e');
-    }
+    await MobileAds.instance.initialize();
+    _isInitialized = true;
+    loadInterstitial();
+    loadRewarded();
   }
 
   BannerAd createBannerAdWithListener({
@@ -66,11 +60,10 @@ class AdService {
       size: AdSize.banner,
       request: const AdRequest(),
       listener: BannerAdListener(
-        onAdLoaded: onLoaded ?? (_) => debugPrint('✅ Banner ad loaded'),
+        onAdLoaded: onLoaded ?? (_) {},
         onAdFailedToLoad:
             onFailedToLoad ??
             (ad, error) {
-              debugPrint('❌ Banner ad failed: $error');
               ad.dispose();
             },
       ),
@@ -88,8 +81,6 @@ class AdService {
         onAdLoaded: (ad) {
           _interstitialAd = ad;
           _interstitialReady = true;
-          debugPrint('✅ Interstitial ad loaded');
-
           ad.fullScreenContentCallback = FullScreenContentCallback(
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
@@ -97,7 +88,6 @@ class AdService {
               loadInterstitial();
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
-              debugPrint('❌ Interstitial show failed: $error');
               ad.dispose();
               _interstitialReady = false;
               loadInterstitial();
@@ -105,7 +95,6 @@ class AdService {
           );
         },
         onAdFailedToLoad: (error) {
-          debugPrint('❌ Interstitial load failed: $error');
           _interstitialReady = false;
           Future.delayed(const Duration(seconds: 60), loadInterstitial);
         },
@@ -134,8 +123,6 @@ class AdService {
         onAdLoaded: (ad) {
           _rewardedAd = ad;
           _rewardedReady = true;
-          debugPrint('✅ Rewarded ad loaded');
-
           ad.fullScreenContentCallback = FullScreenContentCallback(
             onAdDismissedFullScreenContent: (ad) {
               ad.dispose();
@@ -143,7 +130,6 @@ class AdService {
               loadRewarded();
             },
             onAdFailedToShowFullScreenContent: (ad, error) {
-              debugPrint('❌ Rewarded show failed: $error');
               ad.dispose();
               _rewardedReady = false;
               loadRewarded();
@@ -151,7 +137,6 @@ class AdService {
           );
         },
         onAdFailedToLoad: (error) {
-          debugPrint('❌ Rewarded load failed: $error');
           _rewardedReady = false;
           Future.delayed(const Duration(seconds: 60), loadRewarded);
         },

@@ -1,7 +1,5 @@
-// lib/core/services/progress_tracking_service.dart
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
 class ProgressTrackingService {
   static ProgressTrackingService? _instance;
@@ -15,8 +13,6 @@ class ProgressTrackingService {
   // ✅ Start automatic progress tracking (5% every 15 minutes, cap at 95%)
   Future<void> startProgressTracking(String bookingId) async {
     try {
-      debugPrint('📈 Starting progress tracking for: $bookingId');
-
       await Future.delayed(const Duration(seconds: 20));
 
       final bookingDoc = await FirebaseFirestore.instance
@@ -25,7 +21,6 @@ class ProgressTrackingService {
           .get();
 
       if (!bookingDoc.exists) {
-        debugPrint('❌ Booking not found, cancelling progress tracking');
         return;
       }
 
@@ -33,9 +28,7 @@ class ProgressTrackingService {
       final currentStatus = data['status'] as String?;
 
       if (currentStatus != 'inProgress') {
-        debugPrint(
-          '❌ Booking no longer inProgress ($currentStatus), cancelling progress tracking',
-        );
+
         return;
       }
 
@@ -47,9 +40,9 @@ class ProgressTrackingService {
         const Duration(minutes: 15), // Changed from 30 seconds to 15 minutes
         (timer) => _updateProgress(bookingId, timer),
       );
-      debugPrint('✅ Progress tracking started successfully for: $bookingId');
+
     } catch (e) {
-      debugPrint('❌ Error starting progress tracking: $e');
+      // Handle errors
     }
   }
 
@@ -100,37 +93,25 @@ class ProgressTrackingService {
             'progressUpdatedAt': Timestamp.fromDate(DateTime.now()),
           });
 
-      debugPrint(
-        '📈 Progress updated for $bookingId: ${(progress * 100).toInt()}% (${elapsed}min elapsed, ${incrementsOf15Min} intervals)',
-      );
-
+      
       // ✅ Stop timer if work reaches 95% cap
       if (progress >= 0.95) {
         timer.cancel();
         _progressTimers.remove(bookingId);
-        debugPrint(
-          '🏁 Progress tracking stopped - reached 95% cap for: $bookingId',
-        );
+        
       }
     } catch (e) {
-      debugPrint('❌ Error updating progress: $e');
+      // Handle errors
     }
   }
 
   // ✅ ENHANCED: Complete work and hide progress bar
   Future<void> completeWork(String bookingId) async {
     try {
-      debugPrint(
-        '🎯 [COMPLETE WORK] Provider clicked Work Completed for: $bookingId',
-      );
 
       // ✅ Cancel timer immediately to stop progress updates
       _progressTimers[bookingId]?.cancel();
       _progressTimers.remove(bookingId);
-
-      debugPrint(
-        '🔄 [COMPLETE WORK] Setting status to completed and hiding progress bar',
-      );
 
       // ✅ CRITICAL: Update to completed status and remove progress tracking
       await FirebaseFirestore.instance
@@ -151,11 +132,8 @@ class ProgressTrackingService {
                 false, // ✅ Flag to indicate tracking stopped
           });
 
-      debugPrint(
-        '✅ [COMPLETE WORK] Work completed, progress bar hidden for booking: $bookingId',
-      );
     } catch (e) {
-      debugPrint('❌ [COMPLETE WORK] Error completing work: $e');
+      
       rethrow;
     }
   }
@@ -174,11 +152,9 @@ class ProgressTrackingService {
             'progressUpdatedAt': Timestamp.fromDate(DateTime.now()),
           });
 
-      debugPrint(
-        '📈 Progress manually set to ${(clampedProgress * 100).toInt()}% for booking: $bookingId',
-      );
+      // Handle success
     } catch (e) {
-      debugPrint('❌ Error setting progress: $e');
+      // Handle errors
     }
   }
 
@@ -186,7 +162,6 @@ class ProgressTrackingService {
   void stopProgressTracking(String bookingId) {
     _progressTimers[bookingId]?.cancel();
     _progressTimers.remove(bookingId);
-    debugPrint('🛑 Progress tracking stopped for: $bookingId');
   }
 
   // ✅ Check if progress tracking is active for a booking
@@ -207,7 +182,7 @@ class ProgressTrackingService {
         return (data['workProgress'] as num?)?.toDouble();
       }
     } catch (e) {
-      debugPrint('❌ Error getting current progress: $e');
+      // Handle errors
     }
     return null;
   }
@@ -218,6 +193,5 @@ class ProgressTrackingService {
       timer.cancel();
     }
     _progressTimers.clear();
-    debugPrint('🧹 All progress tracking timers disposed');
   }
 }

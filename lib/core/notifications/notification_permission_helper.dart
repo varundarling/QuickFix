@@ -10,9 +10,9 @@ class NotificationPermissionHelper {
             return AlertDialog(
               title: Text('Enable Notifications'),
               content: Text(
-                'QuickFix would like to send you notifications about:\n\n'
-                '• Service booking updates\n'
-                '• New service availability\n'
+                'LocalFix would like to send you notifications about:\n\n'
+                '• Booking updates\n'
+                '• New works availability\n'
                 '• Important announcements\n\n'
                 'You can change this setting anytime in your device settings.',
               ),
@@ -39,7 +39,6 @@ class NotificationPermissionHelper {
       String? fcmToken = await FCMTokenManager.getToken();
 
       if (fcmToken != null) {
-        debugPrint('✅ Notifications enabled successfully');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Notifications enabled successfully!'),
@@ -47,7 +46,6 @@ class NotificationPermissionHelper {
           ),
         );
       } else {
-        debugPrint('❌ Failed to enable notifications');
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to enable notifications. Please try again.'),

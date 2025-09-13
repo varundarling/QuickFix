@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, prefer_final_fields, unused_local_variable
+
 import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -40,7 +42,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   bool isLoading = true;
   StreamSubscription<QuerySnapshot>? _providerBookingsSubscription;
-  bool _isUpdatingStatus = false;
   Set<String> _updatingBookings = {};
   final Map<String, bool> _processingBookings = {};
 
@@ -156,19 +157,19 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       // Ensure user is authenticated
       final isAuthenticated = await authProvider.ensureUserAuthenticated();
       if (!isAuthenticated) {
-        debugPrint('❌ User not authenticated');
+        //debugPrint('❌ User not authenticated');
         return;
       }
 
       // Get current user ID
       final currentUserId = authProvider.getCurrentUserId();
       if (currentUserId == null) {
-        debugPrint('❌ No user ID available');
+        //debugPrint('❌ No user ID available');
         return;
       }
 
       _currentUserId = currentUserId;
-      debugPrint('✅ Initializing dashboard for provider: $currentUserId');
+      //debugPrint('✅ Initializing dashboard for provider: $currentUserId');
 
       // ✅ CRITICAL: Initialize BookingProvider with current user ID
       await bookingProvider.initializeProvider(currentUserId);
@@ -183,9 +184,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         });
       }
 
-      debugPrint('✅ Dashboard initialization completed');
+      //debugPrint('✅ Dashboard initialization completed');
     } catch (error) {
-      debugPrint('❌ Error initializing dashboard: $error');
+      //debugPrint('❌ Error initializing dashboard: $error');
       if (mounted) {
         setState(() {
           isLoading = false;
@@ -228,7 +229,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
   @override
   Widget build(BuildContext context) {
-    debugPrint('🏗️ Building ProviderDashboardScreen');
+    //debugPrint('🏗️ Building ProviderDashboardScreen');
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.primary,
@@ -385,7 +386,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
         final paidEarnings = bookings
             .where((b) => b.status == BookingStatus.paid)
-            .fold(0.0, (total, booking) => total + (booking.totalAmount ?? 0));
+            .fold(0.0, (total, booking) => total + (booking.totalAmount));
 
         return RefreshIndicator(
           onRefresh: () async {
@@ -1540,7 +1541,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                 .toList();
         }
 
-        debugPrint('🔍 [$status] Tab has ${bookings.length} bookings');
+        //debugPrint('🔍 [$status] Tab has ${bookings.length} bookings');
 
         if (bookings.isEmpty) {
           return RefreshIndicator(
@@ -1737,7 +1738,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
               const SizedBox(height: 8),
 
               _buildCustomerDetailsSection(booking),
-              
+
               const SizedBox(height: 4),
 
               _buildProviderNarrowProgressBar(booking),
@@ -2234,9 +2235,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   bookingProvider.lockBookingForOTP(booking.id);
                   bookingProvider.pauseRealTimeListener();
 
-                  debugPrint(
-                    '🔐 [DASHBOARD] Starting OTP verification process',
-                  );
+                  // debugPrint(
+                  //   '🔐 [DASHBOARD] Starting OTP verification process',
+                  // );
 
                   // Verify OTP and start work
                   final success = await OTPService.instance.verifyOTP(
@@ -2245,10 +2246,10 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   );
 
                   if (success) {
-                    debugPrint('✅ [DASHBOARD] OTP verification succeeded');
+                    //debugPrint('✅ [DASHBOARD] OTP verification succeeded');
                     Navigator.of(context).pop(true);
                   } else {
-                    debugPrint('❌ [DASHBOARD] OTP verification failed');
+                    //debugPrint('❌ [DASHBOARD] OTP verification failed');
                     setState(
                       () => errorMessage =
                           'OTP verification failed. Check console for details.',
@@ -2259,7 +2260,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                     bookingProvider.resumeRealTimeListener();
                   }
                 } catch (e) {
-                  debugPrint('❌ [DASHBOARD] OTP verification error: $e');
+                  //debugPrint('❌ [DASHBOARD] OTP verification error: $e');
                   setState(() => errorMessage = 'Verification failed: $e');
 
                   // Resume listener on error
@@ -2305,7 +2306,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
 
         setState(() {});
 
-        debugPrint('✅ [DASHBOARD] OTP verification process completed');
+        //debugPrint('✅ [DASHBOARD] OTP verification process completed');
       }
     } else {
       // Resume listener if dialog was cancelled
@@ -2467,11 +2468,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       // ✅ CRITICAL: Generate OTP when accepting booking
       if (success && newStatus == BookingStatus.confirmed) {
         try {
-          debugPrint('🔑 Generating OTP for booking: $bookingId');
-          final otpCode = await OTPService.instance.createOTPForBooking(
-            bookingId,
-          );
-          debugPrint('✅ OTP generated successfully: $otpCode');
+          //debugPrint('🔑 Generating OTP for booking: $bookingId');
+          await OTPService.instance.createOTPForBooking(bookingId);
+          //debugPrint('✅ OTP generated successfully: $otpCode');
 
           // ✅ Verify OTP was actually created
           await Future.delayed(const Duration(seconds: 1));
@@ -2479,12 +2478,12 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
             bookingId,
           );
           if (verifyOTP != null) {
-            debugPrint('✅ OTP verified in database: $verifyOTP');
+            //debugPrint('✅ OTP verified in database: $verifyOTP');
           } else {
-            debugPrint('❌ OTP verification failed - not found in database');
+            //debugPrint('❌ OTP verification failed - not found in database');
           }
         } catch (e) {
-          debugPrint('❌ Error generating OTP: $e');
+          //debugPrint('❌ Error generating OTP: $e');
           // Show error but don't fail the booking acceptance
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -2534,7 +2533,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       }
     } catch (error) {
-      debugPrint('❌ Error: $error');
+      //debugPrint('❌ Error: $error');
 
       if (mounted) {
         Navigator.of(context).pop();
@@ -2573,13 +2572,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         statusName = 'More';
         break;
       default:
-        debugPrint('⚠️ No tab navigation for status: $newStatus');
+        //debugPrint('⚠️ No tab navigation for status: $newStatus');
         return;
     }
 
-    debugPrint(
-      '📍 [TAB NAVIGATION] Moving to $statusName (index: $targetTabIndex)',
-    );
+    // debugPrint(
+    //   '📍 [TAB NAVIGATION] Moving to $statusName (index: $targetTabIndex)',
+    // );
 
     if (_selectedIndex != targetTabIndex) {
       setState(() {
@@ -2620,7 +2619,7 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
       final serviceProvider = context.read<ServiceProvider>();
       await serviceProvider.loadMyServices();
     } catch (error) {
-      debugPrint('❌ Error refreshing services after deletion: $error');
+      //debugPrint('❌ Error refreshing services after deletion: $error');
     }
   }
 

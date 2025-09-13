@@ -146,9 +146,9 @@ class _ProviderProfileScreenState extends State<ProviderProfileScreen>
                 _emailController.text = user.email;
                 _experienceController.text = user.experience ?? '';
               });
-              debugPrint(
-                '✅ Controllers updated: Business=${_businessNameController.text}, Experience=${_experienceController.text}',
-              );
+              // debugPrint(
+              //   '✅ Controllers updated: Business=${_businessNameController.text}, Experience=${_experienceController.text}',
+              // );
             }
           });
         }

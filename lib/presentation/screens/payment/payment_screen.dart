@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -303,7 +304,7 @@ class _PaymentScreenState extends State<PaymentScreen> {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error in payment confirmation: $e');
+      //debugPrint('❌ Error in payment confirmation: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -346,9 +347,9 @@ class _PaymentScreenState extends State<PaymentScreen> {
         'services': servicesList,
       });
 
-      debugPrint('✅ Completed service saved to local storage');
+      //debugPrint('✅ Completed service saved to local storage');
     } catch (e) {
-      debugPrint('❌ Error saving to local storage: $e');
+      //debugPrint('❌ Error saving to local storage: $e');
     }
   }
 }

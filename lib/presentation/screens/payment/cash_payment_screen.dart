@@ -287,7 +287,7 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
         throw Exception('User not authenticated');
       }
 
-      debugPrint('🔄 Updating booking ${widget.booking.id} to paid status');
+      //debugPrint('🔄 Updating booking ${widget.booking.id} to paid status');
 
       await FirebaseFirestore.instance
           .collection('bookings')
@@ -300,14 +300,14 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
             'lastUpdatedBy': 'customer_$currentUserId',
           });
 
-      debugPrint('✅ Firestore updated to paid status');
+      //debugPrint('✅ Firestore updated to paid status');
 
       await _sendPaymentNotificationToProvider();
 
       await Future.delayed(const Duration(milliseconds: 1000));
       await bookingProvider.loadUserBookings(currentUserId);
 
-      debugPrint('✅ User bookings refreshed');
+      //debugPrint('✅ User bookings refreshed');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -333,13 +333,13 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
 
           // Optional: Handle rating result
           if (ratingResult == true) {
-            debugPrint('✅ Rating submitted successfully');
+            //debugPrint('✅ Rating submitted successfully');
           }
         }
         await AdService.instance.showInterstitial();
       }
     } catch (e) {
-      debugPrint('❌ Error updating payment: $e');
+      //debugPrint('❌ Error updating payment: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -357,7 +357,7 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
 
   Future<void> _sendPaymentNotificationToProvider() async {
     try {
-      debugPrint('💰 Sending payment notification to provider...');
+      //debugPrint('💰 Sending payment notification to provider...');
 
       final authProvider = context.read<AuthProvider>();
       final customerName = authProvider.userModel?.name ?? 'Customer';
@@ -371,9 +371,9 @@ class _CashPaymentScreenState extends State<CashPaymentScreen> {
         paymentAmount: widget.booking.totalAmount,
       );
 
-      debugPrint('✅ Payment notification sent to provider successfully');
+      //debugPrint('✅ Payment notification sent to provider successfully');
     } catch (e) {
-      debugPrint('❌ Error sending payment notification: $e');
+      //debugPrint('❌ Error sending payment notification: $e');
       // Don't throw error - payment was successful, notification is secondary
     }
   }

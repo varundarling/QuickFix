@@ -191,7 +191,7 @@ extension OpacitySafeNumExtension on num {
 extension ColorSafeExtension on Color {
   /// Safe withOpacity that clamps values
   Color safeWithOpacity(double opacity) {
-    return withOpacity(opacity.clamp(0.0, 1.0).toDouble());
+    return withAlpha((opacity.clamp(0.0, 1.0) * 255).toInt());
   }
 }
 

@@ -1,5 +1,5 @@
 class AppStrings {
-  static const String appName = 'QuickFix';
+  static const String appName = 'LocalFix';
   static const String tagline = 'Your Local Service Partner';
 
   //Auth
@@ -11,8 +11,8 @@ class AppStrings {
   static const String loginwithphone = "login with Phone";
 
   //Home
-  static const String findServices = 'Find Services Near You';
-  static const String popularServices = "Popular Services";
+  static const String findServices = 'Find Workers Near You';
+  static const String popularServices = "Best Service Persons";
   static const String recentBookings = 'Recent Bookings';
 
   //Services

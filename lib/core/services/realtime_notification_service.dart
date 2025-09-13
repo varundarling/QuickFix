@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/foundation.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'dart:math';
 
@@ -21,7 +20,6 @@ class RealtimeNotificationService {
     required String providerId,
   }) async {
     try {
-      debugPrint('🔔 Notifying nearby customers of new service...');
 
       // Get nearby customer tokens
       List<String> nearbyTokens = await _getNearbyCustomerTokens(
@@ -31,12 +29,11 @@ class RealtimeNotificationService {
       );
 
       if (nearbyTokens.isEmpty) {
-        debugPrint('📍 No nearby customers found');
         return;
       }
 
       // Send batch notifications
-      int successCount = await FCMHttpService.instance.sendBatchNotifications(
+      await FCMHttpService.instance.sendBatchNotifications(
         fcmTokens: nearbyTokens,
         title: "🔧 New $category Service Available",
         body: "$serviceTitle is now available near $location",
@@ -50,9 +47,9 @@ class RealtimeNotificationService {
         },
       );
 
-      debugPrint('✅ Notified $successCount nearby customers');
+
     } catch (e) {
-      debugPrint('❌ Error notifying customers: $e');
+      // Handle errors
     }
   }
 
@@ -66,7 +63,6 @@ class RealtimeNotificationService {
     required String customerPhone,
   }) async {
     try {
-      debugPrint('🔔 Notifying provider of new booking...');
 
       // First try to get provider's FCM token from providers collection
       DocumentSnapshot providerDoc = await FirebaseFirestore.instance
@@ -91,7 +87,6 @@ class RealtimeNotificationService {
       }
 
       if (providerToken == null || providerToken.isEmpty) {
-        debugPrint('❌ Provider FCM token not found, notification aborted');
         return;
       }
 
@@ -111,12 +106,12 @@ class RealtimeNotificationService {
       );
 
       if (success) {
-        debugPrint('✅ Provider notified of new booking');
+        // Handle success
       } else {
-        debugPrint('❌ Failed to notify provider');
+        // Handle failure
       }
     } catch (e) {
-      debugPrint('❌ Error notifying provider: $e');
+      // Handle errors
     }
   }
 
@@ -161,7 +156,7 @@ class RealtimeNotificationService {
         }
       }
     } catch (e) {
-      debugPrint('❌ Error getting nearby customers: $e');
+      // Handle errors
     }
 
     return tokens;

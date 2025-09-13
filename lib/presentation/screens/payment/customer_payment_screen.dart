@@ -357,11 +357,11 @@ class _CustomerPaymentScreenState extends State<CustomerPaymentScreen> {
         'services': servicesList,
       });
 
-      debugPrint(
-        '✅ Completed service with payment confirmation saved to customer local storage',
-      );
+      // debugPrint(
+      //   '✅ Completed service with payment confirmation saved to customer local storage',
+      // );
     } catch (e) {
-      debugPrint('❌ Error saving to customer local storage: $e');
+      //debugPrint('❌ Error saving to customer local storage: $e');
     }
   }
 }

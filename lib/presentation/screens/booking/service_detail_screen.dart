@@ -1,4 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
+// ignore_for_file: use_build_context_synchronously, unused_local_variable, prefer_final_fields, unused_catch_stack
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -72,20 +72,20 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
     // Debug authentication
     final user = FirebaseAuth.instance.currentUser;
-    debugPrint('=== AUTH VERIFICATION ===');
-    debugPrint('User ID: ${user?.uid}');
-    debugPrint('Email: ${user?.email}');
-    debugPrint('Is Authenticated: ${user != null}');
-    debugPrint('========================');
+    // debugPrint('=== AUTH VERIFICATION ===');
+    // debugPrint('User ID: ${user?.uid}');
+    // debugPrint('Email: ${user?.email}');
+    // debugPrint('Is Authenticated: ${user != null}');
+    // debugPrint('========================');
 
     _provider = widget.provider;
 
     // If provider not passed, fetch it
     if (_provider == null) {
-      debugPrint('🔄 Provider not passed, fetching from Firestore...');
+      //debugPrint('🔄 Provider not passed, fetching from Firestore...');
       _fetchProviderData();
     } else {
-      debugPrint('✅ Provider passed from parent: ${_provider!.businessName}');
+      //debugPrint('✅ Provider passed from parent: ${_provider!.businessName}');
     }
 
     // Load bookings for this service
@@ -176,9 +176,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: const Column(
                   children: [
@@ -250,7 +252,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ),
       );
     } catch (e) {
-      debugPrint('Error selecting date/time: $e');
+      //debugPrint('Error selecting date/time: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Error selecting date/time: $e'),
@@ -277,11 +279,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         if (address != null && mounted) {
           _locationController.text = address;
           _savedLocationText = address; // ✅ NEW: Mark as saved
-          debugPrint('✅ Location auto-fetched: $address');
+          //debugPrint('✅ Location auto-fetched: $address');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error auto-fetching location: $e');
+      //debugPrint('❌ Error auto-fetching location: $e');
       // Don't show error - location is optional
     } finally {
       if (mounted) {
@@ -364,7 +366,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ),
       );
 
-      debugPrint('✅ Location saved: $currentLocation');
+      //debugPrint('✅ Location saved: $currentLocation');
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -377,7 +379,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   Future<void> _fetchProviderData() async {
     if (widget.service.providerId.isEmpty) {
-      debugPrint('❌ No provider ID provided');
+      //debugPrint('❌ No provider ID provided');
       return;
     }
 
@@ -386,7 +388,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     });
 
     try {
-      debugPrint('🔄 Fetching provider data for: ${widget.service.providerId}');
+      //debugPrint('🔄 Fetching provider data for: ${widget.service.providerId}');
 
       // ✅ FIRST: Try to get from providers collection
       final providerDoc = await FirebaseFirestore.instance
@@ -396,9 +398,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
       if (providerDoc.exists && providerDoc.data() != null) {
         final providerModel = ProviderModel.fromFireStore(providerDoc);
-        debugPrint(
-          '✅ Provider found in providers collection: ${providerModel.businessName}',
-        );
+        // debugPrint(
+        //   '✅ Provider found in providers collection: ${providerModel.businessName}',
+        // );
 
         if (mounted) {
           setState(() {
@@ -410,9 +412,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       }
 
       // ✅ FALLBACK: If not found in providers collection, get from user data
-      debugPrint(
-        '⚠️ Provider not found in providers collection, checking user data...',
-      );
+      // debugPrint(
+      //   '⚠️ Provider not found in providers collection, checking user data...',
+      // );
       final userDoc = await FirebaseDatabase.instance
           .ref('users')
           .child(widget.service.providerId)
@@ -420,7 +422,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
       if (userDoc.exists && userDoc.value != null) {
         final userData = Map<String, dynamic>.from(userDoc.value as Map);
-        debugPrint('✅ User data found: ${userData['name']}');
+        //debugPrint('✅ User data found: ${userData['name']}');
 
         // Create a temporary provider model from user data and service data
         final tempProvider = ProviderModel(
@@ -453,19 +455,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             _provider = tempProvider;
             _isLoadingProvider = false;
           });
-          debugPrint('✅ Temporary provider model created');
+          //debugPrint('✅ Temporary provider model created');
         }
         return;
       }
 
-      debugPrint('❌ No provider data found anywhere');
+      //debugPrint('❌ No provider data found anywhere');
       if (mounted) {
         setState(() {
           _provider = null;
           _isLoadingProvider = false;
         });
       } else {
-        debugPrint('❌ Provider document does not exist or has no data');
+        //debugPrint('❌ Provider document does not exist or has no data');
         if (mounted) {
           setState(() {
             _provider = null;
@@ -474,8 +476,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         }
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ Error fetching provider: $e');
-      debugPrint('Stack trace: $stackTrace');
+      //debugPrint('❌ Error fetching provider: $e');
+      //debugPrint('Stack trace: $stackTrace');
 
       if (mounted) {
         setState(() {
@@ -514,7 +516,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         actions: [
           IconButton(
             onPressed: () {
-              debugPrint('🔄 Manual refresh triggered');
+              //debugPrint('🔄 Manual refresh triggered');
               _fetchProviderData();
               _loadBookingData();
             },
@@ -571,8 +573,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: InkWell(
-                      onTap:
-                          _selectConstrainedDateTime,
+                      onTap: _selectConstrainedDateTime,
                       borderRadius: BorderRadius.circular(14),
                       child: Container(
                         padding: const EdgeInsets.symmetric(
@@ -641,7 +642,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             Container(
                               padding: const EdgeInsets.all(8),
                               decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
+                                color: Colors.blue.withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(6),
                               ),
                               child: Row(
@@ -1494,7 +1495,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         await launchUrl(phoneUri);
       }
     } catch (e) {
-      debugPrint('Error making phone call: $e');
+      //debugPrint('Error making phone call: $e');
     }
   }
 
@@ -1771,9 +1772,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       vertical: 2,
                     ),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                     ),
                     child: const Text(
                       'UNSAVED',
@@ -1855,7 +1856,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         // ✅ Method 1: Check for analytics object (primary)
         if (data.containsKey('analytics')) {
           final analytics = data['analytics'] as Map<String, dynamic>?;
-          debugPrint('📊 [ANALYTICS] Found analytics data: $analytics');
+          //debugPrint('📊 [ANALYTICS] Found analytics data: $analytics');
 
           if (analytics != null) {
             // Try different rating field names in analytics
@@ -1883,9 +1884,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ?.toDouble();
             }
 
-            debugPrint(
-              '📊 [ANALYTICS] Extracted - Rating: $rating, Reviews: $totalReviews, Services: $totalServices',
-            );
+            // debugPrint(
+            //   '📊 [ANALYTICS] Extracted - Rating: $rating, Reviews: $totalReviews, Services: $totalServices',
+            // );
           }
         }
 
@@ -1901,9 +1902,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             totalReviews = (data['totalReviews'] as num?)?.toInt();
           }
 
-          debugPrint(
-            '📊 [FALLBACK] Root-level - Rating: $rating, Reviews: $totalReviews',
-          );
+          // debugPrint(
+          //   '📊 [FALLBACK] Root-level - Rating: $rating, Reviews: $totalReviews',
+          // );
         }
 
         final bool hasRating = rating != null && rating > 0;
@@ -1911,9 +1912,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         final displayReviews = totalReviews ?? 0;
         final displayServices = totalServices ?? 0;
 
-        debugPrint(
-          '🎯 [FINAL] Rating: $displayRating, Has Rating: $hasRating, Reviews: $displayReviews',
-        );
+        // debugPrint(
+        //   '🎯 [FINAL] Rating: $displayRating, Has Rating: $hasRating, Reviews: $displayReviews',
+        // );
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,

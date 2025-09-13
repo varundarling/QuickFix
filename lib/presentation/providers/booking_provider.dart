@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_final_fields, unused_local_variable
+
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -92,36 +94,6 @@ class BookingProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  // ✅ ADD: Debug methods
-  void debugCurrentState(String operation) {
-    debugPrint('📊 [$operation] Current booking state:');
-    debugPrint('   - Total bookings: ${_providerBookings.length}');
-    debugPrint('   - Pending: ${pendingBookings.length}');
-    debugPrint('   - Confirmed: ${confirmedBookings.length}');
-    debugPrint('   - Active (confirmed): ${activeBookings.length}');
-    debugPrint('   - Completed: ${completedBookings.length}');
-
-    debugPrint('📋 All bookings:');
-    for (var booking in _providerBookings) {
-      debugPrint(
-        '   - ${booking.serviceName}: ${booking.status} (${booking.id.substring(0, 8)})',
-      );
-    }
-  }
-
-  void debugBookingStates() {
-    debugPrint('📊 Current booking states:');
-    for (var booking in _providerBookings) {
-      debugPrint(
-        '   ${booking.serviceName}: ${booking.status} (ID: ${booking.id.substring(0, 8)})',
-      );
-    }
-    debugPrint('📊 Pending: ${pendingBookings.length}');
-    debugPrint('📊 Confirmed: ${confirmedBookings.length}');
-    debugPrint('📊 Active: ${activeBookings.length}');
-    debugPrint('📊 Completed: ${completedBookings.length}');
-  }
-
   // Getters
   List<BookingModel> get userBookings => _userBookings;
   List<BookingModel> get providerbookings => _providerBookings;
@@ -165,7 +137,7 @@ class BookingProvider extends ChangeNotifier {
     const validTransitions = {
       BookingStatus.pending: [BookingStatus.confirmed, BookingStatus.cancelled],
       BookingStatus.confirmed: [
-        BookingStatus.inProgress, // ✅ Add this back
+        BookingStatus.inProgress,
         BookingStatus.cancelled,
       ],
       BookingStatus.inProgress: [
@@ -179,7 +151,7 @@ class BookingProvider extends ChangeNotifier {
 
     final allowed =
         validTransitions[currentStatus]?.contains(newStatus) ?? false;
-    debugPrint('🔍 Status transition: $currentStatus → $newStatus = $allowed');
+    // 🔍 Status transition: $currentStatus → $newStatus = $allowed
     return allowed;
   }
 
@@ -198,9 +170,7 @@ class BookingProvider extends ChangeNotifier {
 
   Future<void> refreshSpecificBooking(String bookingId) async {
     try {
-      debugPrint(
-        '🔄 [BOOKING PROVIDER] Refreshing specific booking: $bookingId',
-      );
+      // 🔄 [BOOKING PROVIDER] Refreshing specific booking: $bookingId
 
       final doc = await FirebaseFirestore.instance
           .collection('bookings')
@@ -216,34 +186,28 @@ class BookingProvider extends ChangeNotifier {
         );
         if (providerIndex != -1) {
           _providerBookings[providerIndex] = updatedBooking;
-          debugPrint(
-            '✅ [BOOKING PROVIDER] Provider booking $bookingId refreshed',
-          );
+          // ✅ [BOOKING PROVIDER] Provider booking $bookingId refreshed
         }
 
         // Update in user bookings list
         final userIndex = _userBookings.indexWhere((b) => b.id == bookingId);
         if (userIndex != -1) {
           _userBookings[userIndex] = updatedBooking;
-          debugPrint('✅ [BOOKING PROVIDER] User booking $bookingId refreshed');
+          // ✅ [BOOKING PROVIDER] User booking $bookingId refreshed
         }
 
         notifyListeners();
-        debugPrint(
-          '✅ [BOOKING PROVIDER] Booking $bookingId refreshed with status: ${updatedBooking.status}',
-        );
+        // ✅ [BOOKING PROVIDER] Booking $bookingId refreshed with status: ${updatedBooking.status}
       }
     } catch (error) {
-      debugPrint('❌ [BOOKING PROVIDER] Error refreshing booking: $error');
+      // ❌ [BOOKING PROVIDER] Error refreshing booking: $error
     }
   }
 
   void setProviderBookings(List<BookingModel> bookings) {
     _providerBookings = bookings;
     notifyListeners();
-    debugPrint(
-      '✅ [BOOKING PROVIDER] Provider bookings updated: ${bookings.length} bookings',
-    );
+    // ✅ [BOOKING PROVIDER] Provider bookings updated: ${bookings.length} bookings
   }
 
   Future<bool> cancelBooking(String bookingId, String userId) async {
@@ -271,7 +235,7 @@ class BookingProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (error) {
-      debugPrint('❌ Error cancelling booking: $error');
+      // ❌ Error cancelling booking: $error
       _setError('Failed to cancel booking: $error');
       return false;
     } finally {
@@ -285,9 +249,7 @@ class BookingProvider extends ChangeNotifier {
     _setError(null);
 
     try {
-      debugPrint(
-        '🔄 [PROVIDER] Loading bookings with customer data for: $providerId',
-      );
+      // 🔄 [PROVIDER] Loading bookings with customer data for: $providerId
 
       // Fetch bookings for this provider
       final bookingQuerySnapshot = await FirebaseFirestore.instance
@@ -303,9 +265,7 @@ class BookingProvider extends ChangeNotifier {
         try {
           BookingModel booking = BookingModel.fromFireStore(doc);
 
-          debugPrint(
-            '📋 [PROVIDER] Processing booking: ${booking.id} (${booking.status})',
-          );
+          // 📋 [PROVIDER] Processing booking: ${booking.id} (${booking.status})
 
           // ✅ ENHANCED: Check if booking already has customer data
           bool hasValidCustomerData =
@@ -316,16 +276,12 @@ class BookingProvider extends ChangeNotifier {
               booking.customerName != 'null';
 
           if (hasValidCustomerData) {
-            debugPrint(
-              '✅ [PROVIDER] Using existing customer data: ${booking.customerName}',
-            );
+            // ✅ [PROVIDER] Using existing customer data: ${booking.customerName}
             return booking;
           }
 
           // ✅ CRITICAL: Fetch customer details for all bookings without valid data
-          debugPrint(
-            '🔍 [PROVIDER] Fetching customer details for: ${booking.customerId}',
-          );
+          // 🔍 [PROVIDER] Fetching customer details for: ${booking.customerId}
           final customerDetails = await _fetchCustomerDetails(
             booking.customerId,
           );
@@ -338,11 +294,9 @@ class BookingProvider extends ChangeNotifier {
               customerAddressFromProfile: customerDetails['customerAddress'],
             );
 
-            debugPrint(
-              '✅ [PROVIDER] Customer data loaded: ${booking.customerName}',
-            );
+            // ✅ [PROVIDER] Customer data loaded: ${booking.customerName}
           } else {
-            debugPrint('⚠️ [PROVIDER] No customer data found, using fallback');
+            // ⚠️ [PROVIDER] No customer data found, using fallback
             booking = booking.copyWith(
               customerName: 'Customer Info Unavailable',
               customerPhone: 'Contact not available',
@@ -352,7 +306,7 @@ class BookingProvider extends ChangeNotifier {
 
           return booking;
         } catch (e) {
-          debugPrint('❌ [PROVIDER] Error processing booking: $e');
+          // ❌ [PROVIDER] Error processing booking: $e
           BookingModel fallbackBooking = BookingModel.fromFireStore(doc);
           return fallbackBooking.copyWith(
             customerName: 'Error Loading Customer',
@@ -367,18 +321,14 @@ class BookingProvider extends ChangeNotifier {
 
       _providerBookings = bookingsWithCustomerDetails;
 
-      debugPrint(
-        '✅ [PROVIDER] Loaded ${bookingsWithCustomerDetails.length} bookings with customer data',
-      );
+      // ✅ [PROVIDER] Loaded ${bookingsWithCustomerDetails.length} bookings with customer data
 
       // ✅ DEBUG: Show sample of loaded customer data
       for (var booking in bookingsWithCustomerDetails.take(3)) {
-        debugPrint(
-          '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
-        );
+        //   - ${booking.serviceName}: ${booking.customerName} (${booking.status})
       }
     } catch (e) {
-      debugPrint('❌ [PROVIDER] Error loading bookings: $e');
+      //❌ [PROVIDER] Error loading bookings: $e
       _setError('Failed to load bookings: $e');
     } finally {
       _setLoading(false);
@@ -389,9 +339,7 @@ class BookingProvider extends ChangeNotifier {
   // ✅ ADD to BookingProvider class
   Future<void> loadUserBookingsWithProviderData(String userId) async {
     try {
-      debugPrint(
-        '🔄 [BOOKING PROVIDER] Loading bookings with provider data for: $userId',
-      );
+      // 🔄 [BOOKING PROVIDER] Loading bookings with provider data for: $userId
 
       // First load bookings
       final snapshot = await FirebaseFirestore.instance
@@ -421,20 +369,16 @@ class BookingProvider extends ChangeNotifier {
 
           bookingsWithProviders.add(booking);
         } catch (e) {
-          debugPrint('❌ [BOOKING PROVIDER] Error processing booking: $e');
+          // ❌ [BOOKING PROVIDER] Error processing booking: $e
           // Add booking without provider details
           bookingsWithProviders.add(BookingModel.fromFireStore(doc));
         }
       }
 
       updateUserBookings(bookingsWithProviders);
-      debugPrint(
-        '✅ [BOOKING PROVIDER] Loaded ${bookingsWithProviders.length} bookings with provider data',
-      );
+      // ✅ [BOOKING PROVIDER] Loaded ${bookingsWithProviders.length} bookings with provider data
     } catch (e) {
-      debugPrint(
-        '❌ [BOOKING PROVIDER] Error loading bookings with provider data: $e',
-      );
+      // ❌ [BOOKING PROVIDER] Error loading bookings with provider data: $e
     }
   }
 
@@ -447,7 +391,7 @@ class BookingProvider extends ChangeNotifier {
   // ✅ ENHANCED: Update existing _fetchCustomerDetails to handle Firestore better
   Future<Map<String, dynamic>?> _fetchCustomerDetails(String customerId) async {
     try {
-      debugPrint('🔍 [PROVIDER] Fetching customer details for: $customerId');
+      // 🔍 [PROVIDER] Fetching customer details for: $customerId
 
       // ✅ Method 1: Try Firebase Realtime Database first
       try {
@@ -467,9 +411,7 @@ class BookingProvider extends ChangeNotifier {
               '';
 
           if (customerName.isNotEmpty) {
-            debugPrint(
-              '✅ [PROVIDER] Customer found in Realtime DB: $customerName',
-            );
+            // ✅ [PROVIDER] Customer found in Realtime DB: $customerName
             return {
               'customerName': customerName,
               'customerPhone': customerPhone,
@@ -479,7 +421,7 @@ class BookingProvider extends ChangeNotifier {
           }
         }
       } catch (e) {
-        debugPrint('⚠️ [PROVIDER] Realtime DB error: $e');
+        // ⚠️ [PROVIDER] Realtime DB error: $e
       }
 
       // ✅ Method 2: Try Firestore users collection
@@ -503,9 +445,7 @@ class BookingProvider extends ChangeNotifier {
               '';
 
           if (customerName.isNotEmpty) {
-            debugPrint(
-              '✅ [PROVIDER] Customer found in Firestore: $customerName',
-            );
+            // ✅ [PROVIDER] Customer found in Firestore: $customerName
             return {
               'customerName': customerName,
               'customerPhone': customerPhone,
@@ -515,7 +455,7 @@ class BookingProvider extends ChangeNotifier {
           }
         }
       } catch (e) {
-        debugPrint('⚠️ [PROVIDER] Firestore error: $e');
+        // ⚠️ [PROVIDER] Firestore error: $e
       }
 
       // ✅ Method 3: Try to get from existing bookings (fallback)
@@ -535,9 +475,7 @@ class BookingProvider extends ChangeNotifier {
           if (existingName != null &&
               existingName.isNotEmpty &&
               existingName != 'Unknown Customer') {
-            debugPrint(
-              '✅ [PROVIDER] Customer found in existing bookings: $existingName',
-            );
+            // ✅ [PROVIDER] Customer found in existing bookings: $existingName
             return {
               'customerName': existingName,
               'customerPhone': existingPhone ?? '',
@@ -548,10 +486,10 @@ class BookingProvider extends ChangeNotifier {
           }
         }
       } catch (e) {
-        debugPrint('⚠️ [PROVIDER] Existing bookings error: $e');
+        // ⚠️ [PROVIDER] Existing bookings error: $e
       }
 
-      debugPrint('❌ [PROVIDER] Customer not found anywhere: $customerId');
+      // ❌ [PROVIDER] Customer not found anywhere: $customerId
       return {
         'customerName': 'Customer Not Found',
         'customerPhone': 'Contact not available',
@@ -559,7 +497,7 @@ class BookingProvider extends ChangeNotifier {
         'customerAddress': '',
       };
     } catch (e) {
-      debugPrint('❌ [PROVIDER] Critical error fetching customer: $e');
+      // ❌ [PROVIDER] Critical error fetching customer: $e
       return {
         'customerName': 'Error Loading Customer',
         'customerPhone': 'Contact unavailable',
@@ -580,7 +518,7 @@ class BookingProvider extends ChangeNotifier {
     String providerId,
   ) async {
     try {
-      debugPrint('🔍 [CUSTOMER] Fetching provider details for: $providerId');
+      // 🔍 [CUSTOMER] Fetching provider details for: $providerId
 
       // First try providers collection (preferred for providers)
       try {
@@ -591,7 +529,7 @@ class BookingProvider extends ChangeNotifier {
 
         if (providerDoc.exists && providerDoc.data() != null) {
           final providerData = providerDoc.data()!;
-          debugPrint('✅ [CUSTOMER] Provider found in providers collection');
+          // ✅ [CUSTOMER] Provider found in providers collection
 
           return {
             'providerName':
@@ -605,7 +543,7 @@ class BookingProvider extends ChangeNotifier {
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER] Firestore providers error: $e');
+        // ⚠️ [CUSTOMER] Firestore providers error: $e
       }
 
       // Fallback to Realtime Database
@@ -617,7 +555,7 @@ class BookingProvider extends ChangeNotifier {
 
         if (userDoc.exists && userDoc.value != null) {
           final userData = Map<String, dynamic>.from(userDoc.value as Map);
-          debugPrint('✅ [CUSTOMER] Provider found in Realtime DB');
+          // ✅ [CUSTOMER] Provider found in Realtime DB
 
           return {
             'providerName':
@@ -630,7 +568,7 @@ class BookingProvider extends ChangeNotifier {
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER] Realtime DB error: $e');
+        // ⚠️ [CUSTOMER] Realtime DB error: $e
       }
 
       // Last fallback to users collection
@@ -642,7 +580,7 @@ class BookingProvider extends ChangeNotifier {
 
         if (userFirestoreDoc.exists && userFirestoreDoc.data() != null) {
           final userData = userFirestoreDoc.data()!;
-          debugPrint('✅ [CUSTOMER] Provider found in users collection');
+          // ✅ [CUSTOMER] Provider found in users collection
 
           return {
             'providerName':
@@ -655,12 +593,10 @@ class BookingProvider extends ChangeNotifier {
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER] Firestore users error: $e');
+        // ⚠️ [CUSTOMER] Firestore users error: $e
       }
 
-      debugPrint(
-        '❌ [CUSTOMER] Provider not found in any collection: $providerId',
-      );
+      // ❌ [CUSTOMER] Provider not found in any collection: $providerId
       return {
         'providerName': 'Provider Not Available',
         'providerPhone': '',
@@ -668,7 +604,7 @@ class BookingProvider extends ChangeNotifier {
         'providerAddress': '',
       };
     } catch (e) {
-      debugPrint('❌ [CUSTOMER] Error fetching provider: $e');
+      // ❌ [CUSTOMER] Error fetching provider: $e
       return {
         'providerName': 'Error Loading Provider',
         'providerPhone': '',
@@ -678,13 +614,9 @@ class BookingProvider extends ChangeNotifier {
     }
   }
 
-  Future<Map<String, dynamic>?> _fetchProviderDetails(String providerId) async {
-    return await fetchProviderDetailsForCustomer(providerId);
-  }
-
   Future<void> loadServiceBookings(String serviceId) async {
     try {
-      debugPrint('🔄 Loading bookings for service: $serviceId');
+      // 🔄 Loading bookings for service: $serviceId
 
       final querySnapshot = await FirebaseFirestore.instance
           .collection('bookings')
@@ -695,10 +627,10 @@ class BookingProvider extends ChangeNotifier {
           .map((doc) => BookingModel.fromFireStore(doc))
           .toList();
 
-      debugPrint('✅ Loaded ${serviceBookings.length} bookings for service');
+      // ✅ Loaded ${serviceBookings.length} bookings for service
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Error loading service bookings: $e');
+      // ❌ Error loading service bookings: $e
     }
   }
 
@@ -731,25 +663,21 @@ class BookingProvider extends ChangeNotifier {
     String currentUserId,
   ) async {
     if (isBookingLocked(bookingId)) {
-      debugPrint(
-        '🔒 [CONFLICT PREVENTION] Booking locked for OTP verification: $bookingId',
-      );
+      // 🔒 [CONFLICT PREVENTION] Booking locked for OTP verification: $bookingId
       return false;
     }
 
     if (_isUpdatingStatus) {
-      debugPrint('⚠️ [CONFLICT PREVENTION] Update already in progress');
+      // ⚠️ [CONFLICT PREVENTION] Update already in progress
       return false;
     }
 
     _isUpdatingStatus = true;
 
     try {
-      debugPrint(
-        '🔄 [BOOKING PROVIDER] Starting atomic update for: $bookingId',
-      );
-      debugPrint('   - Target Status: $newStatus');
-      debugPrint('   - Provider ID: $currentUserId');
+      // 🔄 [BOOKING PROVIDER] Starting atomic update for: $bookingId
+      //   - Target Status: $newStatus
+      //   - Provider ID: $currentUserId
 
       bool success = false;
 
@@ -766,7 +694,7 @@ class BookingProvider extends ChangeNotifier {
         final currentData = bookingDoc.data()!;
         final currentStatus = bookingStatusFromString(currentData['status']);
 
-        debugPrint('   - Current DB Status: $currentStatus');
+        //    - Current DB Status: $currentStatus
 
         // ✅ CRITICAL: Validate status transition
         if (!_isValidStatusTransition(currentStatus, newStatus)) {
@@ -787,18 +715,16 @@ class BookingProvider extends ChangeNotifier {
         if (newStatus == BookingStatus.completed) {
           final DateTime completionDateTime = DateTime.now();
           updateData['completedAt'] = Timestamp.fromDate(completionDateTime);
-          debugPrint(
-            '✅ Setting completion date to live time: $completionDateTime',
-          );
+          // ✅ Setting completion date to live time: $completionDateTime
         }
 
-        debugPrint('   - Update Data: $updateData');
+        //    - Update Data: $updateData
         transaction.update(bookingRef, updateData);
         success = true;
       });
 
       if (success) {
-        debugPrint('✅ [BOOKING PROVIDER] Status updated successfully');
+        // ✅ [BOOKING PROVIDER] Status updated successfully
 
         // Update local state immediately
         final bookingIndex = _providerBookings.indexWhere(
@@ -857,7 +783,7 @@ class BookingProvider extends ChangeNotifier {
                 'createdAt': FieldValue.serverTimestamp(),
               });
 
-              debugPrint('✅ Status change notification created for customer');
+              // ✅ Status change notification created for customer
             }
           }
         }
@@ -868,7 +794,7 @@ class BookingProvider extends ChangeNotifier {
 
       return false;
     } catch (error) {
-      debugPrint('❌ [BOOKING PROVIDER] Failed: $error');
+      // ❌ [BOOKING PROVIDER] Failed: $error
       return false;
     } finally {
       _isUpdatingStatus = false;
@@ -881,16 +807,12 @@ class BookingProvider extends ChangeNotifier {
   // Add these methods to BookingProvider
   void markBookingAsSystemUpdated(String bookingId) {
     _systemUpdatedBookings.add(bookingId);
-    debugPrint(
-      '🔒 [SYSTEM PROTECTION] Marking booking as system updated: $bookingId',
-    );
+    // 🔒 [SYSTEM PROTECTION] Marking booking as system updated: $bookingId
 
     // Auto-remove after 30 seconds
     Timer(const Duration(seconds: 30), () {
       _systemUpdatedBookings.remove(bookingId);
-      debugPrint(
-        '🔓 [SYSTEM PROTECTION] Auto-removed system protection: $bookingId',
-      );
+      // 🔓 [SYSTEM PROTECTION] Auto-removed system protection: $bookingId
     });
   }
 
@@ -927,7 +849,7 @@ class BookingProvider extends ChangeNotifier {
             ...?additionalData,
           });
 
-      debugPrint('✅ Booking created: ${bookingRef.id}');
+      // ✅ Booking created: ${bookingRef.id}
 
       // Notify provider immediately
       await RealtimeNotificationService.instance.notifyProviderOfNewBooking(
@@ -942,7 +864,7 @@ class BookingProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('❌ Error creating booking: $e');
+      // ❌ Error creating booking: $e
       return false;
     }
   }
@@ -954,7 +876,7 @@ class BookingProvider extends ChangeNotifier {
     String customerId,
   ) async {
     try {
-      debugPrint('🔄 [CUSTOMER] Updating booking status to: $newStatus');
+      //🔄 [CUSTOMER] Updating booking status to: $newStatus
 
       // ✅ CRITICAL: Use live date/time
       final DateTime liveDateTime = DateTime.now();
@@ -971,9 +893,9 @@ class BookingProvider extends ChangeNotifier {
             DateTime.now(); // Live completion time
         updateData['completedAt'] = Timestamp.fromDate(completionDateTime);
 
-        debugPrint(
-          '✅ [CUSTOMER] Setting completion date to live time: $completionDateTime',
-        );
+        // debugPrint(
+        //   '✅ [CUSTOMER] Setting completion date to live time: $completionDateTime',
+        // );
       }
 
       await FirebaseFirestore.instance
@@ -995,7 +917,7 @@ class BookingProvider extends ChangeNotifier {
 
       return true;
     } catch (error) {
-      debugPrint('❌ [CUSTOMER] Error updating status: $error');
+      // debugPrint('❌ [CUSTOMER] Error updating status: $error');
       return false;
     }
   }
@@ -1004,11 +926,11 @@ class BookingProvider extends ChangeNotifier {
   Future<void> initializeProvider(String providerId) async {
     if (_currentProviderId == providerId &&
         _providerBookingsSubscription != null) {
-      debugPrint('🔄 Provider already initialized for $providerId');
+      // debugPrint('🔄 Provider already initialized for $providerId');
       return;
     }
 
-    debugPrint('🔄 [BOOKING PROVIDER] Initializing for provider: $providerId');
+    // debugPrint('🔄 [BOOKING PROVIDER] Initializing for provider: $providerId');
     _currentProviderId = providerId;
 
     await _cancelAllListeners();
@@ -1022,7 +944,7 @@ class BookingProvider extends ChangeNotifier {
 
   // In BookingProvider - Enhanced real-time listener
   void _setupSingleRealTimeListener(String providerId) {
-    debugPrint('🔄 Setting up enhanced real-time listener for: $providerId');
+    // debugPrint('🔄 Setting up enhanced real-time listener for: $providerId');
 
     _providerBookingsSubscription = FirebaseFirestore.instance
         .collection('bookings')
@@ -1031,9 +953,9 @@ class BookingProvider extends ChangeNotifier {
         .snapshots()
         .listen(
           (snapshot) async {
-            debugPrint(
-              '🔔 [REAL-TIME] Received snapshot with ${snapshot.docs.length} documents',
-            );
+            // debugPrint(
+            //   '🔔 [REAL-TIME] Received snapshot with ${snapshot.docs.length} documents',
+            // );
 
             List<BookingModel> bookingsWithCustomerDetails = [];
 
@@ -1043,9 +965,9 @@ class BookingProvider extends ChangeNotifier {
                 final bookingId = doc.id;
                 final status = data['status']?.toString() ?? 'pending';
 
-                debugPrint(
-                  '🔍 [REAL-TIME] Processing booking $bookingId: $status',
-                );
+                // debugPrint(
+                //   '🔍 [REAL-TIME] Processing booking $bookingId: $status',
+                // );
 
                 // ✅ CRITICAL: Create booking model first
                 BookingModel booking = BookingModel.fromFireStore(doc);
@@ -1061,14 +983,14 @@ class BookingProvider extends ChangeNotifier {
                     booking.customerPhone != 'No Phone';
 
                 if (hasCustomerData) {
-                  debugPrint(
-                    '✅ [REAL-TIME] Using existing customer data: ${booking.customerName}',
-                  );
+                  // debugPrint(
+                  //   '✅ [REAL-TIME] Using existing customer data: ${booking.customerName}',
+                  // );
                   bookingsWithCustomerDetails.add(booking);
                 } else {
-                  debugPrint(
-                    '🔍 [REAL-TIME] Fetching missing customer data for: ${booking.customerId}',
-                  );
+                  // debugPrint(
+                  //   '🔍 [REAL-TIME] Fetching missing customer data for: ${booking.customerId}',
+                  // );
 
                   // ✅ CRITICAL: Always fetch customer details for bookings without data
                   final customerDetails = await _fetchCustomerDetails(
@@ -1084,11 +1006,11 @@ class BookingProvider extends ChangeNotifier {
                           customerDetails['customerAddress'],
                     );
 
-                    debugPrint(
-                      '✅ [REAL-TIME] Customer data loaded: ${booking.customerName}',
-                    );
+                    // debugPrint(
+                    //   '✅ [REAL-TIME] Customer data loaded: ${booking.customerName}',
+                    // );
                   } else {
-                    debugPrint('❌ [REAL-TIME] Could not fetch customer data');
+                    // debugPrint('❌ [REAL-TIME] Could not fetch customer data');
                     // ✅ Set fallback data instead of leaving null
                     booking = booking.copyWith(
                       customerName: 'Customer Information Unavailable',
@@ -1100,7 +1022,7 @@ class BookingProvider extends ChangeNotifier {
                   bookingsWithCustomerDetails.add(booking);
                 }
               } catch (e) {
-                debugPrint('❌ [REAL-TIME] Error processing booking: $e');
+                // debugPrint('❌ [REAL-TIME] Error processing booking: $e');
                 // Add booking with fallback data
                 BookingModel fallbackBooking = BookingModel.fromFireStore(doc);
                 fallbackBooking = fallbackBooking.copyWith(
@@ -1116,15 +1038,15 @@ class BookingProvider extends ChangeNotifier {
             notifyListeners();
 
             // ✅ DEBUG: Log final customer data status
-            debugPrint('✅ [REAL-TIME] Final booking customer data:');
+            // debugPrint('✅ [REAL-TIME] Final booking customer data:');
             for (var booking in bookingsWithCustomerDetails.take(3)) {
-              debugPrint(
-                '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
-              );
+              // debugPrint(
+                // '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
+              // );
             }
           },
           onError: (error) {
-            debugPrint('❌ [REAL-TIME] Error: $error');
+            // debugPrint('❌ [REAL-TIME] Error: $error');
           },
         );
   }
@@ -1146,9 +1068,9 @@ class BookingProvider extends ChangeNotifier {
             'updatedAt': FieldValue.serverTimestamp(),
           });
 
-      debugPrint('✅ Booking status unlocked: $bookingId');
+      // debugPrint('✅ Booking status unlocked: $bookingId');
     } catch (e) {
-      debugPrint('❌ Error unlocking booking status: $e');
+      // debugPrint('❌ Error unlocking booking status: $e');
     }
   }
 
@@ -1163,7 +1085,7 @@ class BookingProvider extends ChangeNotifier {
 
   void unlockBookingFromOTP(String bookingId) {
     _lockedBookings.remove(bookingId);
-    debugPrint('🔓 [BOOKING LOCK] Unlocked booking from OTP: $bookingId');
+    // debugPrint('🔓 [BOOKING LOCK] Unlocked booking from OTP: $bookingId');
   }
 
   bool isBookingLocked(String bookingId) {
@@ -1172,32 +1094,32 @@ class BookingProvider extends ChangeNotifier {
 
   // Add this method to BookingProvider
   void pauseRealTimeListener() {
-    debugPrint(
-      '⏸️ [BOOKING PROVIDER] Pausing real-time listener for OTP verification',
-    );
+    // debugPrint(
+    //   '⏸️ [BOOKING PROVIDER] Pausing real-time listener for OTP verification',
+    // );
     _providerBookingsSubscription?.pause();
   }
 
   void resumeRealTimeListener() {
-    debugPrint('▶️ [BOOKING PROVIDER] Resuming real-time listener');
+    // debugPrint('▶️ [BOOKING PROVIDER] Resuming real-time listener');
     _providerBookingsSubscription?.resume();
   }
 
   void debugStatusAfterOTP(String operation) {
-    debugPrint('🔍 [$operation] Status check:');
-    debugPrint('   - _isUpdatingStatus: $_isUpdatingStatus');
-    debugPrint('   - Total bookings: ${_providerBookings.length}');
+    // debugPrint('🔍 [$operation] Status check:');
+    // debugPrint('   - _isUpdatingStatus: $_isUpdatingStatus');
+    // debugPrint('   - Total bookings: ${_providerBookings.length}');
 
     for (var booking in _providerBookings) {
-      debugPrint(
-        '   - ${booking.serviceName}: ${booking.status} (${booking.id.substring(0, 8)})',
-      );
+      // debugPrint(
+      //   '   - ${booking.serviceName}: ${booking.status} (${booking.id.substring(0, 8)})',
+      // );
     }
 
-    debugPrint(
-      '   - InProgress count: ${_providerBookings.where((b) => b.status == BookingStatus.inProgress).length}',
-    );
-    debugPrint('   - Active tab count: ${activeBookings.length}');
+    // debugPrint(
+    //   '   - InProgress count: ${_providerBookings.where((b) => b.status == BookingStatus.inProgress).length}',
+    // );
+    // debugPrint('   - Active tab count: ${activeBookings.length}');
   }
 
   Future<void> loadProviderBookings(String providerId) async {
@@ -1216,9 +1138,9 @@ class BookingProvider extends ChangeNotifier {
           .toList();
 
       _providerBookings = bookings;
-      debugPrint('✅ Loaded ${bookings.length} provider bookings');
+      // debugPrint('✅ Loaded ${bookings.length} provider bookings');
     } catch (error) {
-      debugPrint('❌ Error loading provider bookings: $error');
+      // debugPrint('❌ Error loading provider bookings: $error');
       _setError('Failed to load bookings: $error');
     } finally {
       _setLoading(false);
@@ -1241,9 +1163,9 @@ class BookingProvider extends ChangeNotifier {
           .toList();
 
       _userBookings = bookings;
-      debugPrint('✅ Loaded ${bookings.length} user bookings');
+      //debugPrint('✅ Loaded ${bookings.length} user bookings');
     } catch (error) {
-      debugPrint('❌ Error loading user bookings: $error');
+      // debugPrint('❌ Error loading user bookings: $error');
       _setError('Failed to load bookings: $error');
     } finally {
       _setLoading(false);
@@ -1253,13 +1175,13 @@ class BookingProvider extends ChangeNotifier {
   Future<void> _cancelAllListeners() async {
     _providerBookingsSubscription?.cancel();
     _providerBookingsSubscription = null;
-    debugPrint('🛑 All booking listeners cancelled');
+    // debugPrint('🛑 All booking listeners cancelled');
   }
 
   void disposeProviderListener() {
     _cancelAllListeners();
     _currentProviderId = null;
-    debugPrint('🛑 Provider booking listener disposed');
+    // debugPrint('🛑 Provider booking listener disposed');
   }
 
   void _setLoading(bool loading) {
@@ -1338,7 +1260,7 @@ class BookingProvider extends ChangeNotifier {
 
       await AdService.instance.showRewarded(
         onReward: (amount) {
-          debugPrint('🎉 Customer earned reward: $amount');
+          // debugPrint('🎉 Customer earned reward: $amount');
         },
       );
 
@@ -1353,7 +1275,7 @@ class BookingProvider extends ChangeNotifier {
         bookingId: savedBooking.id,
       );
 
-      debugPrint('✅ Customer booking rewards and notifications sent');
+      // debugPrint('✅ Customer booking rewards and notifications sent');
 
       _userBookings.add(savedBooking);
       notifyListeners();
@@ -1390,7 +1312,7 @@ class BookingProvider extends ChangeNotifier {
   }) async {
     try {
       _setLoading(true);
-      debugPrint('🔄 Creating enhanced booking...');
+      // debugPrint('🔄 Creating enhanced booking...');
 
       final bookingId = const Uuid().v4();
 
@@ -1403,10 +1325,10 @@ class BookingProvider extends ChangeNotifier {
         'customerEmail': customerEmail.isNotEmpty ? customerEmail : 'No Email',
       };
 
-      debugPrint('📋 [BOOKING CREATION] Customer data being saved:');
-      debugPrint('   - Name: ${customerDataMap['customerName']}');
-      debugPrint('   - Phone: ${customerDataMap['customerPhone']}');
-      debugPrint('   - Email: ${customerDataMap['customerEmail']}');
+      // debugPrint('📋 [BOOKING CREATION] Customer data being saved:');
+      // debugPrint('   - Name: ${customerDataMap['customerName']}');
+      // debugPrint('   - Phone: ${customerDataMap['customerPhone']}');
+      // debugPrint('   - Email: ${customerDataMap['customerEmail']}');
 
       final booking = BookingModel(
         id: bookingId,
@@ -1438,9 +1360,9 @@ class BookingProvider extends ChangeNotifier {
           .doc(bookingId)
           .set(booking.toFireStore());
 
-      debugPrint('✅ [BOOKING CREATION] Booking saved with customer data:');
-      debugPrint('   - Customer: ${booking.customerName}');
-      debugPrint('   - Phone: ${booking.customerPhone}');
+      // debugPrint('✅ [BOOKING CREATION] Booking saved with customer data:');
+      // debugPrint('   - Customer: ${booking.customerName}');
+      // debugPrint('   - Phone: ${booking.customerPhone}');
 
       // Mark service as booked
       final serviceProvider = ServiceProvider();
@@ -1454,16 +1376,16 @@ class BookingProvider extends ChangeNotifier {
       // Add to local list
       _userBookings.add(booking);
 
-      debugPrint('✅ Enhanced booking created successfully');
-      debugPrint('   - Customer: $customerName ($customerPhone)');
-      debugPrint('   - Provider: $providerName ($providerPhone)');
+      // debugPrint('✅ Enhanced booking created successfully');
+      // debugPrint('   - Customer: $customerName ($customerPhone)');
+      // debugPrint('   - Provider: $providerName ($providerPhone)');
 
       _setLoading(false);
       notifyListeners();
 
       return booking;
     } catch (e) {
-      debugPrint('❌ Error creating enhanced booking: $e');
+      // debugPrint('❌ Error creating enhanced booking: $e');
       _setError('Failed to create booking: $e');
       _setLoading(false);
       return null;
@@ -1490,9 +1412,9 @@ class BookingProvider extends ChangeNotifier {
             'customerPhone': customerPhone,
             'updatedAt': FieldValue.serverTimestamp(),
           });
-      debugPrint('✅ Service marked as booked successfully');
+      // debugPrint('✅ Service marked as booked successfully');
     } catch (e) {
-      debugPrint('❌ Error marking service as booked: $e');
+      // debugPrint('❌ Error marking service as booked: $e');
     }
   }
 
@@ -1513,11 +1435,11 @@ class BookingProvider extends ChangeNotifier {
                 'fcmToken': freshToken,
                 'lastTokenUpdate': FieldValue.serverTimestamp(),
               }, SetOptions(merge: true));
-          debugPrint('✅ Fresh FCM token saved for provider');
+          // debugPrint('✅ Fresh FCM token saved for provider');
         }
       }
     } catch (e) {
-      debugPrint('❌ Error ensuring provider FCM token: $e');
+      // debugPrint('❌ Error ensuring provider FCM token: $e');
     }
   }
 
@@ -1530,7 +1452,7 @@ class BookingProvider extends ChangeNotifier {
     double? workProgress,
   }) async {
     try {
-      debugPrint('🔄 Updating booking with progress: $bookingId');
+      // debugPrint('🔄 Updating booking with progress: $bookingId');
 
       final updateData = <String, dynamic>{
         'status': newStatus.toString().split('.').last,
@@ -1581,7 +1503,7 @@ class BookingProvider extends ChangeNotifier {
 
       return true;
     } catch (e) {
-      debugPrint('❌ Error updating booking with progress: $e');
+      // debugPrint('❌ Error updating booking with progress: $e');
       return false;
     }
   }
@@ -1607,7 +1529,7 @@ class BookingProvider extends ChangeNotifier {
         notifyListeners();
       }
     } catch (e) {
-      debugPrint('❌ Error updating work progress: $e');
+      // debugPrint('❌ Error updating work progress: $e');
     }
   }
 }

@@ -119,12 +119,12 @@ class _SafetyScreenState extends State<SafetyScreen>
                             screenWidth * 0.2,
                           ),
                           border: Border.all(
-                            color: AppColors.primary.withOpacity(0.2),
+                            color: AppColors.primary.withValues(alpha: 0.2),
                             width: 3,
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: AppColors.primary.withOpacity(0.2),
+                              color: AppColors.primary.withValues(alpha: 0.2),
                               blurRadius: 20,
                               offset: const Offset(0, 10),
                             ),
@@ -136,7 +136,7 @@ class _SafetyScreenState extends State<SafetyScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
+                                  color: AppColors.primary.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(25),
                                 ),
                                 child: Icon(
@@ -212,7 +212,7 @@ class _SafetyScreenState extends State<SafetyScreen>
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 16, // ✅ REDUCED: from 18 to 16
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                   ),
                 ),
 
@@ -320,7 +320,7 @@ class _SafetyScreenState extends State<SafetyScreen>
                         borderRadius: BorderRadius.circular(16),
                         boxShadow: [
                           BoxShadow(
-                            color: AppColors.primary.withOpacity(0.2),
+                            color: AppColors.primary.withValues(alpha: 0.2),
                             blurRadius: 15,
                             offset: const Offset(0, 8),
                           ),
@@ -359,7 +359,7 @@ class _SafetyScreenState extends State<SafetyScreen>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.1),
+            color: AppColors.primary.withValues(alpha: 0.1),
             blurRadius: 15,
             offset: const Offset(0, 5),
           ),
@@ -371,7 +371,7 @@ class _SafetyScreenState extends State<SafetyScreen>
             width: 45, // ✅ REDUCED: from 50 to 45
             height: 45, // ✅ REDUCED: from 50 to 45
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
+              color: AppColors.primary.withValues(alpha: 0.1),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(
@@ -398,7 +398,7 @@ class _SafetyScreenState extends State<SafetyScreen>
                   description,
                   style: TextStyle(
                     fontSize: 13, // ✅ REDUCED: from 14 to 13
-                    color: AppColors.primary.withOpacity(0.7),
+                    color: AppColors.primary.withValues(alpha: 0.7),
                   ),
                 ),
               ],

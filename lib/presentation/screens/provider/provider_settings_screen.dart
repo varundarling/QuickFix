@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -35,7 +37,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading settings: $e');
+      //debugPrint('Error loading settings: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -47,7 +49,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
       await prefs.setBool('booking_notifications', _bookingNotifications);
       await prefs.setBool('payment_notifications', _paymentNotifications);
     } catch (e) {
-      debugPrint('Error saving settings: $e');
+      //debugPrint('Error saving settings: $e');
     }
   }
 
@@ -206,7 +208,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.person, color: AppColors.primary),
@@ -255,8 +257,8 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: _notificationsEnabled
-                    ? AppColors.success.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                    ? AppColors.success.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -282,7 +284,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.book_online, color: Colors.blue),
@@ -302,7 +304,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.purple.withOpacity(0.1),
+                  color: Colors.purple.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.payment, color: Colors.purple),
@@ -324,7 +326,7 @@ class _ProviderSettingsScreenState extends State<ProviderSettingsScreen> {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.info, color: Colors.orange),

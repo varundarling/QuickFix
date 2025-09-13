@@ -39,7 +39,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('Error loading settings: $e');
+      //debugPrint('Error loading settings: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -55,7 +55,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
         _promotionalNotifications,
       );
     } catch (e) {
-      debugPrint('Error saving settings: $e');
+      //debugPrint('Error saving settings: $e');
     }
   }
 
@@ -110,10 +110,10 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
               'updatedAt': FieldValue.serverTimestamp(),
             });
 
-        debugPrint('✅ Server notification preference updated: $enabled');
+        //debugPrint('✅ Server notification preference updated: $enabled');
       }
     } catch (e) {
-      debugPrint('❌ Error updating server preference: $e');
+      //debugPrint('❌ Error updating server preference: $e');
     }
   }
 
@@ -243,7 +243,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
+                    color: AppColors.primary.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Icon(Icons.person, color: AppColors.primary),
@@ -258,7 +258,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.bookmark, color: Colors.blue),
@@ -273,7 +273,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
                 leading: Container(
                   padding: const EdgeInsets.all(8),
                   decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
+                    color: Colors.red.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Icon(Icons.favorite, color: Colors.red),
@@ -305,8 +305,8 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: _notificationsEnabled
-                    ? AppColors.success.withOpacity(0.1)
-                    : Colors.grey.withOpacity(0.1),
+                    ? AppColors.success.withValues(alpha: 0.1)
+                    : Colors.grey.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(
@@ -335,7 +335,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.1),
+                  color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.calendar_today, color: Colors.blue),
@@ -356,7 +356,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.green.withOpacity(0.1),
+                  color: Colors.green.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.update, color: Colors.green),
@@ -377,7 +377,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
               secondary: Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Icon(Icons.local_offer, color: Colors.orange),
@@ -399,7 +399,7 @@ class _CustomerSettingsScreenState extends State<CustomerSettingsScreen> {
             leading: Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
+                color: Colors.orange.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: const Icon(Icons.info, color: Colors.orange),

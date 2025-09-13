@@ -1,4 +1,5 @@
-// lib/presentation/widgets/cards/provider_card.dart
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:flutter_rating_bar/flutter_rating_bar.dart';
 import 'package:location/location.dart';
@@ -85,7 +86,7 @@ class _ProviderCardState extends State<ProviderCard>
             margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Card(
               elevation: _elevationAnimation.value,
-              shadowColor: AppColors.primary.withOpacity(0.25),
+              shadowColor: AppColors.primary.withValues(alpha: 0.25),
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(24),
               ),
@@ -103,7 +104,7 @@ class _ProviderCardState extends State<ProviderCard>
                       end: Alignment.bottomRight,
                       colors: [
                         Colors.white,
-                        AppColors.primary.withOpacity(0.02),
+                        AppColors.primary.withValues(alpha: 0.02),
                         Colors.white,
                       ],
                       stops: const [0.0, 0.5, 1.0],
@@ -138,8 +139,8 @@ class _ProviderCardState extends State<ProviderCard>
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  AppColors.primary.withOpacity(0.1),
-                  AppColors.primary.withOpacity(0.05),
+                  AppColors.primary.withValues(alpha: 0.1),
+                  AppColors.primary.withValues(alpha: 0.05),
                 ],
               )
             : null,
@@ -173,7 +174,7 @@ class _ProviderCardState extends State<ProviderCard>
           borderRadius: BorderRadius.circular(40),
           boxShadow: [
             BoxShadow(
-              color: AppColors.primary.withOpacity(0.3),
+              color: AppColors.primary.withValues(alpha: 0.3),
               blurRadius: 16,
               offset: const Offset(0, 8),
             ),
@@ -190,7 +191,7 @@ class _ProviderCardState extends State<ProviderCard>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primary.withOpacity(0.7)],
+                colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.7)],
               ),
             ),
             child: isProvider
@@ -250,12 +251,12 @@ class _ProviderCardState extends State<ProviderCard>
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.success, AppColors.success.withOpacity(0.8)],
+          colors: [AppColors.success, AppColors.success.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: AppColors.success.withOpacity(0.3),
+            color: AppColors.success.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -285,15 +286,15 @@ class _ProviderCardState extends State<ProviderCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: widget.service!.isActive
-              ? [AppColors.success, AppColors.success.withOpacity(0.8)]
-              : [Colors.orange, Colors.orange.withOpacity(0.8)],
+              ? [AppColors.success, AppColors.success.withValues(alpha: 0.8)]
+              : [Colors.orange, Colors.orange.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
             color:
                 (widget.service!.isActive ? AppColors.success : Colors.orange)
-                    .withOpacity(0.3),
+                    .withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -325,9 +326,9 @@ class _ProviderCardState extends State<ProviderCard>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.15),
+        color: AppColors.primary.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
       ),
       child: Text(
         widget.service!.category,
@@ -359,12 +360,12 @@ class _ProviderCardState extends State<ProviderCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            Colors.amber.withOpacity(0.1),
-            Colors.amber.withOpacity(0.05),
+            Colors.amber.withValues(alpha: 0.1),
+            Colors.amber.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: Colors.amber.withOpacity(0.3)),
+        border: Border.all(color: Colors.amber.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -419,13 +420,13 @@ class _ProviderCardState extends State<ProviderCard>
                 gradient: LinearGradient(
                   colors: [
                     AppColors.success,
-                    AppColors.success.withOpacity(0.8),
+                    AppColors.success.withValues(alpha: 0.8),
                   ],
                 ),
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.success.withOpacity(0.3),
+                    color: AppColors.success.withValues(alpha: 0.3),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -462,12 +463,12 @@ class _ProviderCardState extends State<ProviderCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.success.withOpacity(0.1),
-            AppColors.success.withOpacity(0.05),
+            AppColors.success.withValues(alpha: 0.1),
+            AppColors.success.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.success.withOpacity(0.3)),
+        border: Border.all(color: AppColors.success.withValues(alpha: 0.3)),
       ),
       child: Row(
         children: [
@@ -511,7 +512,7 @@ class _ProviderCardState extends State<ProviderCard>
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(0.15),
+              color: Colors.blue.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Row(
@@ -539,9 +540,9 @@ class _ProviderCardState extends State<ProviderCard>
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: AppColors.primary.withOpacity(0.05),
+        color: AppColors.primary.withValues(alpha: 0.05),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppColors.primary.withOpacity(0.1)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.1)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -593,10 +594,10 @@ class _ProviderCardState extends State<ProviderCard>
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            border: Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
             boxShadow: [
               BoxShadow(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 blurRadius: 6,
                 offset: const Offset(0, 3),
               ),
@@ -669,12 +670,12 @@ class _ProviderCardState extends State<ProviderCard>
       width: double.infinity,
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withValues(alpha: 0.4),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -775,7 +776,7 @@ class _ProviderCardState extends State<ProviderCard>
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.success, AppColors.success.withOpacity(0.8)],
+            colors: [AppColors.success, AppColors.success.withValues(alpha: 0.8)],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
@@ -812,9 +813,9 @@ class _ProviderCardState extends State<ProviderCard>
     return Container(
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: Colors.blue.withOpacity(0.1),
+        color: Colors.blue.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.blue.withOpacity(0.3)),
+        border: Border.all(color: Colors.blue.withValues(alpha: 0.3)),
       ),
       child: Column(
         children: [
@@ -869,7 +870,7 @@ class _ProviderCardState extends State<ProviderCard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: _getStatusColor(activeBookings).withOpacity(0.3),
+            color: _getStatusColor(activeBookings).withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -890,7 +891,7 @@ class _ProviderCardState extends State<ProviderCard>
                 'Service Status',
                 style: TextStyle(
                   fontSize: 12,
-                  color: Colors.white.withOpacity(0.9),
+                  color: Colors.white.withValues(alpha: 0.9),
                   fontWeight: FontWeight.w600,
                 ),
               ),
@@ -912,7 +913,7 @@ class _ProviderCardState extends State<ProviderCard>
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w500,
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
               ),
             ),
           ],
@@ -932,7 +933,7 @@ class _ProviderCardState extends State<ProviderCard>
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: Colors.red.withOpacity(0.3),
+            color: Colors.red.withValues(alpha: 0.3),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -972,7 +973,7 @@ class _ProviderCardState extends State<ProviderCard>
 
   List<Color> _getStatusGradientColors(int activeBookings) {
     final baseColor = _getStatusColor(activeBookings);
-    return [baseColor, baseColor.withOpacity(0.8)];
+    return [baseColor, baseColor.withValues(alpha: 0.8)];
   }
 
   IconData _getStatusIcon(int activeBookings) {
@@ -994,7 +995,7 @@ class _ProviderCardState extends State<ProviderCard>
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.1),
+                color: Colors.red.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: const Icon(
@@ -1036,9 +1037,9 @@ class _ProviderCardState extends State<ProviderCard>
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.red.withOpacity(0.05),
+                color: Colors.red.withValues(alpha: 0.05),
                 borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.red.withOpacity(0.2)),
+                border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
               ),
               child: const Row(
                 children: [

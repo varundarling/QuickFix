@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class EncryptionService {
@@ -72,7 +71,6 @@ class EncryptionService {
   }) async {
     // Check session first
     if (_sessionKeys.containsKey(userUID)) {
-      debugPrint('✅ Master key found in session');
       return _sessionKeys[userUID];
     }
 
@@ -86,22 +84,19 @@ class EncryptionService {
       if (deviceKey != null && encryptedMasterKey != null) {
         final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
         _sessionKeys[userUID] = masterKey;
-        debugPrint('✅ Master key restored from device storage');
         return masterKey;
       }
     } catch (e) {
-      debugPrint('❌ Device key restoration failed: $e');
+      // Ignore errors and fallback to password derivation
     }
 
     // Fallback to password derivation
     if (password != null) {
       final masterKey = await _deriveMasterKey(password, userUID);
       _sessionKeys[userUID] = masterKey;
-      debugPrint('✅ Master key derived from password');
       return masterKey;
     }
 
-    debugPrint('❌ No master key available');
     return null;
   }
 
@@ -140,7 +135,6 @@ class EncryptionService {
       final decryptedJson = _simpleDecrypt(encryptedData, masterKey);
       return jsonDecode(decryptedJson);
     } catch (e) {
-      debugPrint('❌ Decryption failed for user $userUID: $e');
       rethrow;
     }
   }
@@ -183,11 +177,9 @@ class EncryptionService {
 
   static Future<bool> restoreEncryptionSession(String userUID) async {
     try {
-      debugPrint('🔐 Attempting to restore encryption session for: $userUID');
 
       // Check if we already have a session key
       if (_sessionKeys.containsKey(userUID)) {
-        debugPrint('✅ Session key already exists in memory');
         return true;
       }
 
@@ -204,22 +196,15 @@ class EncryptionService {
           // Validate the restored key by attempting a test operation
           if (_isValidKey(masterKey)) {
             _sessionKeys[userUID] = masterKey;
-            debugPrint('✅ Encryption session restored successfully');
             return true;
-          } else {
-            debugPrint('❌ Restored key validation failed');
           }
         } catch (e) {
-          debugPrint('❌ Failed to decrypt stored master key: $e');
           // Clear corrupted keys
           await _clearCorruptedKeys(userUID);
         }
       }
-
-      debugPrint('❌ No valid encryption session found');
       return false;
     } catch (e) {
-      debugPrint('❌ Error restoring encryption session: $e');
       return false;
     }
   }
@@ -238,9 +223,7 @@ class EncryptionService {
     try {
       await _secureStorage.delete(key: 'device_key_$userUID');
       await _secureStorage.delete(key: 'master_key_$userUID');
-      debugPrint('🧹 Cleared corrupted keys for user: $userUID');
     } catch (e) {
-      debugPrint('❌ Error clearing corrupted keys: $e');
     }
   }
 
@@ -261,29 +244,24 @@ class EncryptionService {
       }
 
       // Try to restore session
-      debugPrint('🔄 Session not ready, attempting restoration...');
       return await restoreEncryptionSession(userUID);
     } catch (e) {
-      debugPrint('❌ Error ensuring session ready: $e');
       return false;
     }
   }
 
   static bool isSessionReady(String userUID) {
     final hasSession = _sessionKeys.containsKey(userUID);
-    debugPrint('🔍 Encryption session ready for $userUID: $hasSession');
     return hasSession;
   }
 
   static Future<bool> tryRestoreGoogleUserSession(String userUID) async {
     try {
-      debugPrint('🔄 Attempting Google session restoration for: $userUID');
 
       // Generate Google password (you'll need the user object)
       // This should be called from AuthProvider with the actual user object
       return true; // Implementation depends on your existing encryption service
     } catch (e) {
-      debugPrint('❌ Google session restoration failed: $e');
       return false;
     }
   }

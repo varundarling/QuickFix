@@ -44,8 +44,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     });
 
     try {
-      debugPrint('🔍 Verifying OTP for booking: ${widget.booking.id}');
-      debugPrint('🔍 Entered OTP: $_enteredOTP');
+      // debugPrint('🔍 Verifying OTP for booking: ${widget.booking.id}');
+      // debugPrint('🔍 Entered OTP: $_enteredOTP');
 
       // ✅ Use Firestore instead of Realtime Database
       final otpDoc = await FirebaseFirestore.instance
@@ -73,7 +73,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
         await _validateAndProcessOTP(otpData);
       }
     } catch (e) {
-      debugPrint('❌ Verification error: $e');
+      //debugPrint('❌ Verification error: $e');
       if (mounted) {
         setState(() {
           _errorMessage = e.toString().replaceAll('Exception: ', '');
@@ -92,8 +92,8 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
     final isAlreadyVerified = otpData['isVerified'] as bool? ?? false;
     final expiresAt = (otpData['expiresAt'] as Timestamp?)?.toDate();
 
-    debugPrint('🔍 Stored OTP: $storedOTP');
-    debugPrint('🔍 Is verified: $isAlreadyVerified');
+    // debugPrint('🔍 Stored OTP: $storedOTP');
+    // debugPrint('🔍 Is verified: $isAlreadyVerified');
 
     if (storedOTP == null || storedOTP.isEmpty) {
       throw Exception('Invalid verification code data.');
@@ -137,7 +137,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
       });
     });
 
-    debugPrint('✅ OTP verified and booking status updated to inProgress');
+    //debugPrint('✅ OTP verified and booking status updated to inProgress');
 
     // Start progress tracking
     await ProgressTrackingService.instance.startProgressTracking(
@@ -329,7 +329,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(

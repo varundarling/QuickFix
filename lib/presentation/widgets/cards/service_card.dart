@@ -1,4 +1,3 @@
-// lib/presentation/widgets/cards/service_card.dart
 import 'dart:ui';
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -224,7 +223,7 @@ class _ServiceCardState extends State<ServiceCard>
   Widget _buildCardContent(BuildContext context, double? distance) {
     return Card(
       elevation: 12,
-      shadowColor: AppColors.primary.withOpacity(0.25),
+      shadowColor: AppColors.primary.withValues(alpha: 0.25),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
       child: GestureDetector(
         onTapDown: _handleTapDown,
@@ -241,7 +240,7 @@ class _ServiceCardState extends State<ServiceCard>
               end: Alignment.bottomRight,
               colors: [
                 Colors.white,
-                AppColors.primary.withOpacity(0.02),
+                AppColors.primary.withValues(alpha: 0.02),
                 Colors.white,
               ],
               stops: const [0.0, 0.5, 1.0],
@@ -315,8 +314,8 @@ class _ServiceCardState extends State<ServiceCard>
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  Colors.black.withOpacity(0.1),
-                  Colors.black.withOpacity(0.3),
+                  Colors.black.withValues(alpha: 0.1),
+                  Colors.black.withValues(alpha: 0.3),
                 ],
                 stops: const [0.0, 0.7, 1.0],
               ),
@@ -343,12 +342,12 @@ class _ServiceCardState extends State<ServiceCard>
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
         gradient: LinearGradient(
-          colors: [AppColors.primary, AppColors.primary.withOpacity(0.8)],
+          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
         ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.4),
+            color: AppColors.primary.withValues(alpha: 0.4),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -363,17 +362,14 @@ class _ServiceCardState extends State<ServiceCard>
             color: Colors.white,
           ),
           const SizedBox(width: 6),
-          const Text('Plumbing') ==
-                  null // dead code guard for analyzer
-              ? const SizedBox.shrink()
-              : Text(
-                  widget.service.category,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+          Text(
+            widget.service.category,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
         ],
       ),
     );
@@ -388,7 +384,7 @@ class _ServiceCardState extends State<ServiceCard>
         border: Border.all(color: AppColors.success, width: 2),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),
@@ -420,7 +416,7 @@ class _ServiceCardState extends State<ServiceCard>
         boxShadow: [
           BoxShadow(
             color: (widget.service.isActive ? AppColors.success : Colors.orange)
-                .withOpacity(0.4),
+                .withValues(alpha: 0.4),
             blurRadius: 6,
             offset: const Offset(0, 2),
           ),
@@ -458,7 +454,7 @@ class _ServiceCardState extends State<ServiceCard>
           borderRadius: BorderRadius.circular(16),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.4),
+              color: Colors.grey.withValues(alpha: 0.4),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -497,8 +493,8 @@ class _ServiceCardState extends State<ServiceCard>
         ? [Colors.amber, Colors.amber.shade600]
         : [Colors.grey.shade400, Colors.grey.shade600];
     final shadowColor = hasReviews
-        ? Colors.amber.withOpacity(0.4)
-        : Colors.grey.withOpacity(0.3);
+        ? Colors.amber.withValues(alpha: 0.4)
+        : Colors.grey.withValues(alpha: 0.3);
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -567,7 +563,7 @@ class _ServiceCardState extends State<ServiceCard>
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
+                color: AppColors.primary.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
@@ -632,12 +628,12 @@ class _ServiceCardState extends State<ServiceCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.primary.withOpacity(0.05),
+            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.primary.withValues(alpha: 0.05),
           ],
         ),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withOpacity(0.2)),
+        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
       ),
       child: Row(
         children: [
@@ -740,7 +736,7 @@ class _ServiceCardState extends State<ServiceCard>
                   border: Border.all(color: Colors.blue.shade300),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       blurRadius: 4,
                       offset: const Offset(0, 2),
                     ),
@@ -786,7 +782,7 @@ class _ServiceCardState extends State<ServiceCard>
                   : LinearGradient(
                       colors: [
                         AppColors.primary,
-                        AppColors.primary.withOpacity(0.8),
+                        AppColors.primary.withValues(alpha: 0.8),
                       ],
                     ),
               borderRadius: BorderRadius.circular(16),
@@ -794,7 +790,7 @@ class _ServiceCardState extends State<ServiceCard>
                   ? []
                   : [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
+                        color: AppColors.primary.withValues(alpha: 0.4),
                         blurRadius: 12,
                         offset: const Offset(0, 6),
                       ),
@@ -820,18 +816,14 @@ class _ServiceCardState extends State<ServiceCard>
                     size: 20,
                   ),
                   const SizedBox(width: 8),
-                  const Text('View Details') == null
-                      ? const SizedBox.shrink()
-                      : Text(
-                          widget.service.isBooked
-                              ? 'Not Available'
-                              : 'View Details',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
+                  Text(
+                    widget.service.isBooked ? 'Not Available' : 'View Details',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -852,7 +844,7 @@ class _ServiceCardState extends State<ServiceCard>
                       ? LinearGradient(
                           colors: [
                             AppColors.error,
-                            AppColors.error.withOpacity(0.8),
+                            AppColors.error.withValues(alpha: 0.8),
                           ],
                         )
                       : LinearGradient(
@@ -866,7 +858,7 @@ class _ServiceCardState extends State<ServiceCard>
                   boxShadow: [
                     BoxShadow(
                       color: (isFavorite ? AppColors.error : Colors.grey)
-                          .withOpacity(0.3),
+                          .withValues(alpha: 0.3),
                       blurRadius: 8,
                       offset: const Offset(0, 4),
                     ),
@@ -903,7 +895,7 @@ class _ServiceCardState extends State<ServiceCard>
           filter: ImageFilter.blur(sigmaX: 4, sigmaY: 4),
           child: Container(
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5),
+              color: Colors.black.withValues(alpha: 0.5),
               borderRadius: BorderRadius.circular(24),
             ),
             child: Center(
@@ -920,17 +912,17 @@ class _ServiceCardState extends State<ServiceCard>
                         colors: isBookedByCurrentUser
                             ? [
                                 AppColors.success,
-                                AppColors.success.withOpacity(0.8),
+                                AppColors.success.withValues(alpha: 0.8),
                               ]
                             : [
                                 AppColors.error,
-                                AppColors.error.withOpacity(0.8),
+                                AppColors.error.withValues(alpha: 0.8),
                               ],
                       ),
                       borderRadius: BorderRadius.circular(25),
                       boxShadow: [
                         BoxShadow(
-                          color: Colors.black.withOpacity(0.3),
+                          color: Colors.black.withValues(alpha: 0.3),
                           blurRadius: 12,
                           offset: const Offset(0, 6),
                         ),
@@ -968,7 +960,7 @@ class _ServiceCardState extends State<ServiceCard>
                         vertical: 8,
                       ),
                       decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
+                        color: Colors.black.withValues(alpha: 0.7),
                         borderRadius: BorderRadius.circular(20),
                       ),
                       child: Text(
@@ -995,8 +987,8 @@ class _ServiceCardState extends State<ServiceCard>
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
-            AppColors.primary.withOpacity(0.1),
-            AppColors.primary.withOpacity(0.05),
+            AppColors.primary.withValues(alpha: 0.1),
+            AppColors.primary.withValues(alpha: 0.05),
           ],
         ),
       ),
@@ -1004,7 +996,7 @@ class _ServiceCardState extends State<ServiceCard>
         child: Icon(
           _getCategoryIcon(widget.service.category),
           size: 80,
-          color: AppColors.primary.withOpacity(0.6),
+          color: AppColors.primary.withValues(alpha: 0.6),
         ),
       ),
     );

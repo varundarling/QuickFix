@@ -24,9 +24,9 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
   @override
   void initState() {
     super.initState();
-    debugPrint(
-      '🏗️ UserTypeSelection initState - _selectedUserType: $_selectedUserType',
-    );
+    // debugPrint(
+    //   '🏗️ UserTypeSelection initState - _selectedUserType: $_selectedUserType',
+    // );
 
     _fadeController = AnimationController(
       duration: const Duration(milliseconds: 800),
@@ -153,12 +153,12 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.2)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
         boxShadow: [
           BoxShadow(
-            color: Colors.white.withOpacity(0.1),
+            color: Colors.white.withValues(alpha: 0.1),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -181,7 +181,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.primary.withOpacity(0.4),
+                        color: AppColors.primary.withValues(alpha: 0.4),
                         blurRadius: 10,
                         offset: const Offset(0, 5),
                       ),
@@ -231,7 +231,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                   'Choose your path to success',
                   style: TextStyle(
                     fontSize: 12,
-                    color: Colors.white.withOpacity(0.9),
+                    color: Colors.white.withValues(alpha: 0.9),
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -270,30 +270,30 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
             colors: isSelected
                 ? [Colors.white, const Color(0xFFFAFBFF), Colors.white]
                 : [
-                    Colors.white.withOpacity(0.9),
-                    Colors.white.withOpacity(0.95),
-                    Colors.white.withOpacity(0.9),
+                    Colors.white.withValues(alpha: 0.9),
+                    Colors.white.withValues(alpha: 0.95),
+                    Colors.white.withValues(alpha: 0.9),
                   ],
           ),
           borderRadius: BorderRadius.circular(24),
           border: Border.all(
             color: isSelected
-                ? color.withOpacity(0.6)
-                : Colors.white.withOpacity(0.3),
+                ? color.withValues(alpha: 0.6)
+                : Colors.white.withValues(alpha: 0.3),
             width: isSelected ? 2.5 : 1,
           ),
           boxShadow: [
             BoxShadow(
               color: isSelected
-                  ? color.withOpacity(0.25)
-                  : Colors.black.withOpacity(0.08),
+                  ? color.withValues(alpha: 0.25)
+                  : Colors.black.withValues(alpha: 0.08),
               blurRadius: isSelected ? 25 : 12,
               offset: Offset(0, isSelected ? 12 : 6),
               spreadRadius: isSelected ? 1 : 0,
             ),
             if (isSelected)
               BoxShadow(
-                color: Colors.white.withOpacity(0.8),
+                color: Colors.white.withValues(alpha: 0.8),
                 blurRadius: 15,
                 offset: const Offset(0, -3),
               ),
@@ -312,17 +312,17 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isSelected
-                            ? [color.withOpacity(0.2), color.withOpacity(0.1)]
+                            ? [color.withValues(alpha: 0.2), color.withValues(alpha: 0.1)]
                             : [
-                                Colors.grey.withOpacity(0.1),
-                                Colors.grey.withOpacity(0.05),
+                                Colors.grey.withValues(alpha: 0.1),
+                                Colors.grey.withValues(alpha: 0.05),
                               ],
                       ),
                       borderRadius: BorderRadius.circular(16),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: color.withOpacity(0.3),
+                                color: color.withValues(alpha: 0.3),
                                 blurRadius: 12,
                                 offset: const Offset(0, 4),
                               ),
@@ -350,12 +350,12 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                       padding: const EdgeInsets.all(8),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
-                          colors: [color, color.withOpacity(0.8)],
+                          colors: [color, color.withValues(alpha: 0.8)],
                         ),
                         shape: BoxShape.circle,
                         boxShadow: [
                           BoxShadow(
-                            color: color.withOpacity(0.5),
+                            color: color.withValues(alpha: 0.5),
                             blurRadius: 12,
                             offset: const Offset(0, 4),
                           ),
@@ -405,8 +405,8 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     colors: [
                       Colors.transparent,
                       isSelected
-                          ? color.withOpacity(0.3)
-                          : Colors.grey.withOpacity(0.2),
+                          ? color.withValues(alpha: 0.3)
+                          : Colors.grey.withValues(alpha: 0.2),
                       Colors.transparent,
                     ],
                   ),
@@ -435,13 +435,13 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     ),
                     decoration: BoxDecoration(
                       color: isSelected
-                          ? color.withOpacity(0.1)
-                          : Colors.grey.withOpacity(0.08),
+                          ? color.withValues(alpha: 0.1)
+                          : Colors.grey.withValues(alpha: 0.08),
                       borderRadius: BorderRadius.circular(12),
                       border: Border.all(
                         color: isSelected
-                            ? color.withOpacity(0.2)
-                            : Colors.grey.withOpacity(0.1),
+                            ? color.withValues(alpha: 0.2)
+                            : Colors.grey.withValues(alpha: 0.1),
                       ),
                     ),
                     child: Row(
@@ -459,7 +459,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             style: TextStyle(
                               fontSize: 12,
                               color: isSelected
-                                  ? color.withOpacity(0.9)
+                                  ? color.withValues(alpha: 0.9)
                                   : Colors.grey[700],
                               fontWeight: FontWeight.w600,
                             ),
@@ -508,8 +508,8 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               )
                             : LinearGradient(
                                 colors: [
-                                  Colors.grey.withOpacity(0.6),
-                                  Colors.grey.withOpacity(0.4),
+                                  Colors.grey.withValues(alpha: 0.6),
+                                  Colors.grey.withValues(alpha: 0.4),
                                 ],
                               ),
                         borderRadius: BorderRadius.circular(16),
@@ -517,16 +517,16 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             ? [
                                 // ✅ ENHANCED GLOW EFFECT
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(
-                                    0.4 * _buttonAnimation.value,
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.4 * _buttonAnimation.value,
                                   ),
                                   blurRadius: 20,
                                   offset: const Offset(0, 8),
                                   spreadRadius: 2,
                                 ),
                                 BoxShadow(
-                                  color: AppColors.primary.withOpacity(
-                                    0.2 * _buttonAnimation.value,
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.2 * _buttonAnimation.value,
                                   ),
                                   blurRadius: 30,
                                   offset: const Offset(0, 0),
@@ -540,7 +540,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               ]
                             : [
                                 BoxShadow(
-                                  color: Colors.grey.withOpacity(0.2),
+                                  color: Colors.grey.withValues(alpha: 0.2),
                                   blurRadius: 5,
                                   offset: const Offset(0, 2),
                                 ),
@@ -564,7 +564,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               Icons.person_add_outlined,
                               color: _selectedUserType != null
                                   ? Colors.white
-                                  : Colors.white.withOpacity(0.5),
+                                  : Colors.white.withValues(alpha: 0.5),
                               size: 22, // ✅ LARGER ICON
                             ),
                             const SizedBox(width: 10),
@@ -575,7 +575,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                                 fontWeight: FontWeight.w800, // ✅ BOLDER WEIGHT
                                 color: _selectedUserType != null
                                     ? Colors.white
-                                    : Colors.white.withOpacity(0.5),
+                                    : Colors.white.withValues(alpha: 0.5),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -608,15 +608,15 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               )
                             : LinearGradient(
                                 colors: [
-                                  Colors.grey.withOpacity(0.4),
-                                  Colors.grey.withOpacity(0.2),
+                                  Colors.grey.withValues(alpha: 0.4),
+                                  Colors.grey.withValues(alpha: 0.2),
                                 ],
                               ),
                         borderRadius: BorderRadius.circular(16),
                         border: Border.all(
                           color: _selectedUserType != null
-                              ? Colors.white.withOpacity(0.8)
-                              : Colors.white.withOpacity(0.3),
+                              ? Colors.white.withValues(alpha: 0.8)
+                              : Colors.white.withValues(alpha: 0.3),
                           width: 2,
                         ),
                         boxShadow: _selectedUserType != null
@@ -625,7 +625,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                                 BoxShadow(
                                   color: const Color(
                                     0xFF1E40AF,
-                                  ).withOpacity(0.4 * _buttonAnimation.value),
+                                  ).withValues(alpha: 0.4 * _buttonAnimation.value),
                                   blurRadius: 15,
                                   offset: const Offset(0, 5),
                                   spreadRadius: 1,
@@ -633,7 +633,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                                 BoxShadow(
                                   color: const Color(
                                     0xFF3B82F6,
-                                  ).withOpacity(0.2 * _buttonAnimation.value),
+                                  ).withValues(alpha: 0.2 * _buttonAnimation.value),
                                   blurRadius: 25,
                                   offset: const Offset(0, 0),
                                   spreadRadius: 3,
@@ -641,7 +641,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               ]
                             : [
                                 BoxShadow(
-                                  color: Colors.grey.withOpacity(0.3),
+                                  color: Colors.grey.withValues(alpha: 0.3),
                                   blurRadius: 8,
                                   offset: const Offset(0, 4),
                                 ),
@@ -666,7 +666,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                               Icons.login_outlined,
                               color: _selectedUserType != null
                                   ? Colors.white
-                                  : Colors.white.withOpacity(0.6),
+                                  : Colors.white.withValues(alpha: 0.6),
                               size: 22,
                             ),
                             const SizedBox(width: 10),
@@ -677,7 +677,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                                 fontWeight: FontWeight.w800,
                                 color: _selectedUserType != null
                                     ? Colors.white
-                                    : Colors.white.withOpacity(0.6),
+                                    : Colors.white.withValues(alpha: 0.6),
                                 letterSpacing: 0.5,
                               ),
                             ),
@@ -723,13 +723,13 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
 
   void _continueToSignup({String? defaultType}) {
     final userType = _selectedUserType ?? defaultType ?? 'customer';
-    debugPrint('🚀 Navigating to signup with userType: $userType');
+    // debugPrint('🚀 Navigating to signup with userType: $userType');
     context.go('/signup?userType=$userType');
   }
 
   void _continueToLogin({String? defaultType}) {
     final userType = _selectedUserType ?? defaultType ?? 'customer';
-    debugPrint('🔑 Navigating to login with userType: $userType');
+    // debugPrint('🔑 Navigating to login with userType: $userType');
     context.go('/login?userType=$userType');
   }
 }

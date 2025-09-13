@@ -9,23 +9,19 @@ class NotificationPermissionManager {
       PermissionStatus status = await Permission.notification.status;
 
       if (status.isGranted) {
-        debugPrint('✅ Notification permission already granted');
+        
         return true;
       }
 
       // Request permission if not granted
       if (status.isDenied) {
-        debugPrint('🔔 Requesting notification permission...');
         status = await Permission.notification.request();
 
         if (status.isGranted) {
-          debugPrint('✅ Notification permission granted by user');
           return true;
         } else if (status.isDenied) {
-          debugPrint('❌ Notification permission denied by user');
           return false;
         } else if (status.isPermanentlyDenied) {
-          debugPrint('❌ Notification permission permanently denied');
           // Show dialog to open app settings
           await _showSettingsDialog();
           return false;
@@ -33,14 +29,12 @@ class NotificationPermissionManager {
       }
 
       if (status.isPermanentlyDenied) {
-        debugPrint('❌ Notification permission permanently denied');
         await _showSettingsDialog();
         return false;
       }
 
       return false;
     } catch (e) {
-      debugPrint('❌ Error requesting notification permission: $e');
       return false;
     }
   }
@@ -57,7 +51,6 @@ class NotificationPermissionManager {
       bool permissionGranted = await requestNotificationPermission();
 
       if (!permissionGranted) {
-        debugPrint('❌ Cannot setup FCM: Permission denied');
         return null;
       }
 
@@ -73,14 +66,11 @@ class NotificationPermissionManager {
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
         String? token = await messaging.getToken();
-        debugPrint('✅ FCM Token: ${token?.substring(0, 20)}...');
         return token;
       } else {
-        debugPrint('❌ FCM permission denied');
         return null;
       }
     } catch (e) {
-      debugPrint('❌ Error setting up FCM: $e');
       return null;
     }
   }

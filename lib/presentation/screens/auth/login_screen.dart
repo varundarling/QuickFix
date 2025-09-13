@@ -176,7 +176,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             : () async {
                                 final ok = await context
                                     .read<AuthProvider>()
-                                    .loginWithGoogle();
+                                    .loginWithGoogleStrict();
                                 if (ok && context.mounted) {
                                   await context
                                       .read<AuthProvider>()

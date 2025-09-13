@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
@@ -381,8 +383,6 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                         const SizedBox(height: 20),
 
                         _buildCustomerRatingSection(currentBooking),
-
-                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -490,15 +490,15 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                   booking.customerPhone!,
                 ),
 
-              // Email if available
-              if (booking.customerEmail != null &&
-                  booking.customerEmail!.isNotEmpty &&
-                  booking.customerEmail != 'No Email')
-                _buildDetailRowName(
-                  Icons.email,
-                  'Email',
-                  booking.customerEmail!,
-                ),
+              // // Email if available
+              // if (booking.customerEmail != null &&
+              //     booking.customerEmail!.isNotEmpty &&
+              //     booking.customerEmail != 'No Email')
+              //   _buildDetailRowName(
+              //     Icons.email,
+              //     'Email',
+              //     booking.customerEmail!,
+              //   ),
 
               // Service location
               if (booking.customerAddress?.isNotEmpty == true)
@@ -886,52 +886,6 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
     );
   }
 
-  Widget _buildDetailRowWithAction(
-    IconData icon,
-    String label,
-    String value, {
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Icon(icon, size: 20, color: Colors.grey[600]),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    label,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    value,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                      decoration: TextDecoration.underline,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   Widget _buildTimelineRow(
     IconData icon,
     String label,
@@ -994,8 +948,8 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         throw Exception('Booking not found in provider');
       }
 
-      debugPrint('🔄 [DETAIL] Accepting booking: ${widget.bookingId}');
-      debugPrint('🔄 [DETAIL] Provider ID: ${currentBooking.providerId}');
+      // debugPrint('🔄 [DETAIL] Accepting booking: ${widget.bookingId}');
+      // debugPrint('🔄 [DETAIL] Provider ID: ${currentBooking.providerId}');
 
       // Now use currentBooking which is guaranteed to exist
       final success = await bookingProvider.updateBookingStatus(
@@ -1008,9 +962,9 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         // Generate OTP
         try {
           await OTPService.instance.createOTPForBooking(widget.bookingId);
-          debugPrint('✅ [DETAIL] OTP generated');
+          //debugPrint('✅ [DETAIL] OTP generated');
         } catch (otpError) {
-          debugPrint('⚠️ [DETAIL] OTP generation failed: $otpError');
+          //debugPrint('⚠️ [DETAIL] OTP generation failed: $otpError');
         }
 
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1029,7 +983,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         throw Exception('Failed to update booking status');
       }
     } catch (e) {
-      debugPrint('❌ [DETAIL] Error accepting booking: $e');
+      //debugPrint('❌ [DETAIL] Error accepting booking: $e');
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1203,8 +1157,8 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                             borderRadius: BorderRadius.circular(16),
                             gradient: LinearGradient(
                               colors: [
-                                Colors.green.withOpacity(0.1),
-                                Colors.green.withOpacity(0.05),
+                                Colors.green.withValues(alpha: 0.1),
+                                Colors.green.withValues(alpha: 0.05),
                               ],
                             ),
                           ),
@@ -1259,8 +1213,8 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           borderRadius: BorderRadius.circular(16),
                           gradient: LinearGradient(
                             colors: [
-                              Colors.orange.withOpacity(0.1),
-                              Colors.orange.withOpacity(0.05),
+                              Colors.orange.withValues(alpha: 0.1),
+                              Colors.orange.withValues(alpha: 0.05),
                             ],
                           ),
                         ),
@@ -1348,9 +1302,11 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: AppColors.success.withOpacity(0.1),
+                color: AppColors.success.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                border: Border.all(
+                  color: AppColors.success.withValues(alpha: 0.3),
+                ),
               ),
               child: const Column(
                 children: [
@@ -1642,9 +1598,9 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.grey.withOpacity(0.1),
+                      color: Colors.grey.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withOpacity(0.3)),
+                      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
                     ),
                     child: const Row(
                       children: [
@@ -1668,9 +1624,5 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         );
       },
     );
-  }
-
-  Color _getStatusColor(BookingModel booking) {
-    return Helpers.getStatusColor(booking.status.toString());
   }
 }

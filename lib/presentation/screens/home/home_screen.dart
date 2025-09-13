@@ -41,7 +41,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _initializeOnce() async {
     if (_hasInitialized || !mounted) return;
 
-    debugPrint('🚀 [HOME] Initializing for first time only');
+    //debugPrint('🚀 [HOME] Initializing for first time only');
 
     // await _requestPermissionIfNeeded();
 
@@ -90,9 +90,9 @@ class _HomeScreenState extends State<HomeScreen> {
         await sp.loadAllServices(userLat: 0, userLng: 0);
       }
 
-      debugPrint('✅ [HOME] Data loaded successfully');
+      //debugPrint('✅ [HOME] Data loaded successfully');
     } catch (e) {
-      debugPrint('❌ [HOME] Error loading data: $e');
+      //debugPrint('❌ [HOME] Error loading data: $e');
     } finally {
       if (mounted) {
         setState(() => _isRefreshing = false);
@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _refresh() async {
     if (_isRefreshing || !mounted) return;
 
-    debugPrint('🔄 [HOME] Manual refresh triggered');
+    //debugPrint('🔄 [HOME] Manual refresh triggered');
     await _loadData();
   }
 
@@ -116,7 +116,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // ✅ Refresh when returning to this page
     if (mounted) {
-      debugPrint('🔄 [HOME] Refreshing after return from $route');
+      //debugPrint('🔄 [HOME] Refreshing after return from $route');
       await _loadData();
     }
   }
@@ -601,7 +601,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   void dispose() {
-    debugPrint('🔄 [HOME] Disposing screen');
+    //debugPrint('🔄 [HOME] Disposing screen');
     super.dispose();
   }
 }

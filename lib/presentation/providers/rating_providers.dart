@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_final_fields
+
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/rating_service.dart';
 import 'package:quickfix/data/models/rating_model.dart';
@@ -79,7 +81,7 @@ class RatingProvider extends ChangeNotifier {
       }
       return rating;
     } catch (e) {
-      debugPrint('❌ Error getting rating: $e');
+      // debugPrint('❌ Error getting rating: $e');
       return null;
     }
   }
@@ -91,7 +93,7 @@ class RatingProvider extends ChangeNotifier {
       _providerStats[providerId] = stats;
       notifyListeners();
     } catch (e) {
-      debugPrint('❌ Error loading provider stats: $e');
+      // debugPrint('❌ Error loading provider stats: $e');
     }
   }
 

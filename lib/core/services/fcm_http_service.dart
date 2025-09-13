@@ -5,7 +5,6 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:googleapis_auth/auth_io.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter/foundation.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 
 class FCMHttpService {
@@ -29,11 +28,7 @@ class FCMHttpService {
 
       // Test token generation immediately
       await _getAccessToken();
-      debugPrint(
-        '✅ FCMHttpService initialized successfully for project: $_projectId',
-      );
     } catch (e) {
-      debugPrint('❌ FCMHttpService initialization failed: $e');
       rethrow;
     }
   }
@@ -54,7 +49,6 @@ class FCMHttpService {
           'assets/service-account.json',
         );
       } catch (e) {
-        debugPrint('❌ Failed to load service account from assets: $e');
         throw Exception('Service account file not found in assets');
       }
 
@@ -78,10 +72,8 @@ class FCMHttpService {
       _accessToken = authClient.credentials.accessToken.data;
       _tokenExpiry = authClient.credentials.accessToken.expiry;
 
-      debugPrint('✅ New access token generated, expires: $_tokenExpiry');
       return _accessToken!;
     } catch (e) {
-      debugPrint('❌ Error getting access token: $e');
       rethrow;
     }
   }
@@ -95,7 +87,6 @@ class FCMHttpService {
     Map<String, dynamic>? data,
   }) async {
     if (_projectId == null) {
-      debugPrint('❌ Project ID not initialized');
       return false;
     }
 
@@ -130,7 +121,6 @@ class FCMHttpService {
       } else if (topic != null) {
         message['message']['topic'] = topic;
       } else {
-        debugPrint('❌ No target specified for FCM message');
         return false;
       }
 
@@ -144,17 +134,12 @@ class FCMHttpService {
       );
 
       if (response.statusCode == 200) {
-        final responseData = jsonDecode(response.body);
-        debugPrint('✅ FCM HTTP v1 message sent: ${responseData['name']}');
+        jsonDecode(response.body);
         return true;
       } else {
-        debugPrint(
-          '❌ FCM HTTP v1 error: ${response.statusCode} - ${response.body}',
-        );
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Error sending FCM HTTP v1 message: $e');
       return false;
     }
   }
@@ -167,7 +152,6 @@ class FCMHttpService {
     Map<String, dynamic>? data,
   }) async {
     if (_projectId == null) {
-      debugPrint('❌ Project ID not initialized');
       return false;
     }
 
@@ -210,14 +194,11 @@ class FCMHttpService {
       );
 
       if (response.statusCode == 200) {
-        debugPrint('✅ High priority FCM message sent');
         return true;
       } else {
-        debugPrint('❌ FCM error: ${response.statusCode} - ${response.body}');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Error sending high priority notification: $e');
       return false;
     }
   }
@@ -245,7 +226,6 @@ class FCMHttpService {
       await Future.delayed(Duration(milliseconds: 100));
     }
 
-    debugPrint('✅ Sent $successCount/${fcmTokens.length} notifications');
     return successCount;
   }
 
@@ -264,25 +244,20 @@ class FCMHttpService {
           );
 
       if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        debugPrint('User granted permission');
 
         if (Platform.isIOS) {
           String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
           if (apnsToken == null) {
-            debugPrint('APNS token not available yet');
             return null;
           }
         }
 
         String? token = await FirebaseMessaging.instance.getToken();
-        debugPrint('FCM Token: $token');
         return token;
       } else {
-        debugPrint('Permission denied');
         return null;
       }
     } catch (e) {
-      debugPrint('Error getting FCM token: $e');
       return null;
     }
   }
@@ -290,7 +265,6 @@ class FCMHttpService {
   Future<String?> getTokenWithConnectivityCheck() async {
     var connectivityResult = await (Connectivity().checkConnectivity());
     if (connectivityResult == ConnectivityResult.none) {
-      debugPrint('No internet connection');
       return null;
     }
 
@@ -298,7 +272,6 @@ class FCMHttpService {
       String? token = await FirebaseMessaging.instance.getToken();
       return token;
     } catch (e) {
-      debugPrint('Network error getting token: $e');
       return null;
     }
   }
@@ -318,17 +291,14 @@ class FCMTokenManager {
           .requestPermission(alert: true, badge: true, sound: true);
 
       if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-        debugPrint('❌ Notification permission denied');
         return null;
       }
 
       if (Platform.isIOS) {
         String? apnsToken = await FirebaseMessaging.instance.getAPNSToken();
         if (apnsToken == null) {
-          debugPrint('❌ APNS token not available');
           return null;
         }
-        debugPrint('✅ APNS token available');
       }
 
       for (int attempt = 1; attempt <= 3; attempt++) {
@@ -336,22 +306,18 @@ class FCMTokenManager {
           String? token = await FirebaseMessaging.instance.getToken();
           if (token != null && token.isNotEmpty) {
             _cachedToken = token;
-            debugPrint('✅ FCM Token obtained: ${token.substring(0, 20)}...');
             return token;
           }
         } catch (e) {
-          debugPrint('❌ Token attempt $attempt failed: $e');
+          // Ignore and retry
         }
 
         if (attempt < 3) {
           await Future.delayed(Duration(seconds: 2 * attempt));
         }
       }
-
-      debugPrint('❌ Failed to get FCM token after 3 attempts');
       return null;
     } catch (e) {
-      debugPrint('❌ Error in getToken: $e');
       return null;
     }
   }
@@ -360,10 +326,8 @@ class FCMTokenManager {
     FirebaseMessaging.instance.onTokenRefresh
         .listen((fcmToken) {
           _cachedToken = fcmToken;
-          debugPrint('✅ Token refreshed: ${fcmToken.substring(0, 20)}...');
         })
         .onError((err) {
-          debugPrint('❌ Error in token refresh: $err');
         });
   }
 }

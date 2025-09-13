@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 import 'package:quickfix/data/models/rating_model.dart';
 
 class RatingService {
@@ -101,7 +100,6 @@ class RatingService {
 
       return true;
     } catch (e) {
-      debugPrint('❌ Error submitting rating: $e');
       return false;
     }
   }
@@ -120,7 +118,6 @@ class RatingService {
       }
       return null;
     } catch (e) {
-      debugPrint('❌ Error getting rating: $e');
       return null;
     }
   }
@@ -138,7 +135,6 @@ class RatingService {
           .map((doc) => RatingModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      debugPrint('❌ Error getting provider ratings: $e');
       return [];
     }
   }
@@ -158,7 +154,6 @@ class RatingService {
 
       return {'averageRating': averageRating, 'totalReviews': ratings.length};
     } catch (e) {
-      debugPrint('❌ Error getting rating stats: $e');
       return {'averageRating': 0.0, 'totalReviews': 0};
     }
   }

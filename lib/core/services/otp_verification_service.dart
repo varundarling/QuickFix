@@ -1,11 +1,8 @@
-// lib/presentation/screens/provider/otp_verification_screen.dart (Updated)
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/core/services/progress_tracking_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
-import 'package:quickfix/presentation/providers/booking_provider.dart';
 
 class OTPVerificationScreen extends StatefulWidget {
   final BookingModel booking;
@@ -252,7 +249,7 @@ class _OTPVerificationScreenState extends State<OTPVerificationScreen> {
                         Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: AppColors.error.withOpacity(0.1),
+                            color: AppColors.error.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                           ),
                           child: Row(

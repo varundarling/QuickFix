@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously, deprecated_member_use, library_prefixes
+
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
@@ -48,7 +50,6 @@ class LocationService {
 
       return await _location.getLocation();
     } catch (e) {
-      debugPrint('Error getting location: $e');
       return null;
     }
   }
@@ -69,7 +70,6 @@ class LocationService {
       }
       return null;
     } catch (e) {
-      debugPrint('Error getting address:$e');
       return null;
     }
   }
@@ -96,7 +96,6 @@ class LocationService {
   }
 
   Future<void> onChangeLocationPressed(BuildContext context) async {
-    debugPrint('🔄 Starting GPS location request');
 
     showDialog(
       context: context,
@@ -113,33 +112,29 @@ class LocationService {
     );
 
     try {
-      debugPrint('📍 Checking location permission...');
       final hasPermission = await _checkLocationPermission();
-      debugPrint('🔐 Permission result: $hasPermission');
 
       if (!hasPermission) {
-        debugPrint('❌ Permission denied');
         if (context.mounted) Navigator.of(context).pop();
         if (context.mounted) _showPermissionDeniedDialog(context);
         return;
       }
 
-      debugPrint('🌍 Getting current location...');
-      final position = await _getCurrentLocation();
-      debugPrint('📍 Location result: $position');
+     final position = await _getCurrentLocation();
+
 
       // ✅ ALWAYS close dialog here
       if (context.mounted) Navigator.of(context).pop();
 
       if (position != null && context.mounted) {
-        debugPrint('✅ Location found, showing confirmation');
+
         _showLocationConfirmationDialog(context, position);
       } else if (context.mounted) {
-        debugPrint('❌ Location null, showing error');
+
         _showLocationErrorDialog(context);
       }
     } catch (e) {
-      debugPrint('💥 Exception in GPS: $e');
+
       if (context.mounted) {
         Navigator.of(context).pop(); // ✅ Close dialog on error
       }
@@ -179,23 +174,19 @@ class LocationService {
 
   Future<Position?> _getCurrentLocation() async {
     try {
-      debugPrint('🔄 Requesting position...');
+
 
       // ✅ Use lower accuracy and shorter timeout
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.medium,
         timeLimit: const Duration(seconds: 8),
       );
-
-      debugPrint(
-        '✅ Position received: ${position.latitude}, ${position.longitude}',
-      );
       return position;
     } on TimeoutException {
-      debugPrint('⏰ GPS timeout');
+
       return null;
     } catch (e) {
-      debugPrint('❌ GPS error: $e');
+
       return null;
     }
   }
@@ -217,7 +208,7 @@ class LocationService {
       }
     } catch (e) {
       address = 'Address not available';
-      debugPrint('Error getting address: $e');
+
     }
 
     if (!context.mounted) return;
@@ -305,7 +296,7 @@ class LocationService {
     Position position,
     String address,
   ) async {
-    debugPrint('🔄 Updating user location: $address');
+
 
     showDialog(
       context: context,
@@ -333,7 +324,7 @@ class LocationService {
       if (context.mounted) Navigator.of(context).pop();
 
       if (success && context.mounted) {
-        debugPrint('✅ Location update successful');
+
 
         // ✅ Wait a bit for Firebase to settle
         await Future.delayed(const Duration(milliseconds: 200));
@@ -341,7 +332,7 @@ class LocationService {
         // ✅ Force reload user data
         await authProvider.reloadUserData();
 
-        debugPrint('🎉 UI should now update with: $address');
+
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -359,7 +350,7 @@ class LocationService {
           ),
         );
       } else if (context.mounted) {
-        debugPrint('❌ Location update failed');
+
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
@@ -370,7 +361,7 @@ class LocationService {
         );
       }
     } catch (e) {
-      debugPrint('💥 Location update error: $e');
+
       if (context.mounted) Navigator.of(context).pop();
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -450,8 +441,6 @@ class LocationService {
 
   // ✅ Simplest fix using StatefulBuilder
   Future<void> onManualLocationEntry(BuildContext context) async {
-    String? location;
-
     await showDialog(
       context: context,
       builder: (context) {
@@ -481,8 +470,7 @@ class LocationService {
                     autofocus: true,
                     textCapitalization: TextCapitalization.words,
                     onChanged: (value) {
-                      location = value;
-                      debugPrint('🔤 Location input changed: $location');
+
                     },
                   ),
                   const SizedBox(height: 16),
@@ -501,9 +489,7 @@ class LocationService {
                   onPressed: () {
                     // ✅ Use controller.text instead of location variable
                     final enteredLocation = controller.text.trim();
-                    debugPrint(
-                      '🚀 Confirm pressed with location: $enteredLocation',
-                    );
+
 
                     if (enteredLocation.isNotEmpty) {
                       Navigator.of(context).pop();

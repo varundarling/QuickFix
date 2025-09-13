@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -86,11 +88,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                 padding: const EdgeInsets.all(20),
                 child: Column(
                   children: [
-                    Icon(
-                      Icons.payment,
-                      size: 64,
-                      color: AppColors.success,
-                    ),
+                    Icon(Icons.payment, size: 64, color: AppColors.success),
                     const SizedBox(height: 16),
                     const Text(
                       'Payment Amount',
@@ -136,7 +134,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
 
             // Payment Method Options
             ..._paymentMethods.map((method) => _buildPaymentMethodCard(method)),
-            
+
             const SizedBox(height: 32),
 
             // Pay Now Button
@@ -144,8 +142,8 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
               width: double.infinity,
               height: 56,
               child: ElevatedButton.icon(
-                onPressed: (_selectedPaymentMethod.isNotEmpty && !_isProcessing) 
-                    ? _processPayment 
+                onPressed: (_selectedPaymentMethod.isNotEmpty && !_isProcessing)
+                    ? _processPayment
                     : null,
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
@@ -166,8 +164,8 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                       )
                     : const Icon(Icons.payment, size: 24),
                 label: Text(
-                  _isProcessing 
-                      ? 'Processing Payment...' 
+                  _isProcessing
+                      ? 'Processing Payment...'
                       : 'Pay Now ${Helpers.formatCurrency(widget.booking.totalAmount)}',
                   style: const TextStyle(
                     fontSize: 16,
@@ -183,11 +181,9 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 01),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(
-                  color: Colors.green.withOpacity(0.3),
-                ),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               ),
               child: const Row(
                 children: [
@@ -222,15 +218,15 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
         side: BorderSide(
-          color: isSelected 
-              ? AppColors.primary 
+          color: isSelected
+              ? AppColors.primary
               : (isAvailable ? Colors.transparent : Colors.grey.shade300),
           width: isSelected ? 2 : 1,
         ),
       ),
       child: InkWell(
-        onTap: isAvailable 
-            ? () => setState(() => _selectedPaymentMethod = method['id']) 
+        onTap: isAvailable
+            ? () => setState(() => _selectedPaymentMethod = method['id'])
             : null,
         borderRadius: BorderRadius.circular(12),
         child: Container(
@@ -241,16 +237,14 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: isAvailable 
-                      ? (method['color'] as Color).withOpacity(0.1)
-                      : Colors.grey.withOpacity(0.1),
+                  color: isAvailable
+                      ? (method['color'] as Color).withValues(alpha: 0.1)
+                      : Colors.grey.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Icon(
                   method['icon'] as IconData,
-                  color: isAvailable 
-                      ? method['color'] as Color 
-                      : Colors.grey,
+                  color: isAvailable ? method['color'] as Color : Colors.grey,
                   size: 24,
                 ),
               ),
@@ -264,8 +258,8 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
-                        color: isAvailable 
-                            ? AppColors.textPrimary 
+                        color: isAvailable
+                            ? AppColors.textPrimary
                             : Colors.grey,
                       ),
                     ),
@@ -274,8 +268,8 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                       method['description'] as String,
                       style: TextStyle(
                         fontSize: 14,
-                        color: isAvailable 
-                            ? AppColors.textSecondary 
+                        color: isAvailable
+                            ? AppColors.textSecondary
                             : Colors.grey,
                       ),
                     ),
@@ -289,11 +283,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
                     color: AppColors.primary,
                     shape: BoxShape.circle,
                   ),
-                  child: const Icon(
-                    Icons.check,
-                    size: 16,
-                    color: Colors.white,
-                  ),
+                  child: const Icon(Icons.check, size: 16, color: Colors.white),
                 ),
             ],
           ),
@@ -314,19 +304,19 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
           .collection('bookings')
           .doc(widget.booking.id)
           .update({
-        'status': 'paid',
-        'paymentMethod': _selectedPaymentMethod,
-        'paymentConfirmed': true,
-        'paymentConfirmedAt': Timestamp.fromDate(DateTime.now()),
-        'updatedAt': Timestamp.fromDate(DateTime.now()),
-        'realTimePayment': true,
-      });
+            'status': 'paid',
+            'paymentMethod': _selectedPaymentMethod,
+            'paymentConfirmed': true,
+            'paymentConfirmedAt': Timestamp.fromDate(DateTime.now()),
+            'updatedAt': Timestamp.fromDate(DateTime.now()),
+            'realTimePayment': true,
+          });
 
       // Refresh bookings
       final authProvider = context.read<AuthProvider>();
       final bookingProvider = context.read<BookingProvider>();
       final currentUserId = authProvider.getCurrentUserId();
-      
+
       if (currentUserId != null) {
         await bookingProvider.loadUserBookings(currentUserId);
       }

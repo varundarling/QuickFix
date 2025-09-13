@@ -1,4 +1,8 @@
+import 'dart:async';
+
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
@@ -6,7 +10,7 @@ import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
-import 'package:quickfix/presentation/screens/home/customer_settings-screen.dart';
+import 'package:quickfix/presentation/screens/home/customer_settings_screen.dart';
 import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
 import 'package:quickfix/presentation/screens/onboarding/onboarding_main_screen.dart';
@@ -18,18 +22,73 @@ import 'package:quickfix/presentation/screens/provider/create_service_screen.dar
 import 'package:quickfix/presentation/screens/provider/provider_dashboard_screen.dart';
 import 'package:quickfix/presentation/screens/provider/provider_settings_screen.dart';
 import 'package:quickfix/presentation/screens/splash/splash_screen.dart';
-import 'package:quickfix/quickFix.dart';
+import 'package:quickfix/quick_fix.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
+// Reactively refresh GoRouter on auth state changes
+class GoRouterRefreshStream extends ChangeNotifier {
+  late final StreamSubscription _sub;
+  GoRouterRefreshStream(Stream stream) {
+    _sub = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
+  @override
+  void dispose() {
+    _sub.cancel();
+    super.dispose();
+  }
+}
+
+// Resolve and cache user role once per UID
+class RoleResolver {
+  static Future<String?> getRole(String uid) async {
+    // 1) Firestore users/{uid}.userType
+    try {
+      final fs = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(uid)
+          .get();
+      final r = fs.data()?['userType']?.toString();
+      if (r != null && r.isNotEmpty) {
+        await _cache(uid, r);
+        return r;
+      }
+    } catch (_) {}
+
+    // 2) RTDB users/{uid}/public_info/userType
+    try {
+      final snap = await FirebaseDatabase.instance
+          .ref('users/$uid/public_info/userType')
+          .get();
+      if (snap.exists && snap.value != null) {
+        final r = snap.value.toString();
+        await _cache(uid, r);
+        return r;
+      }
+    } catch (_) {}
+
+    // 3) Local cache fallback (saved during auth bootstrap)
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('user_type_$uid');
+  }
+
+  static Future<void> _cache(String uid, String role) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('user_type_$uid', role);
+  }
+}
 
 class AppRouter {
   static GoRouter router({required bool showOnboarding}) {
     return GoRouter(
       initialLocation: showOnboarding ? '/onboarding' : '/splash',
       navigatorKey: navigatorKey,
-      redirect: (context, state) {
+      refreshListenable: GoRouterRefreshStream(
+        FirebaseAuth.instance.authStateChanges(),
+      ), // reactive
+      redirect: (context, state) async {
         final user = FirebaseAuth.instance.currentUser;
         final isLoggedIn = user != null;
 
-        // Treat onboarding as a safe/auth path
         final isOnboardingPath = state.matchedLocation == '/onboarding';
         final isAuthPath =
             state.matchedLocation == '/login' ||
@@ -37,22 +96,34 @@ class AppRouter {
             state.matchedLocation == '/user-type-selection' ||
             isOnboardingPath;
 
-        if (isLoggedIn) {
-          // NEW: ensure splash goes to home once authenticated
-          if (state.matchedLocation == '/splash') return '/home';
-          if (isAuthPath) return '/home';
-          if (state.matchedLocation == '/onboarding') return '/home';
+        // Logged out: only allow auth/onboarding; drive splash
+        if (!isLoggedIn) {
+          if (state.matchedLocation == '/splash') {
+            return showOnboarding ? '/onboarding' : '/user-type-selection';
+          }
+          if (!isAuthPath && state.matchedLocation != '/splash') {
+            return showOnboarding ? '/onboarding' : '/user-type-selection';
+          }
           return null;
         }
 
-        // Not logged in → allow onboarding; otherwise send to onboarding or user-type
-        if (!isAuthPath && state.matchedLocation != '/splash') {
-          return showOnboarding ? '/onboarding' : '/user-type-selection';
-        }
-        
-        return null;
-      },
+        // Logged in: enforce landing only from splash/onboarding/auth
+        final mustLand =
+            isAuthPath ||
+            state.matchedLocation == '/splash' ||
+            state.matchedLocation == '/onboarding';
+        if (!mustLand) return null;
 
+        // Resolve role; if not ready, don't misroute
+        final role = await RoleResolver.getRole(
+          user!.uid,
+        ); // implement lookup + cache
+        if (role == null) return null;
+
+        final r = role.toLowerCase().replaceAll('_', '');
+        final isProvider = r == 'provider' || r == 'serviceprovider';
+        return isProvider ? '/provider-dashboard' : '/home';
+      },
       routes: [
         GoRoute(
           path: '/onboarding',
@@ -208,7 +279,7 @@ class AppRouter {
           path: '/customer-otp/:bookingId',
           name: 'customer-otp',
           builder: (context, state) {
-            final bookingId = state.pathParameters['bookingId']!;
+            state.pathParameters['bookingId']!;
             // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Customer OTP Screen')),
@@ -220,7 +291,7 @@ class AppRouter {
           path: '/otp-verification/:bookingId',
           name: 'otp-verification',
           builder: (context, state) {
-            final bookingId = state.pathParameters['bookingId']!;
+            state.pathParameters['bookingId']!;
             // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('OTP Verification Screen')),
@@ -232,7 +303,7 @@ class AppRouter {
           path: '/service-progress/:bookingId',
           name: 'service-progress',
           builder: (context, state) {
-            final bookingId = state.pathParameters['bookingId']!;
+            state.pathParameters['bookingId']!;
             // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Service Progress Screen')),
@@ -244,7 +315,7 @@ class AppRouter {
           path: '/real-time-payment/:bookingId',
           name: 'real-time-payment',
           builder: (context, state) {
-            final bookingId = state.pathParameters['bookingId']!;
+            state.pathParameters['bookingId']!;
             // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Real-time Payment Screen')),

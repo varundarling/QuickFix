@@ -1,10 +1,8 @@
 import 'dart:math' as math;
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-
-import '../models/service_model.dart';
-import '../models/provider_model.dart';
-import '../../core/services/firebase_service.dart';
+import 'package:quickfix/core/services/firebase_service.dart';
+import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/data/models/provider_model.dart';
 
 class ServiceRepository {
   final FirebaseService _firebaseService = FirebaseService.instance;
@@ -235,7 +233,7 @@ class ServiceRepository {
     final providers = await fs.collection('providers').get();
 
     for (final p in providers.docs) {
-      final pdata = p.data() as Map<String, dynamic>;
+      final pdata = p.data();
       final rawRating = (pdata['rating'] ?? pdata['raitng'] ?? 0.0);
       final rawCount = (pdata['totalReviews'] ?? 0);
       final avg = (rawRating is num) ? rawRating.toDouble() : 0.0;

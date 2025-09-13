@@ -146,11 +146,11 @@ class ServiceProvider extends ChangeNotifier {
     String? customerPhone,
   }) async {
     try {
-      debugPrint('🔄 Marking service $serviceId as booked by user $userId');
+      // debugPrint('🔄 Marking service $serviceId as booked by user $userId');
 
       final serviceIndex = _services.indexWhere((s) => s.id == serviceId);
       if (serviceIndex == -1) {
-        debugPrint('❌ Service not found in local list');
+        // debugPrint('❌ Service not found in local list');
         return false;
       }
 
@@ -188,11 +188,11 @@ class ServiceProvider extends ChangeNotifier {
             'updatedAt': Timestamp.fromDate(DateTime.now()),
           });
 
-      debugPrint('✅ Service marked as booked successfully');
+      // debugPrint('✅ Service marked as booked successfully');
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('❌ Error marking service as booked: $e');
+      // debugPrint('❌ Error marking service as booked: $e');
       _errorMessage = 'Failed to book service: $e';
       notifyListeners();
       return false;
@@ -283,12 +283,12 @@ class ServiceProvider extends ChangeNotifier {
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
-      debugPrint('✅ Loaded ${_providerServices.length} provider services');
+      // debugPrint('✅ Loaded ${_providerServices.length} provider services');
 
       _isLoading = false;
       _safeNotifyListeners();
     } catch (e) {
-      debugPrint('❌ Error loading provider services: $e');
+      // debugPrint('❌ Error loading provider services: $e');
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
@@ -307,11 +307,11 @@ class ServiceProvider extends ChangeNotifier {
       final currentUser = FirebaseAuth.instance.currentUser;
 
       // ✅ Add extensive debugging
-      debugPrint('🔍 Loading services for user: ${currentUser?.uid}');
-      debugPrint('🔍 User email: ${currentUser?.email}');
+      // debugPrint('🔍 Loading services for user: ${currentUser?.uid}');
+      // debugPrint('🔍 User email: ${currentUser?.email}');
 
       if (currentUser == null) {
-        debugPrint('❌ No current user found, clearing services');
+        // debugPrint('❌ No current user found, clearing services');
         _providerServices = [];
         _isLoading = false;
         _safeNotifyListeners();
@@ -321,7 +321,7 @@ class ServiceProvider extends ChangeNotifier {
       // ✅ Force token refresh to ensure authentication is valid
       await currentUser.getIdToken(true);
 
-      debugPrint('🔍 Querying services with providerId: ${currentUser.uid}');
+      // debugPrint('🔍 Querying services with providerId: ${currentUser.uid}');
 
       // Load services for current provider
       final snapshot = await FirebaseFirestore.instance
@@ -338,26 +338,26 @@ class ServiceProvider extends ChangeNotifier {
             },
           );
 
-      debugPrint('🔍 Found ${snapshot.docs.length} services in Firestore');
+      // debugPrint('🔍 Found ${snapshot.docs.length} services in Firestore');
 
       // ✅ Debug each service found
       for (var doc in snapshot.docs) {
-        final data = doc.data();
-        debugPrint(
-          '📄 Service: ${data['name']} (ID: ${doc.id}) - Provider: ${data['providerId']} - Booked: ${data['isBooked'] ?? false}',
-        );
+        doc.data();
+        // debugPrint(
+        //   '📄 Service: ${data['name']} (ID: ${doc.id}) - Provider: ${data['providerId']} - Booked: ${data['isBooked'] ?? false}',
+        // );
       }
 
       _providerServices = snapshot.docs
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
-      debugPrint('✅ Successfully loaded ${_providerServices.length} services');
+      // debugPrint('✅ Successfully loaded ${_providerServices.length} services');
 
       _isLoading = false;
       _safeNotifyListeners();
     } catch (e) {
-      debugPrint('❌ Error loading services: $e');
+      // debugPrint('❌ Error loading services: $e');
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
@@ -388,7 +388,7 @@ class ServiceProvider extends ChangeNotifier {
             provider.latitude,
             provider.longitude,
           );
-          return distance <= 20.0; //within 20km
+          return distance <= 10.0; //within 10km
         }).toList();
 
         //sort by distance
@@ -551,7 +551,7 @@ class ServiceProvider extends ChangeNotifier {
     _safeNotifyListeners();
 
     try {
-      debugPrint('🔄 Loading all services for customers...');
+      // debugPrint('🔄 Loading all services for customers...');
 
       final snapshot = await FirebaseFirestore.instance
           .collection('services')
@@ -562,13 +562,13 @@ class ServiceProvider extends ChangeNotifier {
           .map((doc) => ServiceModel.fromFireStore(doc))
           .toList();
 
-      debugPrint('📊 Total services loaded: ${allServices.length}');
-      debugPrint(
-        '📊 Available services: ${allServices.where((s) => s.isAvailableForBooking).length}',
-      );
-      debugPrint(
-        '📊 Booked services: ${allServices.where((s) => s.isBooked).length}',
-      );
+      // debugPrint('📊 Total services loaded: ${allServices.length}');
+      // debugPrint(
+      //   '📊 Available services: ${allServices.where((s) => s.isAvailableForBooking).length}',
+      // );
+      // debugPrint(
+      //   '📊 Booked services: ${allServices.where((s) => s.isBooked).length}',
+      // );
 
       // Filter by location if provided (within 20km radius)
       if (userLat != null && userLng != null) {
@@ -610,11 +610,11 @@ class ServiceProvider extends ChangeNotifier {
       _isLoading = false;
       _safeNotifyListeners();
 
-      debugPrint(
-        '✅ Successfully loaded and filtered ${_services.length} services',
-      );
+      // debugPrint(
+      //   '✅ Successfully loaded and filtered ${_services.length} services',
+      // );
     } catch (e) {
-      debugPrint('❌ Error loading all services: $e');
+      // debugPrint('❌ Error loading all services: $e');
       _isLoading = false;
       _errorMessage = e.toString();
       _safeNotifyListeners();
@@ -648,7 +648,7 @@ class ServiceProvider extends ChangeNotifier {
             'createdAt': FieldValue.serverTimestamp(),
           });
 
-      debugPrint('✅ Service created: ${serviceRef.id}');
+      // debugPrint('✅ Service created: ${serviceRef.id}');
 
       // Notify nearby customers
       await RealtimeNotificationService.instance
@@ -665,7 +665,7 @@ class ServiceProvider extends ChangeNotifier {
       notifyListeners();
       return true;
     } catch (e) {
-      debugPrint('❌ Error creating service: $e');
+      // debugPrint('❌ Error creating service: $e');
       return false;
     }
   }
@@ -762,9 +762,9 @@ class ServiceProvider extends ChangeNotifier {
         notifyListeners();
       }
 
-      debugPrint(
-        '✅ Service created with provider details: $providerBusinessName',
-      );
+      // debugPrint(
+      //   '✅ Service created with provider details: $providerBusinessName',
+      // );
       return true;
     } catch (e) {
       _isLoading = false;
@@ -772,7 +772,7 @@ class ServiceProvider extends ChangeNotifier {
       if (hasListeners) {
         notifyListeners();
       }
-      debugPrint('❌ Error creating service with provider details: $e');
+      // debugPrint('❌ Error creating service with provider details: $e');
       return false;
     }
   }
@@ -780,14 +780,14 @@ class ServiceProvider extends ChangeNotifier {
   // ✅ Enhanced: Add booking fields to existing services
   Future<void> addBookingFieldsToExistingServices() async {
     try {
-      debugPrint('🔄 Adding booking fields to existing services...');
+      // debugPrint('🔄 Adding booking fields to existing services...');
 
       final snapshot = await FirebaseFirestore.instance
           .collection('services')
           .get();
 
       if (snapshot.docs.isEmpty) {
-        debugPrint('✅ No existing services to update');
+        // debugPrint('✅ No existing services to update');
         return;
       }
 
@@ -810,25 +810,25 @@ class ServiceProvider extends ChangeNotifier {
       }
 
       await batch.commit();
-      debugPrint(
-        '✅ Updated ${snapshot.docs.length} existing services with booking fields',
-      );
+      // debugPrint(
+      //   '✅ Updated ${snapshot.docs.length} existing services with booking fields',
+      // );
     } catch (e) {
-      debugPrint('❌ Error updating existing services: $e');
+      // debugPrint('❌ Error updating existing services: $e');
     }
   }
 
   // ✅ Enhanced: Add availability to existing services (keeping original method)
   Future<void> addAvailabilityToExistingServices() async {
     try {
-      debugPrint('🔄 Adding availability field to existing services...');
+      // debugPrint('🔄 Adding availability field to existing services...');
 
       final snapshot = await FirebaseFirestore.instance
           .collection('services')
           .get();
 
       if (snapshot.docs.isEmpty) {
-        debugPrint('✅ No existing services to update');
+        // debugPrint('✅ No existing services to update');
         return;
       }
 
@@ -846,11 +846,11 @@ class ServiceProvider extends ChangeNotifier {
       }
 
       await batch.commit();
-      debugPrint(
-        '✅ Updated ${snapshot.docs.length} existing services with availability field',
-      );
+      // debugPrint(
+      //   '✅ Updated ${snapshot.docs.length} existing services with availability field',
+      // );
     } catch (e) {
-      debugPrint('❌ Error updating existing services: $e');
+      // debugPrint('❌ Error updating existing services: $e');
     }
   }
 
@@ -890,7 +890,7 @@ class ServiceProvider extends ChangeNotifier {
       }
       return null;
     } catch (e) {
-      debugPrint('❌ Error refreshing service: $e');
+      // debugPrint('❌ Error refreshing service: $e');
       return null;
     }
   }
@@ -898,7 +898,7 @@ class ServiceProvider extends ChangeNotifier {
   // Add this method to ServiceProvider class
   Future<void> migrateExistingServicesToProviders() async {
     try {
-      debugPrint('🔄 Starting migration of existing services...');
+      // debugPrint('🔄 Starting migration of existing services...');
 
       // Get all services
       final servicesSnapshot = await FirebaseFirestore.instance
@@ -995,9 +995,9 @@ class ServiceProvider extends ChangeNotifier {
       }
 
       await batch.commit();
-      debugPrint('✅ Migration completed successfully!');
+      // debugPrint('✅ Migration completed successfully!');
     } catch (e) {
-      debugPrint('❌ Migration failed: $e');
+      // debugPrint('❌ Migration failed: $e');
       rethrow;
     }
   }

@@ -38,8 +38,6 @@ class NotificationChannels {
           AndroidFlutterLocalNotificationsPlugin
         >()
         ?.createNotificationChannel(highChannel);
-
-    debugPrint('✅ Notification channels created');
   }
 
   // ✅ Example: Show notification using the created channel

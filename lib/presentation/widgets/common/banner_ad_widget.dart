@@ -3,7 +3,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 
 class BannerAdWidget extends StatefulWidget {
-  const BannerAdWidget({super.key,});
+  const BannerAdWidget({super.key});
 
   @override
   State<BannerAdWidget> createState() => _BannerAdWidgetState();
@@ -26,10 +26,10 @@ class _BannerAdWidgetState extends State<BannerAdWidget> {
         setState(() {
           _isLoaded = true;
         });
-        debugPrint('✅ Banner ad loaded');
+        //debugPrint('✅ Banner ad loaded');
       },
       onFailedToLoad: (ad, error) {
-        debugPrint('❌ Banner ad failed: $error');
+        //debugPrint('❌ Banner ad failed: $error');
         ad.dispose();
         setState(() {
           _bannerAd = null;

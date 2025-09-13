@@ -1,5 +1,4 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:flutter/material.dart';
 
 enum BookingStatus {
   pending,
@@ -15,7 +14,6 @@ enum BookingStatus {
 BookingStatus? bookingStatusFromString(String value) {
   try {
     final cleanValue = value.toLowerCase().trim();
-    debugPrint('🔍 [STATUS PARSING] Input: "$value" → Clean: "$cleanValue"');
 
     // ✅ CRITICAL: Handle all possible status values
     switch (cleanValue) {
@@ -26,7 +24,6 @@ BookingStatus? bookingStatusFromString(String value) {
       case 'inprogress':
       case 'in_progress':
       case 'in-progress':
-        debugPrint('✅ [STATUS PARSING] Matched inProgress');
         return BookingStatus.inProgress;
       case 'completed':
         return BookingStatus.completed;
@@ -42,13 +39,9 @@ BookingStatus? bookingStatusFromString(String value) {
       case 'payment-pending':
         return BookingStatus.paymentPending;
       default:
-        debugPrint(
-          '❌ [STATUS PARSING] Unknown status: "$cleanValue" - defaulting to pending',
-        );
         return BookingStatus.pending;
     }
   } catch (e) {
-    debugPrint('❌ [STATUS PARSING] Error parsing "$value": $e');
     return BookingStatus.pending;
   }
 }

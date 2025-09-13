@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_conditional_assignment, use_build_context_synchronously
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
@@ -71,22 +73,22 @@ class _CustomerBookingDetailScreenState
         return;
       }
 
-      debugPrint(
-        '🔍 [CUSTOMER DETAIL] Processing booking: ${bookingToProcess.serviceName}',
-      );
-      debugPrint(
-        '🔍 [CUSTOMER DETAIL] Provider ID: ${bookingToProcess.providerId}',
-      );
-      debugPrint(
-        '🔍 [CUSTOMER DETAIL] Existing provider phone: ${bookingToProcess.providerPhone}',
-      );
+      // debugPrint(
+      //   '🔍 [CUSTOMER DETAIL] Processing booking: ${bookingToProcess.serviceName}',
+      // );
+      // debugPrint(
+      //   '🔍 [CUSTOMER DETAIL] Provider ID: ${bookingToProcess.providerId}',
+      // );
+      // debugPrint(
+      //   '🔍 [CUSTOMER DETAIL] Existing provider phone: ${bookingToProcess.providerPhone}',
+      // );
 
       // ✅ CRITICAL: Try multiple methods to get provider details
       Map<String, dynamic>? providerDetails;
 
       // Method 1: Use existing booking provider data if available
       if (bookingToProcess.providerPhone?.isNotEmpty == true) {
-        debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
+        // debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
         providerDetails = {
           'name': bookingToProcess.providerName ?? 'Service Provider',
           'businessName': bookingToProcess.providerName ?? 'Service Provider',
@@ -96,9 +98,9 @@ class _CustomerBookingDetailScreenState
         };
       } else {
         // Method 2: Fetch from service data
-        debugPrint(
-          '🔄 [CUSTOMER DETAIL] Fetching provider data from service...',
-        );
+        // debugPrint(
+        //   '🔄 [CUSTOMER DETAIL] Fetching provider data from service...',
+        // );
         try {
           final serviceDoc = await FirebaseFirestore.instance
               .collection('services')
@@ -113,9 +115,9 @@ class _CustomerBookingDetailScreenState
                 serviceData['providerName'] as String?;
 
             if (serviceMobile?.isNotEmpty == true) {
-              debugPrint(
-                '✅ [CUSTOMER DETAIL] Provider data from service: $serviceMobile',
-              );
+              // debugPrint(
+              //   '✅ [CUSTOMER DETAIL] Provider data from service: $serviceMobile',
+              // );
               providerDetails = {
                 'name': serviceProviderName ?? 'Service Provider',
                 'businessName': serviceProviderName ?? 'Service Provider',
@@ -126,21 +128,21 @@ class _CustomerBookingDetailScreenState
             }
           }
         } catch (e) {
-          debugPrint('⚠️ [CUSTOMER DETAIL] Service data fetch error: $e');
+          //debugPrint('⚠️ [CUSTOMER DETAIL] Service data fetch error: $e');
         }
 
         // Method 3: Fallback to provider profile data
         if (providerDetails == null) {
-          debugPrint('🔄 [CUSTOMER DETAIL] Fetching from provider profile...');
+          // debugPrint('🔄 [CUSTOMER DETAIL] Fetching from provider profile...');
           providerDetails = await _fetchProviderDetails(
             bookingToProcess.providerId,
           );
         }
       }
 
-      debugPrint(
-        '🔍 [CUSTOMER DETAIL] Final provider details: $providerDetails',
-      );
+      // debugPrint(
+      //   '🔍 [CUSTOMER DETAIL] Final provider details: $providerDetails',
+      // );
 
       BookingModel updatedBooking;
 
@@ -157,10 +159,10 @@ class _CustomerBookingDetailScreenState
 
         final providerEmail = providerDetails['email']?.toString() ?? '';
 
-        debugPrint('✅ [CUSTOMER DETAIL] Final mapped provider data:');
-        debugPrint('   - Name: $providerName');
-        debugPrint('   - Phone: $providerPhone');
-        debugPrint('   - Email: $providerEmail');
+        // debugPrint('✅ [CUSTOMER DETAIL] Final mapped provider data:');
+        // debugPrint('   - Name: $providerName');
+        // debugPrint('   - Phone: $providerPhone');
+        // debugPrint('   - Email: $providerEmail');
 
         updatedBooking = bookingToProcess.copyWith(
           providerName: providerName,
@@ -168,9 +170,9 @@ class _CustomerBookingDetailScreenState
           providerEmail: providerEmail,
         );
       } else {
-        debugPrint(
-          '⚠️ [CUSTOMER DETAIL] No provider details found, using fallback',
-        );
+        // debugPrint(
+        //   '⚠️ [CUSTOMER DETAIL] No provider details found, using fallback',
+        // );
         updatedBooking = bookingToProcess.copyWith(
           providerName: 'Provider information unavailable',
           providerPhone: '',
@@ -183,11 +185,11 @@ class _CustomerBookingDetailScreenState
         isLoading = false;
       });
 
-      debugPrint(
-        '✅ [CUSTOMER DETAIL] Booking loaded with provider phone: ${updatedBooking.providerPhone}',
-      );
+      // debugPrint(
+      //   '✅ [CUSTOMER DETAIL] Booking loaded with provider phone: ${updatedBooking.providerPhone}',
+      // );
     } catch (e) {
-      debugPrint('❌ [CUSTOMER DETAIL] Error loading booking: $e');
+      // debugPrint('❌ [CUSTOMER DETAIL] Error loading booking: $e');
       setState(() {
         isLoading = false;
         errorMessage = 'Failed to load booking: $e';
@@ -368,9 +370,9 @@ class _CustomerBookingDetailScreenState
                       const SizedBox(height: 4),
                       ElevatedButton(
                         onPressed: () {
-                          debugPrint(
-                            '🔄 [CUSTOMER DETAIL] Manual provider data refresh',
-                          );
+                          // debugPrint(
+                          //   '🔄 [CUSTOMER DETAIL] Manual provider data refresh',
+                          // );
                           _loadBooking();
                         },
                         style: ElevatedButton.styleFrom(
@@ -433,9 +435,9 @@ class _CustomerBookingDetailScreenState
                     booking.providerPhone!,
                     Icons.phone,
                     () {
-                      debugPrint(
-                        '📞 [CUSTOMER DETAIL] Calling provider: ${booking.providerPhone}',
-                      );
+                      // debugPrint(
+                      //   '📞 [CUSTOMER DETAIL] Calling provider: ${booking.providerPhone}',
+                      // );
                       Helpers.launchPhone(booking.providerPhone!);
                     },
                   ),
@@ -492,9 +494,9 @@ class _CustomerBookingDetailScreenState
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withOpacity(0.1),
+                  color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                 ),
                 child: Column(
                   children: [
@@ -675,9 +677,9 @@ class _CustomerBookingDetailScreenState
               width: double.infinity,
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
+                color: Colors.green.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.withOpacity(0.3)),
+                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
               ),
               child: Column(
                 children: [
@@ -755,9 +757,9 @@ class _CustomerBookingDetailScreenState
                     width: double.infinity,
                     padding: const EdgeInsets.all(16),
                     decoration: BoxDecoration(
-                      color: Colors.orange.withOpacity(0.1),
+                      color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       children: [
@@ -898,8 +900,8 @@ class _CustomerBookingDetailScreenState
                 borderRadius: BorderRadius.circular(12),
                 gradient: LinearGradient(
                   colors: [
-                    Colors.orange.withOpacity(0.1),
-                    Colors.orange.withOpacity(0.05),
+                    Colors.orange.withValues(alpha: 0.1),
+                    Colors.orange.withValues(alpha: 0.05),
                   ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
@@ -942,7 +944,7 @@ class _CustomerBookingDetailScreenState
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withOpacity(0.3)),
+                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
                     ),
                     child: Column(
                       children: [
@@ -961,7 +963,7 @@ class _CustomerBookingDetailScreenState
                             vertical: 12,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.orange.withOpacity(0.1),
+                            color: Colors.orange.withValues(alpha: 0.1),
                             borderRadius: BorderRadius.circular(8),
                             border: Border.all(color: Colors.orange),
                           ),
@@ -993,7 +995,7 @@ class _CustomerBookingDetailScreenState
                               vertical: 8,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.orange.withOpacity(0.1),
+                              color: Colors.orange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: const Row(
@@ -1024,7 +1026,7 @@ class _CustomerBookingDetailScreenState
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Colors.blue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: const Row(
@@ -1163,13 +1165,13 @@ class _CustomerBookingDetailScreenState
   // ✅ ADD: Method to fetch provider details from Firestore
   Future<Map<String, dynamic>?> _fetchProviderDetails(String providerId) async {
     try {
-      debugPrint(
-        '🔍 [CUSTOMER DETAIL] Fetching provider details for: $providerId',
-      );
+      // debugPrint(
+      //   '🔍 [CUSTOMER DETAIL] Fetching provider details for: $providerId',
+      // );
 
       // ✅ CRITICAL: Method 1 - Try to get from booking's existing provider data first
       if (booking?.providerPhone?.isNotEmpty == true) {
-        debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
+        //debugPrint('✅ [CUSTOMER DETAIL] Using existing booking provider data');
         return {
           'name': booking?.providerName ?? 'Service Provider',
           'businessName': booking?.providerName ?? 'Service Provider',
@@ -1193,7 +1195,7 @@ class _CustomerBookingDetailScreenState
             serviceData['providerName'] as String?;
 
         if (serviceMobile?.isNotEmpty == true) {
-          debugPrint('✅ [CUSTOMER DETAIL] Provider found via service data');
+          //debugPrint('✅ [CUSTOMER DETAIL] Provider found via service data');
           return {
             'name': serviceProviderName ?? 'Service Provider',
             'businessName': serviceProviderName ?? 'Service Provider',
@@ -1206,7 +1208,7 @@ class _CustomerBookingDetailScreenState
 
       // ✅ Method 3 - Try Firebase Realtime Database
       try {
-        debugPrint('🔍 [CUSTOMER DETAIL] Trying Realtime Database...');
+        //debugPrint('🔍 [CUSTOMER DETAIL] Trying Realtime Database...');
         final rtdbSnapshot = await FirebaseDatabase.instance
             .ref('users')
             .child(providerId)
@@ -1214,7 +1216,7 @@ class _CustomerBookingDetailScreenState
 
         if (rtdbSnapshot.exists && rtdbSnapshot.value != null) {
           final userData = Map<String, dynamic>.from(rtdbSnapshot.value as Map);
-          debugPrint('✅ [CUSTOMER DETAIL] Provider found in Realtime DB');
+          //debugPrint('✅ [CUSTOMER DETAIL] Provider found in Realtime DB');
 
           // ✅ ENHANCED: Better field mapping with multiple phone field options
           final providerPhone =
@@ -1229,8 +1231,8 @@ class _CustomerBookingDetailScreenState
               userData['name']?.toString() ??
               'Service Provider';
 
-          debugPrint('✅ [CUSTOMER DETAIL] Mapped phone: $providerPhone');
-          debugPrint('✅ [CUSTOMER DETAIL] Mapped name: $providerName');
+          // debugPrint('✅ [CUSTOMER DETAIL] Mapped phone: $providerPhone');
+          // debugPrint('✅ [CUSTOMER DETAIL] Mapped name: $providerName');
 
           return {
             'name': providerName,
@@ -1241,14 +1243,14 @@ class _CustomerBookingDetailScreenState
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER DETAIL] Realtime DB error: $e');
+        //debugPrint('⚠️ [CUSTOMER DETAIL] Realtime DB error: $e');
       }
 
       // ✅ Method 4 - Try Firestore providers collection
       try {
-        debugPrint(
-          '🔍 [CUSTOMER DETAIL] Trying Firestore providers collection...',
-        );
+        // debugPrint(
+        //   '🔍 [CUSTOMER DETAIL] Trying Firestore providers collection...',
+        // );
         final providerDoc = await FirebaseFirestore.instance
             .collection('providers')
             .doc(providerId)
@@ -1256,9 +1258,9 @@ class _CustomerBookingDetailScreenState
 
         if (providerDoc.exists && providerDoc.data() != null) {
           final providerData = providerDoc.data()!;
-          debugPrint(
-            '✅ [CUSTOMER DETAIL] Provider found in Firestore providers',
-          );
+          // debugPrint(
+          //   '✅ [CUSTOMER DETAIL] Provider found in Firestore providers',
+          // );
 
           final providerPhone =
               providerData['mobileNumber']?.toString() ??
@@ -1277,12 +1279,12 @@ class _CustomerBookingDetailScreenState
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER DETAIL] Firestore providers error: $e');
+        //debugPrint('⚠️ [CUSTOMER DETAIL] Firestore providers error: $e');
       }
 
       // ✅ Method 5 - Try Firestore users collection
       try {
-        debugPrint('🔍 [CUSTOMER DETAIL] Trying Firestore users collection...');
+        //debugPrint('🔍 [CUSTOMER DETAIL] Trying Firestore users collection...');
         final userDoc = await FirebaseFirestore.instance
             .collection('users')
             .doc(providerId)
@@ -1290,7 +1292,7 @@ class _CustomerBookingDetailScreenState
 
         if (userDoc.exists && userDoc.data() != null) {
           final userData = userDoc.data()!;
-          debugPrint('✅ [CUSTOMER DETAIL] Provider found in Firestore users');
+          //debugPrint('✅ [CUSTOMER DETAIL] Provider found in Firestore users');
 
           final providerPhone =
               userData['phone']?.toString() ??
@@ -1310,15 +1312,15 @@ class _CustomerBookingDetailScreenState
           };
         }
       } catch (e) {
-        debugPrint('⚠️ [CUSTOMER DETAIL] Firestore users error: $e');
+        //debugPrint('⚠️ [CUSTOMER DETAIL] Firestore users error: $e');
       }
 
-      debugPrint(
-        '❌ [CUSTOMER DETAIL] Provider not found in any source: $providerId',
-      );
+      // debugPrint(
+      //   '❌ [CUSTOMER DETAIL] Provider not found in any source: $providerId',
+      // );
       return null;
     } catch (e) {
-      debugPrint('❌ [CUSTOMER DETAIL] Critical error fetching provider: $e');
+      //debugPrint('❌ [CUSTOMER DETAIL] Critical error fetching provider: $e');
       return null;
     }
   }
@@ -1523,8 +1525,8 @@ class _CustomerBookingDetailScreenState
               borderRadius: BorderRadius.circular(12),
               gradient: LinearGradient(
                 colors: [
-                  Colors.blue.withOpacity(0.1),
-                  Colors.blue.withOpacity(0.05),
+                  Colors.blue.withValues(alpha: 0.1),
+                  Colors.blue.withValues(alpha: 0.05),
                 ],
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
@@ -1665,7 +1667,7 @@ class _CustomerBookingDetailScreenState
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.1),
+                    color: Colors.blue.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(

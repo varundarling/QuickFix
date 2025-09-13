@@ -1,3 +1,5 @@
+// ignore_for_file: deprecated_member_use
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
@@ -11,7 +13,6 @@ import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
-
 class CreateServiceScreen extends StatefulWidget {
   const CreateServiceScreen({super.key});
 
@@ -167,7 +168,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               // ✅ FIXED: Category Dropdown with dynamic items
               DropdownButtonFormField<String>(
                 dropdownColor: Colors.white,
-                value: _selectedCategory,
+                initialValue: _selectedCategory,
                 decoration: const InputDecoration(
                   labelText: 'Category',
                   border: OutlineInputBorder(),
@@ -258,13 +259,13 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                       colors: [
-                        AppColors.primary.withOpacity(0.1),
-                        AppColors.primary.withOpacity(0.05),
+                        AppColors.primary.withValues(alpha: 0.1),
+                        AppColors.primary.withValues(alpha: 0.05),
                       ],
                     ),
                     borderRadius: BorderRadius.circular(12),
                     border: Border.all(
-                      color: AppColors.primary.withOpacity(0.3),
+                      color: AppColors.primary.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Row(
@@ -533,21 +534,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
     );
   }
 
-  void _addSubService() {
-    if (_subServiceController.text.trim().isNotEmpty) {
-      setState(() {
-        _subServices.add(_subServiceController.text.trim());
-        _subServiceController.clear();
-      });
-    }
-  }
-
-  void _removeSubService(String service) {
-    setState(() {
-      _subServices.remove(service);
-    });
-  }
-
   void _createService() async {
     if (_isCreating || !mounted) return;
     if (!_formKey.currentState!.validate()) return;
@@ -732,7 +718,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       debugPrint(
         '❌ [CREATE SERVICE] Error creating/updating provider profile: $e',
       );
-      throw e;
+      rethrow;
     }
   }
 

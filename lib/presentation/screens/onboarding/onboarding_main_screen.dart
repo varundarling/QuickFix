@@ -1,3 +1,5 @@
+// ignore_for_file: use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,6 +29,14 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
     const SafetyScreen(),
   ];
 
+  Future<void> _finishOnboarding() async {
+    // Mark onboarding as completed
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('hasSeenOnboarding', true);
+
+    // Navigate to your existing UserTypeSelectionScreen
+    if (context.mounted) context.go('/user-type-selection');
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -92,7 +102,7 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                 decoration: BoxDecoration(
                   color: _currentPage == index
                       ? Colors.white
-                      : Colors.white.withOpacity(0.5),
+                      : Colors.white.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -127,17 +137,6 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
         ],
       ),
     );
-  }
-
-  Future<void> _finishOnboarding() async {
-    // Mark onboarding as completed
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenOnboarding', true);
-
-    // Navigate to your existing UserTypeSelectionScreen
-    if (mounted) {
-      context.go('/user-type-selection');
-    }
   }
 
   @override
