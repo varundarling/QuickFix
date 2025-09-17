@@ -134,7 +134,7 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
         //debugPrint('✅ Customer notification setup complete');
       } else if (userType == 'provider') {
         await FirebaseMessaging.instance.subscribeToTopic('provider_updates');
-        debugPrint('✅ Provider notification setup complete');
+        // debugPrint('✅ Provider notification setup complete');
       }
 
       //debugPrint('✅ User notifications configured for: $userType');

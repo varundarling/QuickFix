@@ -380,7 +380,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                             );
                           },
                         ),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 16),
 
                         _buildCustomerRatingSection(currentBooking),
                       ],
@@ -1338,10 +1338,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
   }
 
   Widget _buildWorkProgressCard(BookingModel booking) {
-    // ✅ NEW: Hide progress card if work is completed
-    if (!_showProgressCard) {
-      return const SizedBox.shrink();
-    }
+    if (!_showProgressCard) return const SizedBox.shrink();
 
     return StreamBuilder<DocumentSnapshot>(
       stream: FirebaseFirestore.instance
@@ -1349,22 +1346,22 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
           .doc(booking.id)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const SizedBox.shrink();
+        }
 
-        final data = snapshot.data!.data() as Map<String, dynamic>?;
-        if (data == null) return const SizedBox.shrink();
-
-        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
-        final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
-        final workStartTime = (data['workStartTime'] as Timestamp?)?.toDate();
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final isWorkInProgress = (data['isWorkInProgress'] as bool?) ?? false;
+        final ts = data['workStartTime'] as Timestamp?;
+        final workStartTime = ts?.toDate();
+        final dbProgress = ((data['workProgress'] ?? 0.0) as num).toDouble();
 
         if (!isWorkInProgress || workStartTime == null) {
           return const SizedBox.shrink();
         }
 
-        // Calculate elapsed time
+        final display = _computeSyncedProgress(workStartTime, dbProgress);
         final elapsed = DateTime.now().difference(workStartTime);
-        final elapsedMinutes = elapsed.inMinutes;
         final elapsedHours = elapsed.inHours;
         final remainingMinutes = elapsed.inMinutes % 60;
 
@@ -1406,7 +1403,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '${(progress * 100).round()}% Complete',
+                            '${(display * 100).round()}% Complete',
                             style: const TextStyle(
                               fontSize: 14,
                               color: AppColors.textSecondary,
@@ -1427,7 +1424,7 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                       child: Text(
                         elapsedHours > 0
                             ? '${elapsedHours}h ${remainingMinutes}m'
-                            : '${elapsedMinutes}m',
+                            : '${elapsed.inMinutes}m',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1438,38 +1435,24 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                   ],
                 ),
                 const SizedBox(height: 20),
-
-                // Progress Bar
-                Container(
-                  width: double.infinity,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [Colors.blue, Colors.blueAccent],
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: display,
+                    minHeight: 12,
+                    backgroundColor: Colors.grey.shade300,
+                    valueColor: const AlwaysStoppedAnimation<Color>(
+                      Colors.blue,
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 20),
-
-                // ✅ UPDATED: Complete Work Button - Always Enabled
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: _handleCompleteWork, // ✅ Always enabled
+                    onPressed: _handleCompleteWork,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.success, // ✅ Always green
+                      backgroundColor: AppColors.success,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
@@ -1492,6 +1475,17 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
         );
       },
     );
+  }
+
+  double _computeSyncedProgress(DateTime workStartTime, double dbProgress) {
+    final minutes = DateTime.now().difference(workStartTime).inMinutes;
+    final intervals = minutes ~/ 15; // step every 15 minutes
+    final stepped = 0.10 + (intervals * 0.05); // base 10% + 5% per step
+    final computed = stepped.clamp(0.0, 0.95);
+    // Never regress below the server value, never exceed 95%
+    return (dbProgress.isNaN ? 0.0 : dbProgress).clamp(0.0, 0.95) > computed
+        ? dbProgress.clamp(0.0, 0.95)
+        : computed;
   }
 
   Future<void> _handleCompleteWork() async {
@@ -1600,7 +1594,9 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
                     decoration: BoxDecoration(
                       color: Colors.grey.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.grey.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.grey.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Row(
                       children: [

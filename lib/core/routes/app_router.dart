@@ -116,7 +116,7 @@ class AppRouter {
 
         // Resolve role; if not ready, don't misroute
         final role = await RoleResolver.getRole(
-          user!.uid,
+          user.uid,
         ); // implement lookup + cache
         if (role == null) return null;
 

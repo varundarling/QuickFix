@@ -330,7 +330,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               bookings = [];
           }
         } catch (e) {
-         // debugPrint('❌ [CUSTOMER] Error filtering bookings: $e');
+          // debugPrint('❌ [CUSTOMER] Error filtering bookings: $e');
           bookings = [];
         }
 
@@ -1031,7 +1031,8 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
   }
 
   Widget _buildNarrowProgressBar(BookingModel booking) {
-    if (booking.status != BookingStatus.inProgress) {
+    if (booking.status != BookingStatus.inProgress ||
+        !booking.isWorkInProgress) {
       return const SizedBox.shrink();
     }
 
@@ -1041,20 +1042,23 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
           .doc(booking.id)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const SizedBox.shrink();
+        }
 
         final data = snapshot.data!.data() as Map<String, dynamic>?;
         if (data == null) return const SizedBox.shrink();
 
-        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
         final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
-        final status = data['status'] as String?;
-
         if (!isWorkInProgress) return const SizedBox.shrink();
 
-        if (status != 'inProgress' && !isWorkInProgress) {
-          return const SizedBox.shrink();
-        }
+        final workStartTs = data['workStartTime'] as Timestamp?;
+        final workStartTime = workStartTs?.toDate();
+        final dbProgress = ((data['workProgress'] ?? 0.0) as num).toDouble();
+
+        if (workStartTime == null) return const SizedBox.shrink();
+
+        final display = _computeSyncedProgress(workStartTime, dbProgress);
 
         return Container(
           margin: const EdgeInsets.only(top: 8),
@@ -1063,10 +1067,10 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
             children: [
               Row(
                 children: [
-                  Icon(Icons.construction, size: 14, color: Colors.blue),
+                  const Icon(Icons.work, size: 14, color: Colors.blue),
                   const SizedBox(width: 6),
                   Text(
-                    'Work in Progress - ${(progress * 100).toInt()}%',
+                    'Work Progress - ${(display * 100).toInt()}%',
                     style: const TextStyle(
                       fontSize: 12,
                       color: Colors.blue,
@@ -1076,22 +1080,13 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
                 ],
               ),
               const SizedBox(height: 6),
-              Container(
-                width: double.infinity,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey.shade300,
-                  borderRadius: BorderRadius.circular(2),
-                ),
-                child: FractionallySizedBox(
-                  alignment: Alignment.centerLeft,
-                  widthFactor: progress,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.blue,
-                      borderRadius: BorderRadius.circular(2),
-                    ),
-                  ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(2),
+                child: LinearProgressIndicator(
+                  value: display,
+                  minHeight: 4,
+                  backgroundColor: Colors.grey.shade300,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
                 ),
               ),
             ],
@@ -1099,6 +1094,15 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
         );
       },
     );
+  }
+
+  double _computeSyncedProgress(DateTime workStartTime, double dbProgress) {
+    final minutes = DateTime.now().difference(workStartTime).inMinutes;
+    final intervals = minutes ~/ 15; // one step every 15 minutes
+    final stepped = 0.10 + (intervals * 0.05); // base 10% + 5% per step
+    final computed = stepped.clamp(0.0, 0.95);
+    final persisted = (dbProgress.isNaN ? 0.0 : dbProgress).clamp(0.0, 0.95);
+    return persisted > computed ? persisted : computed;
   }
 
   void _showPaymentOptions(BookingModel booking) {

@@ -191,7 +191,10 @@ class _ProviderCardState extends State<ProviderCard>
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
-                colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.7)],
+                colors: [
+                  AppColors.primary,
+                  AppColors.primary.withValues(alpha: 0.7),
+                ],
               ),
             ),
             child: isProvider
@@ -441,7 +444,7 @@ class _ProviderCardState extends State<ProviderCard>
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '${widget.provider!.hourlyRate!.toInt()}/hr',
+                    '${widget.provider!.hourlyRate!.toInt()}/day',
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -499,7 +502,7 @@ class _ProviderCardState extends State<ProviderCard>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '₹${widget.service!.basePrice.toInt()}',
+                  '₹${widget.service!.basePrice.toInt()}/ day',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
@@ -768,23 +771,26 @@ class _ProviderCardState extends State<ProviderCard>
   }
 
   Widget _buildWorkProgressBar(BookingModel booking) {
-    final progress = booking.workProgress;
-    final isCompleted = progress >= 1.0;
-
+    final isCompleted =
+        booking.workProgress >= 1.0 ||
+        booking.status == BookingStatus.completed;
     if (isCompleted) {
       return Container(
         padding: const EdgeInsets.all(12),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.success, AppColors.success.withValues(alpha: 0.8)],
+            colors: [
+              AppColors.success,
+              AppColors.success.withValues(alpha: 0.8),
+            ],
           ),
           borderRadius: BorderRadius.circular(12),
         ),
-        child: Row(
+        child: const Row(
           children: [
-            const Icon(Icons.check_circle, color: Colors.white, size: 20),
-            const SizedBox(width: 8),
-            const Text(
+            Icon(Icons.check_circle, color: Colors.white, size: 20),
+            SizedBox(width: 8),
+            Text(
               'Work Completed',
               style: TextStyle(
                 color: Colors.white,
@@ -797,18 +803,14 @@ class _ProviderCardState extends State<ProviderCard>
       );
     }
 
-    // Calculate time-based progress if work has started
-    double displayProgress = progress;
-    if (booking.workStartTime != null && progress < 1.0) {
-      final elapsed = DateTime.now()
-          .difference(booking.workStartTime!)
-          .inMinutes;
-      final timeProgress = (elapsed / 30.0).clamp(
-        0.0,
-        0.9,
-      ); // Max 90% from time
-      displayProgress = (progress + timeProgress).clamp(0.0, 0.9);
+    if (booking.workStartTime == null || !booking.isWorkInProgress) {
+      return const SizedBox.shrink();
     }
+
+    final display = _computeSyncedProgress(
+      booking.workStartTime!,
+      booking.workProgress,
+    );
 
     return Container(
       padding: const EdgeInsets.all(12),
@@ -833,7 +835,7 @@ class _ProviderCardState extends State<ProviderCard>
               ),
               const Spacer(),
               Text(
-                '${(displayProgress * 100).round()}%',
+                '${(display * 100).round()}%',
                 style: const TextStyle(
                   color: Colors.blue,
                   fontWeight: FontWeight.bold,
@@ -846,7 +848,7 @@ class _ProviderCardState extends State<ProviderCard>
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
-              value: displayProgress,
+              value: display,
               backgroundColor: Colors.grey.shade300,
               valueColor: const AlwaysStoppedAnimation<Color>(Colors.blue),
               minHeight: 6,
@@ -855,6 +857,16 @@ class _ProviderCardState extends State<ProviderCard>
         ],
       ),
     );
+  }
+
+  double _computeSyncedProgress(DateTime workStartTime, double dbProgress) {
+    final minutes = DateTime.now().difference(workStartTime).inMinutes;
+    final intervals = minutes ~/ 15; // one step every 15 minutesh
+    final stepped = 0.10 + (intervals * 0.05); // base 10% + steps
+    final computed = stepped.clamp(0.0, 0.95);
+    return (dbProgress.isNaN ? 0.0 : dbProgress).clamp(0.0, 0.95) > computed
+        ? dbProgress.clamp(0.0, 0.95)
+        : computed;
   }
 
   Widget _buildServiceStatusCard(

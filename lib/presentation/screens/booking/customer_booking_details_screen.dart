@@ -481,7 +481,6 @@ class _CustomerBookingDetailScreenState
 
           _buildProgressSection(booking),
 
-
           // Legacy OTP Card (keep for backward compatibility but hide if new OTP section is shown)
           if (booking.status == BookingStatus.confirmed) ...[
             const SizedBox(height: 16),
@@ -496,7 +495,9 @@ class _CustomerBookingDetailScreenState
                 decoration: BoxDecoration(
                   color: Colors.orange.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                  border: Border.all(
+                    color: Colors.orange.withValues(alpha: 0.3),
+                  ),
                 ),
                 child: Column(
                   children: [
@@ -640,11 +641,11 @@ class _CustomerBookingDetailScreenState
             ],
           ),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           _buildRatingSection(booking),
 
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
 
           // Action Buttons (Updated to handle real-time payment)
           if (booking.status == BookingStatus.completed &&
@@ -759,7 +760,9 @@ class _CustomerBookingDetailScreenState
                     decoration: BoxDecoration(
                       color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -944,7 +947,9 @@ class _CustomerBookingDetailScreenState
                     decoration: BoxDecoration(
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: Column(
                       children: [
@@ -1047,7 +1052,6 @@ class _CustomerBookingDetailScreenState
             ),
           );
         }
-
         return const SizedBox.shrink();
       },
     );
@@ -1483,7 +1487,6 @@ class _CustomerBookingDetailScreenState
   }
 
   Widget _buildProgressSection(BookingModel booking) {
-    // Only show progress for inProgress bookings
     if (booking.status != BookingStatus.inProgress) {
       return const SizedBox.shrink();
     }
@@ -1494,22 +1497,21 @@ class _CustomerBookingDetailScreenState
           .doc(booking.id)
           .snapshots(),
       builder: (context, snapshot) {
-        if (!snapshot.hasData) return const SizedBox.shrink();
-
-        final data = snapshot.data!.data() as Map<String, dynamic>?;
-        if (data == null) return const SizedBox.shrink();
-
-        final progress = (data['workProgress'] as num?)?.toDouble() ?? 0.0;
-        final workStartTime = (data['workStartTime'] as Timestamp?)?.toDate();
-        final isWorkInProgress = data['isWorkInProgress'] as bool? ?? false;
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const SizedBox.shrink();
+        }
+        final data = snapshot.data!.data() as Map<String, dynamic>;
+        final isWorkInProgress = (data['isWorkInProgress'] as bool?) ?? false;
+        final ts = data['workStartTime'] as Timestamp?;
+        final workStartTime = ts?.toDate();
+        final dbProgress = ((data['workProgress'] ?? 0.0) as num).toDouble();
 
         if (!isWorkInProgress || workStartTime == null) {
           return const SizedBox.shrink();
         }
 
-        // Calculate elapsed time
+        final display = _computeSyncedProgress(workStartTime, dbProgress);
         final elapsed = DateTime.now().difference(workStartTime);
-        final elapsedMinutes = elapsed.inMinutes;
         final elapsedHours = elapsed.inHours;
         final remainingMinutes = elapsed.inMinutes % 60;
 
@@ -1570,7 +1572,7 @@ class _CustomerBookingDetailScreenState
                         borderRadius: BorderRadius.circular(12),
                       ),
                       child: Text(
-                        '${(progress * 100).toInt()}%',
+                        '${(display * 100).toInt()}%',
                         style: const TextStyle(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
@@ -1581,32 +1583,18 @@ class _CustomerBookingDetailScreenState
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Progress Bar
-                Container(
-                  width: double.infinity,
-                  height: 12,
-                  decoration: BoxDecoration(
-                    color: Colors.grey.shade300,
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: FractionallySizedBox(
-                    alignment: Alignment.centerLeft,
-                    widthFactor: progress,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [Colors.blue, Colors.blue.shade700],
-                        ),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(6),
+                  child: LinearProgressIndicator(
+                    value: display,
+                    minHeight: 12,
+                    backgroundColor: Colors.grey.shade300,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      Colors.blue.shade700,
                     ),
                   ),
                 ),
-
                 const SizedBox(height: 16),
-
-                // Time Information
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -1624,7 +1612,7 @@ class _CustomerBookingDetailScreenState
                         Text(
                           elapsedHours > 0
                               ? '${elapsedHours}h ${remainingMinutes}m'
-                              : '${elapsedMinutes}m',
+                              : '${elapsed.inMinutes}m',
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1645,11 +1633,11 @@ class _CustomerBookingDetailScreenState
                         ),
                         const SizedBox(height: 2),
                         Text(
-                          progress >= 0.75
+                          display >= 0.75
                               ? 'Almost Complete'
-                              : progress >= 0.5
-                              ? 'In Progress'
-                              : 'Getting Started',
+                              : (display >= 0.5
+                                    ? 'In Progress'
+                                    : 'Getting Started'),
                           style: const TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
@@ -1660,10 +1648,7 @@ class _CustomerBookingDetailScreenState
                     ),
                   ],
                 ),
-
                 const SizedBox(height: 12),
-
-                // Info Message
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1680,7 +1665,7 @@ class _CustomerBookingDetailScreenState
                       const SizedBox(width: 8),
                       const Expanded(
                         child: Text(
-                          'Your service provider is working on your request.\nYou\'ll be notified when it\'s completed.',
+                          'Your service provider is working on your request.\nYou’ll be notified when it’s completed.',
                           style: TextStyle(fontSize: 14, color: Colors.blue),
                         ),
                       ),
@@ -1695,4 +1680,13 @@ class _CustomerBookingDetailScreenState
     );
   }
 
+  double _computeSyncedProgress(DateTime workStartTime, double dbProgress) {
+    final minutes = DateTime.now().difference(workStartTime).inMinutes;
+    final intervals = minutes ~/ 15;
+    final stepped = 0.10 + (intervals * 0.05);
+    final computed = stepped.clamp(0.0, 0.95);
+    return (dbProgress.isNaN ? 0.0 : dbProgress).clamp(0.0, 0.95) > computed
+        ? dbProgress.clamp(0.0, 0.95)
+        : computed;
+  }
 }
