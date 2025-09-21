@@ -31,7 +31,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   ProviderModel? _provider;
   bool _isLoadingProvider = false;
   DateTime? _selectedDate;
-  double _selectedRating = 5.0;
 
   final TextEditingController _locationController = TextEditingController();
   bool _isFetchingLocation = false;

@@ -33,8 +33,6 @@ class _ServiceCardState extends State<ServiceCard>
     with SingleTickerProviderStateMixin {
   late AnimationController _animationController;
   late Animation<double> _scaleAnimation;
-  late Animation<double> _fadeAnimation;
-  bool _isPressed = false;
 
   // Real-time rating fields
   StreamSubscription<DocumentSnapshot>? _providerRatingSub;
@@ -52,9 +50,6 @@ class _ServiceCardState extends State<ServiceCard>
       vsync: this,
     );
     _scaleAnimation = Tween<double>(begin: 1.0, end: 0.98).animate(
-      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
-    );
-    _fadeAnimation = Tween<double>(begin: 1.0, end: 0.8).animate(
       CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
     );
 
@@ -171,18 +166,15 @@ class _ServiceCardState extends State<ServiceCard>
 
   void _handleTapDown(TapDownDetails details) {
     if (!widget.service.isBooked) {
-      setState(() => _isPressed = true);
       _animationController.forward();
     }
   }
 
   void _handleTapUp(TapUpDetails details) {
-    setState(() => _isPressed = false);
     _animationController.reverse();
   }
 
   void _handleTapCancel() {
-    setState(() => _isPressed = false);
     _animationController.reverse();
   }
 

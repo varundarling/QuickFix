@@ -38,7 +38,6 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
   late PageController _pageController;
   String? _currentUserId;
   BookingProvider? _bookingProvider;
-  AuthProvider? _authProvider;
 
   bool isLoading = true;
   StreamSubscription<QuerySnapshot>? _providerBookingsSubscription;

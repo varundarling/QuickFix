@@ -26,8 +26,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
   bool isLoading = true;
-  bool _isCustomerUpdating = false;
-  final Map<String, int> _customerBookingVersions = {};
 
   StreamSubscription<QuerySnapshot>? _bookingsSubscription;
 
@@ -1141,7 +1139,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
     );
 
     if (confirmed == true && mounted) {
-      _isCustomerUpdating = true;
 
       try {
         final bookingProvider = context.read<BookingProvider>();
@@ -1172,7 +1169,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
           );
         }
       } finally {
-        _isCustomerUpdating = false;
       }
     }
   }

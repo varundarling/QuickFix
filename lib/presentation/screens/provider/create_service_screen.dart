@@ -29,7 +29,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   final _addressController = TextEditingController();
 
   bool _isCreating = false;
-  bool _isLoadingLocation = false;
 
   String _selectedCategory = 'Plumbing';
   bool _showOtherCategoryField = false;
@@ -79,7 +78,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
   Future<void> _getCurrentLocation() async {
     setState(() {
-      _isLoadingLocation = true;
     });
 
     try {
@@ -127,7 +125,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       }
     } finally {
       setState(() {
-        _isLoadingLocation = false;
       });
     }
   }

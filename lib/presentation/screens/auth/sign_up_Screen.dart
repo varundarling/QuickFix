@@ -173,7 +173,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Google Sign-Up Button
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
-                    return Container(
+                    return SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton.icon(
@@ -225,7 +225,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: AppColors.textSecondary.withOpacity(0.3),
+                            color: AppColors.textSecondary.withValues(alpha: 0.3),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -242,7 +242,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   children: [
                     Expanded(
                       child: Divider(
-                        color: AppColors.textSecondary.withOpacity(0.3),
+                        color: AppColors.textSecondary.withValues(alpha: 0.3),
                       ),
                     ),
                     Padding(
@@ -258,7 +258,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     ),
                     Expanded(
                       child: Divider(
-                        color: AppColors.textSecondary.withOpacity(0.3),
+                        color: AppColors.textSecondary.withValues(alpha: 0.3),
                       ),
                     ),
                   ],

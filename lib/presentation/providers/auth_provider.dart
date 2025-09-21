@@ -34,7 +34,6 @@ class AuthProvider extends ChangeNotifier {
   bool _isSigningUp = false;
   bool _isUpdatingProfile = false;
   bool _isGoogleSigningIn = false;
-  bool _isGoogleInitialized = false;
   bool _isInitialized = false;
 
   User? get user => _user;

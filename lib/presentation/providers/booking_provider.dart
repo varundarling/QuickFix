@@ -17,7 +17,6 @@ import 'package:uuid/uuid.dart';
 
 class BookingProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
-  final Uuid _uuid = const Uuid();
 
   List<BookingModel> _userBookings = [];
   List<BookingModel> _providerBookings = [];
@@ -33,8 +32,6 @@ class BookingProvider extends ChangeNotifier {
   DateTime? _selectedDateTime;
   String _description = '';
   String _customerAddress = '';
-  double? _customerLatitude;
-  double? _customerLongitude;
   double _totalAmount = 0.0;
   double _selectedRating = 5.0;
 
@@ -72,8 +69,6 @@ class BookingProvider extends ChangeNotifier {
     required double longitude,
   }) {
     _customerAddress = address;
-    _customerLatitude = latitude;
-    _customerLongitude = longitude;
     notifyListeners();
   }
 
@@ -88,8 +83,6 @@ class BookingProvider extends ChangeNotifier {
     _selectedDateTime = null;
     _description = '';
     _customerAddress = '';
-    _customerLatitude = null;
-    _customerLongitude = null;
     _totalAmount = 0.0;
     notifyListeners();
   }

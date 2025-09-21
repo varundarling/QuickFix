@@ -14,7 +14,7 @@ class EncryptionService {
     String password,
     String userUID,
   ) async {
-    final salt = utf8.encode(userUID + 'quickfix_salt_2025');
+    final salt = utf8.encode('${userUID}quickfix_salt_2025');
     final passwordBytes = utf8.encode(password);
 
     var hmacSha256 = Hmac(sha256, salt);
@@ -224,6 +224,7 @@ class EncryptionService {
       await _secureStorage.delete(key: 'device_key_$userUID');
       await _secureStorage.delete(key: 'master_key_$userUID');
     } catch (e) {
+      // Ignore errors during cleanup
     }
   }
 

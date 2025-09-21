@@ -91,7 +91,6 @@ Future<void> _preflightPermissions() async {
 
 // FCM Token Manager (keep your existing code)
 class FCMTokenManager {
-  static String? _cachedToken;
 
   static Future<bool> requestNotificationPermission() async {
     try {
@@ -135,7 +134,6 @@ class FCMTokenManager {
         try {
           String? token = await FirebaseMessaging.instance.getToken();
           if (token != null && token.isNotEmpty) {
-            _cachedToken = token;
             //debugPrint('✅ FCM Token obtained: ${token.substring(0, 20)}...');
             return token;
           }
@@ -158,7 +156,6 @@ class FCMTokenManager {
   static void initializeTokenListener() {
     FirebaseMessaging.instance.onTokenRefresh
         .listen((fcmToken) {
-          _cachedToken = fcmToken;
           //debugPrint('✅ Token refreshed: ${fcmToken.substring(0, 20)}...');
         })
         .onError((err) {

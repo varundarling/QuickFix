@@ -1,6 +1,5 @@
 import 'package:permission_handler/permission_handler.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
 
 class NotificationPermissionManager {
   static Future<bool> requestNotificationPermission() async {

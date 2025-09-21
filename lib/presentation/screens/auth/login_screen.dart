@@ -154,7 +154,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Google Sign-In Button
                 Consumer<AuthProvider>(
                   builder: (context, authProvider, child) {
-                    return Container(
+                    return SizedBox(
                       width: double.infinity,
                       height: 56,
                       child: OutlinedButton.icon(
@@ -205,7 +205,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: AppColors.textSecondary.withOpacity(0.3),
+                            color: AppColors.textSecondary.withValues(alpha: 0.3),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -221,7 +221,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   children: [
                     Expanded(
                       child: Divider(
-                        color: AppColors.textSecondary.withOpacity(0.3),
+                        color: AppColors.textSecondary.withValues(alpha: 0.3),
                       ),
                     ),
                     Padding(
@@ -237,7 +237,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                     Expanded(
                       child: Divider(
-                        color: AppColors.textSecondary.withOpacity(0.3),
+                        color: AppColors.textSecondary.withValues(alpha: 0.3),
                       ),
                     ),
                   ],
