@@ -1,0 +1,9 @@
+{
+    "cmake.sourceDirectory": "${workspaceFolder}/windows",
+    "cmake.configureOnOpen": true,
+    "java.configuration.updateBuildConfiguration": "automatic",
+    "files.exclude": {
+        "**/linux/": true,
+        "**/macos/": true
+    }
+}

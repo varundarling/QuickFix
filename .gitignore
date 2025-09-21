@@ -18,155 +18,20 @@ migrate_working_dir/
 *.iws
 .idea/
 
-# =====================================
-# FIREBASE & NOTIFICATION SECURITY
-# =====================================
-
-# Firebase service account keys (NEVER commit these!)
-*serviceAccount*.json
-*service-account*.json
-*serviceAccountKey*.json
-service-account-key.json
-firebase-adminsdk-*.json
-
->> .gitignore
-echo "assets/*.json" >> .gitignore
-echo ".env" >> .gitignore
-
-# Firebase Service Accounts (NEVER COMMIT)
-assets/quickfix-d41ac-firebase-adminsdk-fbsvc-c126a61f84.json
-assets/quickfix-d41ac-firebase-adminsdk-fbsvc-f7bdf98788.json
-assets/service-account.json
-assets/*firebase*adminsdk*.json
-
-# Environment files
-.env
-*.env
-
-# Any Firebase admin SDK files
-**/*firebase*adminsdk*.json
-
-
-# Environment variables with sensitive data
-.env
-.env.local
-.env.production
-.env.development
-.env.test
-
-# Firebase configuration files (optional - see note below)
-firebase_options.dart
-google-services.json
-GoogleService-Info.plist
-
-# Backend server files (if you create Node.js backend)
-quickfix-backend/
-server/node_modules/
-server/.env
-server/serviceAccount*.json
-
-# =====================================
-# FLUTTER STANDARD FILES
-# =====================================
-
-# Build outputs
-**/build/
-**/android/app/build/
-**/ios/build/
-**/web/build/
-**/linux/build/
-**/windows/build/
-**/macos/build/
-
-# Flutter generated files
-.flutter-plugins
-.flutter-plugins-dependencies
-.packages
-.metadata
-.dart_tool/
-pubspec.lock
-
-# IDE files
-.idea/
-.vscode/
-*.iml
-*.ipr
-*.iws
-.project
-.classpath
-.settings/
-
-# OS generated files
-.DS_Store
-.DS_Store?
-._*
-.Spotlight-V100
-.Trashes
-ehthumbs.db
-Thumbs.db
-*~
-
-# Logs and temporary files
-*.log
-*.tmp
-*.temp
-*.swp
-*.swo
-*~.nib
-*.pyc
-
-# Coverage reports
-coverage/
-lcov.info
-
-# Obfuscated app symbols
-app.*.symbols
-
-# Android specific
-**/android/local.properties
-**/android/app/debug/
-**/android/app/profile/
-**/android/app/release/
-**/android/.gradle/
-
-# iOS specific
-**/ios/Flutter/Flutter.framework
-**/ios/Flutter/Flutter.podspec
-**/ios/.symlinks/
-**/ios/Flutter/App.framework
-**/ios/Flutter/Generated.xcconfig
-**/ios/Flutter/flutter_export_environment.sh
-**/ios/ServiceDefinitions.json
-**/ios/Runner/GeneratedPluginRegistrant.*
-**/.symlinks/
-**/ios/Pods/
-**/ios/.symlinks/
-
-# Sensitive files - DO NOT COMMIT
-# .env
-# assets/service-account.json
-# *.env
-
-
-# Web specific
-**/web/firebase-config.js
-
-
 # The .vscode folder contains launch configuration and tasks you configure in
 # VS Code which you may wish to be included in version control, so this line
 # is commented out by default.
 #.vscode/
-# .env file (DO NOT commit to git)
 
 # Flutter/Dart/Pub related
 **/doc/api/
 **/ios/Flutter/.last_build_id
 .dart_tool/
-.flutter-plugins
 .flutter-plugins-dependencies
 .pub-cache/
 .pub/
 /build/
+/coverage/
 
 # Symbolication related
 app.*.symbols
