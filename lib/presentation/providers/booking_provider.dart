@@ -17,6 +17,7 @@ import 'package:uuid/uuid.dart';
 
 class BookingProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  static const double _kDeveloperCommissionRate = 0.10;
 
   List<BookingModel> _userBookings = [];
   List<BookingModel> _providerBookings = [];
@@ -42,6 +43,61 @@ class BookingProvider extends ChangeNotifier {
   String get customerAddress => _customerAddress;
   double get totalAmount => _totalAmount;
   double get selectedRating => _selectedRating;
+
+  Future<void> _applyCommissionSplitAndPersist(
+    String bookingId, {
+    double? paidAmount, // optional override if gateway returns actual paid
+  }) async {
+    await FirebaseFirestore.instance.runTransaction((tx) async {
+      final ref = FirebaseFirestore.instance
+          .collection('bookings')
+          .doc(bookingId);
+      final snap = await tx.get(ref);
+      if (!snap.exists) {
+        throw Exception('Booking not found');
+      }
+
+      final data = snap.data()! as Map<String, dynamic>;
+
+      // Use provided paidAmount if present, else fall back to stored totalAmount
+      final double total =
+          (paidAmount ??
+                  (data['totalAmount'] is num
+                      ? (data['totalAmount'] as num).toDouble()
+                      : 0.0))
+              .toDouble();
+
+      // Guard against negative or null totals
+      final safeTotal = total.isFinite && total > 0 ? total : 0.0;
+
+      final double developerCommissionRaw =
+          safeTotal * _kDeveloperCommissionRate;
+      final double developerCommission = double.parse(
+        developerCommissionRaw.toStringAsFixed(2),
+      );
+      final double providerAmount = double.parse(
+        (safeTotal - developerCommission).toStringAsFixed(2),
+      );
+
+      tx.update(ref, {
+        'developerCommission': developerCommission,
+        'providerAmount': providerAmount,
+        'commissionRate': _kDeveloperCommissionRate,
+        'payoutSplitApplied': true,
+        'payoutSplitAppliedAt': FieldValue.serverTimestamp(),
+      });
+    });
+
+    // Refresh the updated booking in local state
+    await refreshSpecificBooking(bookingId);
+  }
+
+  Future<void> applyCommissionSplit(
+    String bookingId, {
+    double? paidAmount,
+  }) async {
+    await _applyCommissionSplitAndPersist(bookingId, paidAmount: paidAmount);
+  }
 
   void setSelectedService(String serviceId) {
     _selectedServiceId = serviceId;
@@ -781,6 +837,10 @@ class BookingProvider extends ChangeNotifier {
           }
         }
 
+        if (newStatus == BookingStatus.paid) {
+          await _applyCommissionSplitAndPersist(bookingId);
+        }
+
         await Future.delayed(const Duration(milliseconds: 1000));
         return true;
       }
@@ -906,6 +966,9 @@ class BookingProvider extends ChangeNotifier {
               : null,
         );
         notifyListeners();
+      }
+      if (newStatus == BookingStatus.paid) {
+        await _applyCommissionSplitAndPersist(bookingId);
       }
 
       return true;
@@ -1034,7 +1097,7 @@ class BookingProvider extends ChangeNotifier {
             // debugPrint('✅ [REAL-TIME] Final booking customer data:');
             for (var booking in bookingsWithCustomerDetails.take(3)) {
               // debugPrint(
-                // '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
+              // '   - ${booking.serviceName}: ${booking.customerName} (${booking.status})',
               // );
             }
           },

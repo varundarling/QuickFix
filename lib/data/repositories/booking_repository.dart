@@ -4,17 +4,54 @@ import '../../core/services/firebase_service.dart';
 
 class BookingRepository {
   final FirebaseService _firebaseService = FirebaseService.instance;
+  static const double _developerCommissionRate = 0.10;
+
+  final CollectionReference bookingsCollection = FirebaseFirestore.instance
+      .collection('bookings');
 
   Future<void> createBooking(BookingModel booking) async {
+    final developerCommission =
+        (booking.totalAmount * _developerCommissionRate);
+    final providerAmount = booking.totalAmount - developerCommission;
     try {
-      await _firebaseService.createDocument(
-        'bookings',
-        booking.id,
-        booking.toFireStore(),
+      final bookingWithCommission = BookingModel(
+        id: booking.id,
+        customerId: booking.customerId,
+        providerId: booking.providerId,
+        serviceId: booking.serviceId,
+        serviceName: booking.serviceName,
+        scheduledDateTime: booking.scheduledDateTime,
+        description: booking.description,
+        totalAmount: booking.totalAmount,
+        status: booking.status,
+        customerAddress: booking.customerAddress,
+        createdAt: booking.createdAt,
+        completedAt: booking.completedAt,
+        // Add commission fields here
+        developerCommission: developerCommission,
+        providerAmount: providerAmount,
       );
+
+      await bookingsCollection
+          .doc(bookingWithCommission.id)
+          .set(bookingWithCommission.toFireStore());
     } catch (e) {
       rethrow;
     }
+  }
+
+  Future<void> updateBookingPayment(
+    String bookingId,
+    double totalPaidAmount,
+  ) async {
+    final developerCommission = totalPaidAmount * _developerCommissionRate;
+    final providerAmount = totalPaidAmount - developerCommission;
+
+    await bookingsCollection.doc(bookingId).update({
+      'totalAmount': totalPaidAmount,
+      'developerCommission': developerCommission,
+      'providerAmount': providerAmount,
+    });
   }
 
   Future<BookingModel?> getBookingById(String bookingId) async {
@@ -37,7 +74,7 @@ class BookingRepository {
             .where('customerId', isEqualTo: userId)
             .orderBy('createdAt', descending: true),
       );
-      
+
       return querySnapshot.docs
           .map((doc) => BookingModel.fromFireStore(doc))
           .toList();
@@ -54,7 +91,7 @@ class BookingRepository {
             .where('providerId', isEqualTo: providerId)
             .orderBy('createdAt', descending: true),
       );
-      
+
       return querySnapshot.docs
           .map((doc) => BookingModel.fromFireStore(doc))
           .toList();
@@ -63,7 +100,10 @@ class BookingRepository {
     }
   }
 
-  Future<void> updateBookingStatus(String bookingId, BookingStatus status) async {
+  Future<void> updateBookingStatus(
+    String bookingId,
+    BookingStatus status,
+  ) async {
     try {
       final updateData = <String, dynamic>{
         'status': status.toString().split('.').last,
@@ -104,25 +144,33 @@ class BookingRepository {
   }
 
   Stream<List<BookingModel>> getUserBookingsStream(String userId) {
-    return _firebaseService.getCollectionStream(
-      'bookings',
-      queryBuilder: (query) => query
-          .where('customerId', isEqualTo: userId)
-          .orderBy('createdAt', descending: true),
-    ).map((snapshot) => snapshot.docs
-        .map((doc) => BookingModel.fromFireStore(doc))
-        .toList());
+    return _firebaseService
+        .getCollectionStream(
+          'bookings',
+          queryBuilder: (query) => query
+              .where('customerId', isEqualTo: userId)
+              .orderBy('createdAt', descending: true),
+        )
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BookingModel.fromFireStore(doc))
+              .toList(),
+        );
   }
 
   Stream<List<BookingModel>> getProviderBookingsStream(String providerId) {
-    return _firebaseService.getCollectionStream(
-      'bookings',
-      queryBuilder: (query) => query
-          .where('providerId', isEqualTo: providerId)
-          .orderBy('createdAt', descending: true),
-    ).map((snapshot) => snapshot.docs
-        .map((doc) => BookingModel.fromFireStore(doc))
-        .toList());
+    return _firebaseService
+        .getCollectionStream(
+          'bookings',
+          queryBuilder: (query) => query
+              .where('providerId', isEqualTo: providerId)
+              .orderBy('createdAt', descending: true),
+        )
+        .map(
+          (snapshot) => snapshot.docs
+              .map((doc) => BookingModel.fromFireStore(doc))
+              .toList(),
+        );
   }
 
   Future<List<BookingModel>> getBookingsByStatus(BookingStatus status) async {
@@ -133,7 +181,7 @@ class BookingRepository {
             .where('status', isEqualTo: status.toString().split('.').last)
             .orderBy('createdAt', descending: true),
       );
-      
+
       return querySnapshot.docs
           .map((doc) => BookingModel.fromFireStore(doc))
           .toList();

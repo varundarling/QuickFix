@@ -95,6 +95,8 @@ class BookingModel {
   final double? customerRating;
   final bool hasCustomerReview;
   final DateTime? ratedAt;
+  final double? _developerCommission;
+  final double? _providerAmount;
 
   BookingModel({
     this.paymentDate,
@@ -145,7 +147,15 @@ class BookingModel {
     this.customerRating,
     this.hasCustomerReview = false,
     this.ratedAt,
-  });
+    double? developerCommission,
+    double? providerAmount,
+  }) : _developerCommission = developerCommission,
+       _providerAmount = providerAmount;
+
+  // Public getters for internal use only - not exposed to UI
+  double get developerCommission => _developerCommission ?? 0.0;
+  double get providerAmount =>
+      _providerAmount ?? (totalAmount - developerCommission);
 
   factory BookingModel.fromFireStore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
@@ -215,21 +225,9 @@ class BookingModel {
       ratedAt: data['ratedAt'] != null
           ? (data['ratedAt'] as Timestamp).toDate()
           : null,
+      developerCommission: (data['developerCommission'] ?? 0.0).toDouble(),
+      providerAmount: (data['providerAmount'] ?? 0.0).toDouble(),
     );
-  }
-
-  static DateTime _parseDateTime(dynamic value) {
-    if (value == null) return DateTime.now();
-
-    if (value is Timestamp) {
-      return value.toDate();
-    } else if (value is int) {
-      return DateTime.fromMillisecondsSinceEpoch(value);
-    } else if (value is String) {
-      return DateTime.tryParse(value) ?? DateTime.now();
-    }
-
-    return DateTime.now();
   }
 
   Map<String, dynamic> toFireStore() {
@@ -290,7 +288,23 @@ class BookingModel {
       'customerRating': customerRating,
       'hasCustomerReview': hasCustomerReview,
       'ratedAt': ratedAt != null ? Timestamp.fromDate(ratedAt!) : null,
+      'developerCommission': developerCommission,
+      'providerAmount': providerAmount,
     };
+  }
+
+  static DateTime _parseDateTime(dynamic value) {
+    if (value == null) return DateTime.now();
+
+    if (value is Timestamp) {
+      return value.toDate();
+    } else if (value is int) {
+      return DateTime.fromMillisecondsSinceEpoch(value);
+    } else if (value is String) {
+      return DateTime.tryParse(value) ?? DateTime.now();
+    }
+
+    return DateTime.now();
   }
 
   String get statusDisplay {

@@ -1,3 +1,5 @@
+/* eslint-disable max-len */
+
 module.exports = {
   env: {
     es6: true,
