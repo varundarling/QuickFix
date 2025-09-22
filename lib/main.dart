@@ -3,10 +3,12 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart'; // NEW
 import 'package:quickfix/core/notifications/notification_channel.dart';
-import 'package:quickfix/core/notifications/notification_permission_manager.dart'; // ✅ ADDED
-import 'package:quickfix/core/services/location_service.dart'; // ✅ ADDED
+import 'package:quickfix/core/notifications/notification_permission_manager.dart';
+import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
+import 'package:quickfix/core/utils/logger.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/quick_fix.dart';
 import 'package:quickfix/core/services/ad_service.dart';
@@ -47,78 +49,64 @@ Future<void> main() async {
     final serviceProvider = ServiceProvider();
     await serviceProvider.addAvailabilityToExistingServices();
   } catch (e) {
-    //debugPrint('❌ Error in one-time setup: $e');
+    Log.e('Error in one-time setup: $e');
   }
 
-  //debugPrint('🌟 Initializing rating system...');
-
-  //print('Connected to Firebase app → ${Firebase.app().name}');
+  Log.i('App initialization complete');
   runApp(const QuickFix());
 }
 
-// Requests notification + location permissions up front and pre-fetches FCM token
-Future<void> _preflightPermissions() async {
+Future _preflightPermissions() async {
   try {
-    // Notifications
     await NotificationPermissionManager.requestNotificationPermission();
   } catch (e) {
-    //debugPrint('⚠️ Notification permission request failed (non-fatal): $e');
+    Log.w('Notification permission request failed: $e');
   }
 
   try {
-    // Get FCM token early; user-specific save to Firestore will still occur post-login via AuthProvider
     await FCMTokenManager.getToken();
   } catch (e) {
-    //debugPrint('⚠️ FCM token prefetch failed (non-fatal): $e');
+    Log.w('FCM token prefetch failed: $e');
   }
 
   try {
-    // Location
     final granted = await LocationService.instance.requestPermission();
     if (!granted) {
-      //debugPrint('❌ Location permission denied at startup');
+      Log.w('Location permission denied at startup');
     }
-
-    // Try to enable device location services if off
     final isEnabled = await LocationService.instance.isLocationEnabled();
     if (!isEnabled) {
       await LocationService.instance.enableLocationService();
     }
   } catch (e) {
-    //debugPrint('⚠️ Location preflight failed (non-fatal): $e');
+    Log.w('Location preflight failed: $e');
   }
 }
 
-// FCM Token Manager (keep your existing code)
 class FCMTokenManager {
-
-  static Future<bool> requestNotificationPermission() async {
+  static Future requestNotificationPermission() async {
     try {
       PermissionStatus status = await Permission.notification.status;
-
       if (status.isGranted) {
-        //debugPrint('✅ Notification permission already granted');
+        Log.d('Notification permission already granted');
         return true;
       }
-
       if (status.isDenied) {
-        //('🔔 Requesting notification permission...');
         status = await Permission.notification.request();
         return status.isGranted;
       }
-
       return false;
     } catch (e) {
-      //debugPrint('❌ Error requesting notification permission: $e');
+      Log.e('Error requesting notification permission: $e');
       return false;
     }
   }
 
-  static Future<String?> getToken() async {
+  static Future getToken() async {
     try {
       bool permissionGranted = await requestNotificationPermission();
       if (!permissionGranted) {
-        //debugPrint('❌ Cannot get FCM token: Permission denied');
+        Log.w('Cannot get FCM token: Permission denied');
         return null;
       }
 
@@ -126,7 +114,7 @@ class FCMTokenManager {
           .requestPermission(alert: true, badge: true, sound: true);
 
       if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-        //debugPrint('❌ FCM permission denied');
+        Log.w('FCM permission denied');
         return null;
       }
 
@@ -134,21 +122,20 @@ class FCMTokenManager {
         try {
           String? token = await FirebaseMessaging.instance.getToken();
           if (token != null && token.isNotEmpty) {
-            //debugPrint('✅ FCM Token obtained: ${token.substring(0, 20)}...');
+            Log.d('FCM Token obtained: ${token.substring(0, 20)}...');
             return token;
           }
         } catch (e) {
-          //debugPrint('❌ Token attempt $attempt failed: $e');
+          Log.w('Token attempt $attempt failed: $e');
         }
 
         if (attempt < 3) {
           await Future.delayed(Duration(seconds: 2 * attempt));
         }
       }
-
       return null;
     } catch (e) {
-      //debugPrint('❌ Error in getToken: $e');
+      Log.e('Error in getToken: $e');
       return null;
     }
   }
@@ -156,10 +143,10 @@ class FCMTokenManager {
   static void initializeTokenListener() {
     FirebaseMessaging.instance.onTokenRefresh
         .listen((fcmToken) {
-          //debugPrint('✅ Token refreshed: ${fcmToken.substring(0, 20)}...');
+          Log.d('Token refreshed: ${fcmToken.substring(0, 20)}...');
         })
         .onError((err) {
-          //debugPrint('❌ Error in token refresh: $err');
+          Log.e('Error in token refresh: $err');
         });
   }
 }

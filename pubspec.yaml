@@ -73,6 +73,8 @@ dependencies:
   convert: ^3.1.2
   font_awesome_flutter: ^10.10.0
   animated_text_kit: ^4.2.3
+  flutter_upi_india: ^1.0.1
+  upi_india: ^3.0.1
 
 dev_dependencies:
   flutter_test:
