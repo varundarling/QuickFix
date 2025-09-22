@@ -3,7 +3,6 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart'; // NEW
 import 'package:quickfix/core/notifications/notification_channel.dart';
 import 'package:quickfix/core/notifications/notification_permission_manager.dart';
 import 'package:quickfix/core/services/location_service.dart';

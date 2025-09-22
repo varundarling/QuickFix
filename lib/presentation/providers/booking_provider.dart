@@ -57,7 +57,7 @@ class BookingProvider extends ChangeNotifier {
         throw Exception('Booking not found');
       }
 
-      final data = snap.data()! as Map<String, dynamic>;
+      final data = snap.data()!;
 
       // Use provided paidAmount if present, else fall back to stored totalAmount
       final double total =
