@@ -11,7 +11,6 @@ import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/home/search_screen.dart';
 import 'package:quickfix/presentation/screens/booking/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
-import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
 import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -130,34 +129,23 @@ class _HomeScreenState extends State<HomeScreen> {
         AdService.instance.loadInterstitial();
         AdService.instance.loadRewarded();
       },
-      body: Scaffold(
-        backgroundColor: AppColors.background,
-        body: Column(
-          children: [
-            Expanded(
-              child: SafeArea(
-                child: RefreshIndicator(
-                  onRefresh: _refresh,
-                  color: AppColors.primary,
-                  backgroundColor: Colors.white,
-                  child: Consumer<ServiceProvider>(
-                    builder: (context, sp, child) {
-                      return CustomScrollView(
-                        physics: const AlwaysScrollableScrollPhysics(),
-                        slivers: [
-                          _buildCompactAppBar(),
-                          SliverToBoxAdapter(child: _buildQuickAccessMenu()),
-                          SliverToBoxAdapter(child: _buildSearchBar(context)),
-                          SliverToBoxAdapter(child: _buildCategoryTabs()),
-                          _buildServicesContent(),
-                        ],
-                      );
-                    },
-                  ),
-                ),
-              ),
-            ),
-          ],
+      body: RefreshIndicator(
+        onRefresh: _refresh,
+        color: AppColors.primary,
+        backgroundColor: Colors.white,
+        child: Consumer<ServiceProvider>(
+          builder: (context, sp, child) {
+            return CustomScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              slivers: [
+                _buildCompactAppBar(),
+                SliverToBoxAdapter(child: _buildQuickAccessMenu()),
+                SliverToBoxAdapter(child: _buildSearchBar(context)),
+                SliverToBoxAdapter(child: _buildCategoryTabs()),
+                _buildServicesContent(),
+              ],
+            );
+          },
         ),
       ),
     );
