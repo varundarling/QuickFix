@@ -4,9 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/favourites_provider.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -36,115 +38,123 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      appBar: AppBar(
-        title: const Text('Favorites'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          Consumer<FavoritesProvider>(
-            builder: (context, favoritesProvider, child) {
-              if (favoritesProvider.favoriteServices.isNotEmpty) {
-                return PopupMenuButton(
-                  icon: const Icon(Icons.more_vert),
-                  itemBuilder: (context) => [
-                    PopupMenuItem(
-                      child: const Row(
-                        children: [
-                          Icon(Icons.clear_all, size: 20),
-                          SizedBox(width: 8),
-                          Text('Clear All'),
-                        ],
-                      ),
-                      onTap: () => _showClearAllDialog(),
-                    ),
-                  ],
-                );
-              }
-              return const SizedBox.shrink();
-            },
-          ),
-        ],
-      ),
-      body: Consumer<FavoritesProvider>(
-        builder: (context, favoritesProvider, child) {
-          if (favoritesProvider.isLoading) {
-            return const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading your favorites...'),
-                ],
-              ),
-            );
-          }
-
-          if (favoritesProvider.favoriteServices.isEmpty) {
-            return _buildEmptyState();
-          }
-
-          return RefreshIndicator(
-            onRefresh: _loadFavorites,
-            child: ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: favoritesProvider.favoriteServices.length,
-              itemBuilder: (context, index) {
-                final service = favoritesProvider.favoriteServices[index];
-                return Dismissible(
-                  key: Key(service.id),
-                  direction: DismissDirection.endToStart,
-                  background: Container(
-                    alignment: Alignment.centerRight,
-                    padding: const EdgeInsets.only(right: 20),
-                    margin: const EdgeInsets.only(bottom: 16),
-                    decoration: BoxDecoration(
-                      color: AppColors.error,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: const Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.delete, color: Colors.white, size: 24),
-                        SizedBox(height: 4),
-                        Text(
-                          'Remove',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                          ),
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        backgroundColor: AppColors.background,
+        appBar: AppBar(
+          title: const Text('Favorites'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            Consumer<FavoritesProvider>(
+              builder: (context, favoritesProvider, child) {
+                if (favoritesProvider.favoriteServices.isNotEmpty) {
+                  return PopupMenuButton(
+                    icon: const Icon(Icons.more_vert),
+                    itemBuilder: (context) => [
+                      PopupMenuItem(
+                        child: const Row(
+                          children: [
+                            Icon(Icons.clear_all, size: 20),
+                            SizedBox(width: 8),
+                            Text('Clear All'),
+                          ],
                         ),
-                      ],
-                    ),
-                  ),
-                  onDismissed: (direction) {
-                    favoritesProvider.removeFavorite(service.id);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${service.name} removed from favorites'),
-                        action: SnackBarAction(
-                          label: 'Undo',
-                          onPressed: () {
-                            favoritesProvider.toggleFavorite(service);
-                          },
-                        ),
+                        onTap: () => _showClearAllDialog(),
                       ),
-                    );
-                  },
-                  child: ServiceCard(
-                    service: service,
-                    onTap: () => _navigateToServiceDetail(service),
-                    showFavoriteButton: true,
-                  ),
-                );
+                    ],
+                  );
+                }
+                return const SizedBox.shrink();
               },
             ),
-          );
-        },
+          ],
+        ),
+        body: Consumer<FavoritesProvider>(
+          builder: (context, favoritesProvider, child) {
+            if (favoritesProvider.isLoading) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading your favorites...'),
+                  ],
+                ),
+              );
+            }
+
+            if (favoritesProvider.favoriteServices.isEmpty) {
+              return _buildEmptyState();
+            }
+
+            return RefreshIndicator(
+              onRefresh: _loadFavorites,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: favoritesProvider.favoriteServices.length,
+                itemBuilder: (context, index) {
+                  final service = favoritesProvider.favoriteServices[index];
+                  return Dismissible(
+                    key: Key(service.id),
+                    direction: DismissDirection.endToStart,
+                    background: Container(
+                      alignment: Alignment.centerRight,
+                      padding: const EdgeInsets.only(right: 20),
+                      margin: const EdgeInsets.only(bottom: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(Icons.delete, color: Colors.white, size: 24),
+                          SizedBox(height: 4),
+                          Text(
+                            'Remove',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    onDismissed: (direction) {
+                      favoritesProvider.removeFavorite(service.id);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text(
+                            '${service.name} removed from favorites',
+                          ),
+                          action: SnackBarAction(
+                            label: 'Undo',
+                            onPressed: () {
+                              favoritesProvider.toggleFavorite(service);
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                    child: ServiceCard(
+                      service: service,
+                      onTap: () => _navigateToServiceDetail(service),
+                      showFavoriteButton: true,
+                    ),
+                  );
+                },
+              ),
+            );
+          },
+        ),
       ),
     );
   }

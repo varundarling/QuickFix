@@ -7,12 +7,14 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/widgets/common/custom_text_field.dart';
+
 class CreateServiceScreen extends StatefulWidget {
   const CreateServiceScreen({super.key});
 
@@ -77,8 +79,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
-    setState(() {
-    });
+    setState(() {});
 
     try {
       LocationPermission permission = await Geolocator.checkPermission();
@@ -114,7 +115,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         _addressController.text = _currentAddress ?? '';
       }
     } catch (e) {
-      debugPrint('Error getting location: $e');
+      //debugPrint('Error getting location: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -124,8 +125,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         );
       }
     } finally {
-      setState(() {
-      });
+      setState(() {});
     }
   }
 
@@ -554,7 +554,6 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       final authProvider = context.read<AuthProvider>();
       final currentUser = FirebaseAuth.instance.currentUser!;
 
-      // ✅ CRITICAL: Get complete user profile data BEFORE creating service
       final userModel = authProvider.userModel;
       if (userModel == null) {
         throw Exception(
@@ -564,48 +563,52 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
 
       await _createOrUpdateProviderProfile(currentUser.uid, authProvider);
 
-      // ✅ ENHANCED: Pass provider details to service creation
-      final success = await serviceProvider.addServiceWithProviderDetails(
-        name: _nameController.text.trim(),
-        description: _descriptionController.text.trim(),
-        category: _selectedCategory,
-        basePrice: double.parse(_basePriceController.text.trim()),
-        imageUrl: '',
-        subServices: _subServices,
-        mobileNumber: _mobileNumberController.text.trim(),
-        latitude: _latitude!,
-        longitude: _longitude!,
-        address: _addressController.text.trim(),
-        // ✅ NEW: Include provider business details
-        providerBusinessName: userModel.businessName ?? userModel.name,
-        providerName: userModel.name,
-        providerEmail: userModel.email,
+      // ✅ Show rewarded ad BEFORE creating service
+      await AdService.instance.showRewarded(
+        onReward: (reward) async {
+          // Example: You can apply discount or just allow creation
+          //debugPrint("Reward earned: $reward");
+
+          // Continue with service creation AFTER reward
+          final success = await serviceProvider.addServiceWithProviderDetails(
+            name: _nameController.text.trim(),
+            description: _descriptionController.text.trim(),
+            category: _selectedCategory,
+            basePrice: double.parse(_basePriceController.text.trim()),
+            imageUrl: '',
+            subServices: _subServices,
+            mobileNumber: _mobileNumberController.text.trim(),
+            latitude: _latitude!,
+            longitude: _longitude!,
+            address: _addressController.text.trim(),
+            providerBusinessName: userModel.businessName ?? userModel.name,
+            providerName: userModel.name,
+            providerEmail: userModel.email,
+          );
+
+          if (success) {
+            await NotificationService.instance.notifyAllCustomersOfNewService(
+              serviceName: _nameController.text.trim(),
+              category: _selectedCategory,
+              serviceId: 'new_service',
+              location: _addressController.text.trim(),
+            );
+
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('Service created successfully!'),
+                  backgroundColor: AppColors.success,
+                ),
+              );
+              await Future.delayed(const Duration(milliseconds: 500));
+              if (mounted) {
+                context.go('/provider-dashboard');
+              }
+            }
+          }
+        },
       );
-
-      // ... rest of your existing notification and success logic
-      if (success) {
-        await NotificationService.instance.notifyAllCustomersOfNewService(
-          serviceName: _nameController.text.trim(),
-          category: _selectedCategory,
-          serviceId: 'new_service',
-          location: _addressController.text.trim(),
-        );
-
-        debugPrint('✅ New service notification sent to all customers');
-      }
-
-      if (success && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Service created successfully!'),
-            backgroundColor: AppColors.success,
-          ),
-        );
-        await Future.delayed(const Duration(milliseconds: 500));
-        if (mounted) {
-          context.go('/provider-dashboard');
-        }
-      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -640,9 +643,9 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         fcmToken = await FCMTokenManager.getToken();
       }
 
-      debugPrint(
-        '✅ [CREATE SERVICE] FCM Token for provider: ${fcmToken?.substring(0, 20)}...',
-      );
+      // debugPrint(
+      //   '✅ [CREATE SERVICE] FCM Token for provider: ${fcmToken?.substring(0, 20)}...',
+      // );
 
       // Check if provider document already exists
       final providerDoc = await FirebaseFirestore.instance
@@ -708,13 +711,13 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
       }, SetOptions(merge: true));
 
       await batch.commit();
-      debugPrint(
-        '✅ [CREATE SERVICE] Provider profile created/updated with FCM token',
-      );
+      // debugPrint(
+      //   '✅ [CREATE SERVICE] Provider profile created/updated with FCM token',
+      // );
     } catch (e) {
-      debugPrint(
-        '❌ [CREATE SERVICE] Error creating/updating provider profile: $e',
-      );
+      // debugPrint(
+      //   '❌ [CREATE SERVICE] Error creating/updating provider profile: $e',
+      // );
       rethrow;
     }
   }

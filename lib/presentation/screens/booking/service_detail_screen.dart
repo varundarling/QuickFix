@@ -6,10 +6,12 @@ import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/data/models/service_model.dart';
@@ -504,186 +506,192 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      // ✅ FIXED: Use regular AppBar, not inside CustomScrollView
-      appBar: AppBar(
-        title: const Text('Service Details'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            onPressed: () {
-              //debugPrint('🔄 Manual refresh triggered');
-              _fetchProviderData();
-              _loadBookingData();
-            },
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh',
-          ),
-        ],
-      ),
-      body: CustomScrollView(
-        slivers: [
-          // ✅ Service Image Header as SliverAppBar
-          SliverAppBar(
-            expandedHeight: 250,
-            pinned: false,
-            backgroundColor: AppColors.primary,
-            automaticallyImplyLeading:
-                false, // Remove back button since we have one in main AppBar
-            flexibleSpace: FlexibleSpaceBar(background: _buildHeaderImage()),
-          ),
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        backgroundColor: AppColors.background,
+        // ✅ FIXED: Use regular AppBar, not inside CustomScrollView
+        appBar: AppBar(
+          title: const Text('Service Details'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            IconButton(
+              onPressed: () {
+                //debugPrint('🔄 Manual refresh triggered');
+                _fetchProviderData();
+                _loadBookingData();
+              },
+              icon: const Icon(Icons.refresh),
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
+        body: CustomScrollView(
+          slivers: [
+            // ✅ Service Image Header as SliverAppBar
+            SliverAppBar(
+              expandedHeight: 250,
+              pinned: false,
+              backgroundColor: AppColors.primary,
+              automaticallyImplyLeading:
+                  false, // Remove back button since we have one in main AppBar
+              flexibleSpace: FlexibleSpaceBar(background: _buildHeaderImage()),
+            ),
 
-          // ✅ CRITICAL FIX: Wrap all content in SliverToBoxAdapter
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // Service Header
-                  _buildServiceHeader(),
-                  const SizedBox(height: 24),
+            // ✅ CRITICAL FIX: Wrap all content in SliverToBoxAdapter
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Service Header
+                    _buildServiceHeader(),
+                    const SizedBox(height: 24),
 
-                  // Provider Details Section
-                  _buildProviderSection(),
-                  const SizedBox(height: 24),
+                    // Provider Details Section
+                    _buildProviderSection(),
+                    const SizedBox(height: 24),
 
-                  // Contact Information
-                  _buildContactSection(),
-                  const SizedBox(height: 24),
+                    // Contact Information
+                    _buildContactSection(),
+                    const SizedBox(height: 24),
 
-                  // Booking Details Section (for existing bookings)
-                  _buildBookingDetailsSection(),
+                    // Booking Details Section (for existing bookings)
+                    _buildBookingDetailsSection(),
 
-                  // Service Description
-                  _buildServiceDescription(),
-                  const SizedBox(height: 24),
+                    // Service Description
+                    _buildServiceDescription(),
+                    const SizedBox(height: 24),
 
-                  _buildLocationField(),
-                  const SizedBox(height: 24),
+                    _buildLocationField(),
+                    const SizedBox(height: 24),
 
-                  Card(
-                    elevation: 4,
-                    margin: const EdgeInsets.symmetric(vertical: 8),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14),
-                    ),
-                    child: InkWell(
-                      onTap: _selectConstrainedDateTime,
-                      borderRadius: BorderRadius.circular(14),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 16,
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.blue.shade50,
-                                    borderRadius: BorderRadius.circular(12),
-                                  ),
-                                  child: const Icon(
-                                    Icons.event,
-                                    color: Colors.blue,
-                                    size: 24,
-                                  ),
-                                ),
-                                const SizedBox(width: 16),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        _selectedDate == null
-                                            ? 'Select desired date & time'
-                                            : 'Selected Date & Time',
-                                        style: const TextStyle(
-                                          fontSize: 16,
-                                          fontWeight: FontWeight.w600,
-                                          color: Colors.black87,
-                                        ),
-                                      ),
-                                      if (_selectedDate != null) ...[
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          Helpers.formatDateTime(
-                                            _selectedDate!,
-                                          ),
-                                          style: TextStyle(
-                                            fontSize: 14,
-                                            color: Colors.blue.shade700,
-                                            fontWeight: FontWeight.w500,
-                                          ),
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.arrow_forward_ios,
-                                  size: 16,
-                                  color: Colors.grey.shade600,
-                                ),
-                              ],
-                            ),
-
-                            // ✅ NEW: Show working hours info
-                            const SizedBox(height: 12),
-                            Container(
-                              padding: const EdgeInsets.all(8),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withValues(alpha: 0.1),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Row(
+                    Card(
+                      elevation: 4,
+                      margin: const EdgeInsets.symmetric(vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                      child: InkWell(
+                        onTap: _selectConstrainedDateTime,
+                        borderRadius: BorderRadius.circular(14),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 20,
+                            vertical: 16,
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
                                 children: [
-                                  Icon(
-                                    Icons.info_outline,
-                                    size: 14,
-                                    color: Colors.blue.shade700,
-                                  ),
-                                  const SizedBox(width: 6),
-                                  Text(
-                                    'Available: Next 30 days • 9 AM - 6 PM',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: Colors.blue.shade700,
-                                      fontWeight: FontWeight.w500,
+                                  Container(
+                                    padding: const EdgeInsets.all(8),
+                                    decoration: BoxDecoration(
+                                      color: Colors.blue.shade50,
+                                      borderRadius: BorderRadius.circular(12),
                                     ),
+                                    child: const Icon(
+                                      Icons.event,
+                                      color: Colors.blue,
+                                      size: 24,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 16),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      children: [
+                                        Text(
+                                          _selectedDate == null
+                                              ? 'Select desired date & time'
+                                              : 'Selected Date & Time',
+                                          style: const TextStyle(
+                                            fontSize: 16,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                        if (_selectedDate != null) ...[
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            Helpers.formatDateTime(
+                                              _selectedDate!,
+                                            ),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.blue.shade700,
+                                              fontWeight: FontWeight.w500,
+                                            ),
+                                          ),
+                                        ],
+                                      ],
+                                    ),
+                                  ),
+                                  Icon(
+                                    Icons.arrow_forward_ios,
+                                    size: 16,
+                                    color: Colors.grey.shade600,
                                   ),
                                 ],
                               ),
-                            ),
-                          ],
+
+                              // ✅ NEW: Show working hours info
+                              const SizedBox(height: 12),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: Colors.blue.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.info_outline,
+                                      size: 14,
+                                      color: Colors.blue.shade700,
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      'Available: Next 30 days • 9 AM - 6 PM',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.blue.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
 
-                  // // Sub-services
-                  // if (widget.service.subServices.isNotEmpty) ...[
-                  //   _buildSubServices(),
-                  //   const SizedBox(height: 24),
-                  // ],
+                    // // Sub-services
+                    // if (widget.service.subServices.isNotEmpty) ...[
+                    //   _buildSubServices(),
+                    //   const SizedBox(height: 24),
+                    // ],
 
-                  // Book Service Button
-                  _buildBookServiceButton(context),
+                    // Book Service Button
+                    _buildBookServiceButton(context),
 
-                  const SizedBox(height: 32),
-                ],
+                    const SizedBox(height: 32),
+                  ],
+                ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -1536,7 +1544,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     if (_isLocationChanged) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          // ✅ Remove 'const' since we're using a function
           content: const Text(
             'Please save your location changes before booking',
           ),
@@ -1546,7 +1553,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             label: 'SAVE NOW',
             textColor: Colors.white,
             onPressed: () async {
-              // ✅ Provide actual callback function
               await _saveLocation();
             },
           ),
@@ -1572,7 +1578,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         return;
       }
 
-      // ✅ GET USER DATA BEFORE BOOKING
       final authProvider = context.read<AuthProvider>();
       final bookingProvider = context.read<BookingProvider>();
 
@@ -1580,15 +1585,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       String customerPhone = '';
       String customerEmail = '';
 
-      // ✅ ENSURE USER DATA IS AVAILABLE
       if (authProvider.userModel != null) {
         customerName = authProvider.userModel!.name;
         customerPhone = authProvider.userModel!.phone;
         customerEmail = authProvider.userModel!.email;
       } else {
-        // Fallback: get from Firebase Auth
         customerEmail = user.email ?? '';
-        // Try to get name from display name
         customerName = user.displayName ?? 'Customer';
       }
 
@@ -1596,65 +1598,71 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         customerName = 'Customer';
       }
 
-      // ✅ FIXED: Add required customer parameters
-      final booking = await bookingProvider.createBookingWithDetails(
-        customerId: user.uid,
-        providerId: widget.service.providerId,
-        service: widget.service,
-        scheduledDateTime: _selectedDate!,
-        description: widget.service.description.isNotEmpty
-            ? widget.service.description
-            : 'Service booking',
-        customerAddress: _savedLocationText.isNotEmpty
-            ? _savedLocationText
-            : _locationController.text.trim(),
-        customerLatitude: 0.0,
-        customerLongitude: 0.0,
-        totalAmount: widget.service.basePrice,
-        selectedDate: _selectedDate,
-        customerName: customerName,
-        customerPhone: customerPhone,
-        customerEmail: customerEmail,
-        providerName:
-            widget.service.providerBusinessName ??
-            widget.service.providerName ??
-            'Service Provider',
-        providerPhone: widget.service.mobileNumber,
-        providerEmail: widget.service.providerEmail ?? '',
-        serviceName: widget.service.name,
-        serviceCategory: widget.service.category,
-      );
+      // ✅ Show rewarded ad BEFORE booking
+      await AdService.instance.showRewarded(
+        onReward: (reward) async {
+          //debugPrint("Reward earned: $reward");
 
-      if (!mounted) return;
+          // Proceed with booking AFTER reward
+          final booking = await bookingProvider.createBookingWithDetails(
+            customerId: user.uid,
+            providerId: widget.service.providerId,
+            service: widget.service,
+            scheduledDateTime: _selectedDate!,
+            description: widget.service.description.isNotEmpty
+                ? widget.service.description
+                : 'Service booking',
+            customerAddress: _savedLocationText.isNotEmpty
+                ? _savedLocationText
+                : _locationController.text.trim(),
+            customerLatitude: 0.0,
+            customerLongitude: 0.0,
+            totalAmount: widget.service.basePrice,
+            selectedDate: _selectedDate,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            customerEmail: customerEmail,
+            providerName:
+                widget.service.providerBusinessName ??
+                widget.service.providerName ??
+                'Service Provider',
+            providerPhone: widget.service.mobileNumber,
+            providerEmail: widget.service.providerEmail ?? '',
+            serviceName: widget.service.name,
+            serviceCategory: widget.service.category,
+          );
 
-      if (booking != null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${widget.service.name} booked successfully!'),
-            backgroundColor: AppColors.success,
-            duration: const Duration(seconds: 3),
-          ),
-        );
+          if (!mounted) return;
 
-        // Reload booking data
-        _loadBookingData();
+          if (booking != null) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text('${widget.service.name} booked successfully!'),
+                backgroundColor: AppColors.success,
+                duration: const Duration(seconds: 3),
+              ),
+            );
 
-        WidgetsBinding.instance.addPostFrameCallback((_) {
-          if (mounted) {
-            Navigator.of(context).pop();
+            _loadBookingData();
+
+            WidgetsBinding.instance.addPostFrameCallback((_) {
+              if (mounted) {
+                Navigator.of(context).pop();
+              }
+            });
+          } else if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  bookingProvider.errorMessage ?? 'Failed to book service',
+                ),
+                backgroundColor: Colors.red,
+                duration: const Duration(seconds: 3),
+              ),
+            );
           }
-        });
-      } else if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              bookingProvider.errorMessage ?? 'Failed to book service',
-            ),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
+        },
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -1773,7 +1781,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     decoration: BoxDecoration(
                       color: Colors.orange.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
-                      border: Border.all(color: Colors.orange.withValues(alpha: 0.3)),
+                      border: Border.all(
+                        color: Colors.orange.withValues(alpha: 0.3),
+                      ),
                     ),
                     child: const Text(
                       'UNSAVED',

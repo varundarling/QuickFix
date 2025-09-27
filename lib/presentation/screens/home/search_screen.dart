@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   final List<ServiceModel> services;
@@ -48,88 +50,94 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Search Services'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        elevation: 0,
-      ),
-      body: Column(
-        children: [
-          // Search Header
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: const BorderRadius.only(
-                bottomLeft: Radius.circular(20),
-                bottomRight: Radius.circular(20),
-              ),
-            ),
-            child: Column(
-              children: [
-                // Search TextField
-                TextField(
-                  controller: _searchController,
-                  autofocus: true,
-                  style: const TextStyle(fontSize: 16),
-                  decoration: InputDecoration(
-                    hintText: 'Search for services...',
-                    prefixIcon: const Icon(
-                      Icons.search,
-                      color: AppColors.primary,
-                    ),
-                    suffixIcon: _searchQuery.isNotEmpty
-                        ? IconButton(
-                            icon: const Icon(
-                              Icons.clear,
-                              color: AppColors.primary,
-                            ),
-                            onPressed: () {
-                              _searchController.clear();
-                            },
-                          )
-                        : null,
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(25),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 16,
-                    ),
-                  ),
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        appBar: AppBar(
+          title: const Text('Search Services'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+        ),
+        body: Column(
+          children: [
+            // Search Header
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(20),
+                  bottomRight: Radius.circular(20),
                 ),
-                const SizedBox(height: 12),
-
-                // Search Results Counter
-                Row(
-                  children: [
-                    Icon(
-                      Icons.info_outline,
-                      size: 16,
-                      color: Colors.white.withValues(alpha: 0.8),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_filteredServices.length} services found',
-                      style: TextStyle(
-                        color: Colors.white.withValues(alpha: 0.9),
-                        fontSize: 14,
+              ),
+              child: Column(
+                children: [
+                  // Search TextField
+                  TextField(
+                    controller: _searchController,
+                    autofocus: true,
+                    style: const TextStyle(fontSize: 16),
+                    decoration: InputDecoration(
+                      hintText: 'Search for services...',
+                      prefixIcon: const Icon(
+                        Icons.search,
+                        color: AppColors.primary,
+                      ),
+                      suffixIcon: _searchQuery.isNotEmpty
+                          ? IconButton(
+                              icon: const Icon(
+                                Icons.clear,
+                                color: AppColors.primary,
+                              ),
+                              onPressed: () {
+                                _searchController.clear();
+                              },
+                            )
+                          : null,
+                      filled: true,
+                      fillColor: Colors.white,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(25),
+                        borderSide: BorderSide.none,
+                      ),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 16,
                       ),
                     ),
-                  ],
-                ),
-              ],
-            ),
-          ),
+                  ),
+                  const SizedBox(height: 12),
 
-          // Search Results
-          Expanded(child: _buildSearchResults()),
-        ],
+                  // Search Results Counter
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.info_outline,
+                        size: 16,
+                        color: Colors.white.withValues(alpha: 0.8),
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_filteredServices.length} services found',
+                        style: TextStyle(
+                          color: Colors.white.withValues(alpha: 0.9),
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            // Search Results
+            Expanded(child: _buildSearchResults()),
+          ],
+        ),
       ),
     );
   }

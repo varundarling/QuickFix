@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
@@ -14,6 +15,7 @@ import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
 import 'package:quickfix/presentation/screens/payment/payment_options_screen.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
 class CustomerBookingsScreen extends StatefulWidget {
   const CustomerBookingsScreen({super.key});
@@ -236,43 +238,49 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('My Bookings'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
-        bottom: TabBar(
-          controller: _tabController,
-          indicatorColor: Colors.white,
-          labelColor: Colors.white,
-          unselectedLabelColor: Colors.white70,
-          tabs: _tabs.map((tab) {
-            return Tab(
-              icon: Icon(tab['icon'] as IconData),
-              text: tab['label'] as String,
-            );
-          }).toList(),
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        appBar: AppBar(
+          title: const Text('My Bookings'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          bottom: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.white,
+            labelColor: Colors.white,
+            unselectedLabelColor: Colors.white70,
+            tabs: _tabs.map((tab) {
+              return Tab(
+                icon: Icon(tab['icon'] as IconData),
+                text: tab['label'] as String,
+              );
+            }).toList(),
+          ),
         ),
-      ),
-      body: isLoading
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading your bookings...'),
-                ],
+        body: isLoading
+            ? const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading your bookings...'),
+                  ],
+                ),
+              )
+            : TabBarView(
+                controller: _tabController,
+                children: _tabs.map((tab) {
+                  return _buildBookingsList(tab['status'] as BookingStatus);
+                }).toList(),
               ),
-            )
-          : TabBarView(
-              controller: _tabController,
-              children: _tabs.map((tab) {
-                return _buildBookingsList(tab['status'] as BookingStatus);
-              }).toList(),
-            ),
-      // Add banner ad at bottom
-      bottomNavigationBar: const BannerAdWidget(),
+        // Add banner ad at bottom
+        bottomNavigationBar: const BannerAdWidget(),
+      ),
     );
   }
 
@@ -1139,7 +1147,6 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
     );
 
     if (confirmed == true && mounted) {
-
       try {
         final bookingProvider = context.read<BookingProvider>();
         final success = await bookingProvider.updateBookingStatus(
@@ -1168,8 +1175,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
             ),
           );
         }
-      } finally {
-      }
+      } finally {}
     }
   }
 

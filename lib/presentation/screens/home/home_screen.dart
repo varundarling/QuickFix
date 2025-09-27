@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/constants/app_strings.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
@@ -11,6 +12,7 @@ import 'package:quickfix/presentation/screens/home/search_screen.dart';
 import 'package:quickfix/presentation/screens/booking/service_detail_screen.dart';
 import 'package:quickfix/presentation/widgets/cards/service_card.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key, this.passedLocation});
@@ -123,35 +125,40 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: Column(
-        children: [
-          const BannerAdWidget(),
-          Expanded(
-            child: SafeArea(
-              child: RefreshIndicator(
-                onRefresh: _refresh,
-                color: AppColors.primary,
-                backgroundColor: Colors.white,
-                child: Consumer<ServiceProvider>(
-                  builder: (context, sp, child) {
-                    return CustomScrollView(
-                      physics: const AlwaysScrollableScrollPhysics(),
-                      slivers: [
-                        _buildCompactAppBar(),
-                        SliverToBoxAdapter(child: _buildQuickAccessMenu()),
-                        SliverToBoxAdapter(child: _buildSearchBar(context)),
-                        SliverToBoxAdapter(child: _buildCategoryTabs()),
-                        _buildServicesContent(),
-                      ],
-                    );
-                  },
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            Expanded(
+              child: SafeArea(
+                child: RefreshIndicator(
+                  onRefresh: _refresh,
+                  color: AppColors.primary,
+                  backgroundColor: Colors.white,
+                  child: Consumer<ServiceProvider>(
+                    builder: (context, sp, child) {
+                      return CustomScrollView(
+                        physics: const AlwaysScrollableScrollPhysics(),
+                        slivers: [
+                          _buildCompactAppBar(),
+                          SliverToBoxAdapter(child: _buildQuickAccessMenu()),
+                          SliverToBoxAdapter(child: _buildSearchBar(context)),
+                          SliverToBoxAdapter(child: _buildCategoryTabs()),
+                          _buildServicesContent(),
+                        ],
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

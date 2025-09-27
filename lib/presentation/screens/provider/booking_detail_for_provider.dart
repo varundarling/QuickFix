@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/otp_verification_service.dart';
 import 'package:quickfix/core/services/progress_tracking_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
@@ -12,6 +13,7 @@ import 'package:quickfix/data/models/rating_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/presentation/providers/rating_providers.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 import 'package:quickfix/presentation/widgets/rating/rating_display_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 
@@ -35,375 +37,386 @@ class _BookingDetailForProviderState extends State<BookingDetailForProvider> {
   bool _showProgressCard = true;
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Booking Details'),
-        backgroundColor: AppColors.primary,
-        elevation: 0,
-      ),
-      body: Consumer<BookingProvider>(
-        builder: (context, bookingProvider, child) {
-          final BookingModel? currentBooking = bookingProvider.providerbookings
-              .where((b) => b.id == widget.bookingId)
-              .cast<BookingModel?>()
-              .firstOrNull;
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        appBar: AppBar(
+          title: const Text('Booking Details'),
+          backgroundColor: AppColors.primary,
+          elevation: 0,
+        ),
+        body: Consumer<BookingProvider>(
+          builder: (context, bookingProvider, child) {
+            final BookingModel? currentBooking = bookingProvider
+                .providerbookings
+                .where((b) => b.id == widget.bookingId)
+                .cast<BookingModel?>()
+                .firstOrNull;
 
-          if (currentBooking == null) {
-            return const Center(
+            if (currentBooking == null) {
+              return const Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CircularProgressIndicator(),
+                    SizedBox(height: 16),
+                    Text('Loading booking details...'),
+                  ],
+                ),
+              );
+            }
+
+            return SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
               child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  CircularProgressIndicator(),
-                  SizedBox(height: 16),
-                  Text('Loading booking details...'),
+                  // Service Information
+                  _buildDetailCard(
+                    title: 'Service Details',
+                    icon: Icons.build_circle,
+                    children: [
+                      _buildDetailRow('Service', currentBooking.serviceName),
+                      _buildDetailRow(
+                        'Description',
+                        currentBooking.description.isNotEmpty
+                            ? currentBooking.description
+                            : 'No description provided',
+                      ),
+                      _buildDetailRow(
+                        'Booked Date',
+                        Helpers.formatDateTime(currentBooking.createdAt),
+                      ),
+                      _buildDetailRow(
+                        'Scheduled Date',
+                        Helpers.formatDateTime(
+                          currentBooking.scheduledDateTime,
+                        ),
+                      ),
+                      _buildDetailRow(
+                        'Amount',
+                        Helpers.formatCurrency(currentBooking.totalAmount),
+                      ),
+                    ],
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // // Customer Information Card
+                  // if (currentBooking.status != BookingStatus.completed)
+                  //   Card(
+                  //     elevation: 4,
+                  //     shape: RoundedRectangleBorder(
+                  //       borderRadius: BorderRadius.circular(12),
+                  //     ),
+                  //     child: Padding(
+                  //       padding: const EdgeInsets.all(20),
+                  //       child: Column(
+                  //         crossAxisAlignment: CrossAxisAlignment.start,
+                  //         children: [
+                  //           Row(
+                  //             children: [
+                  //               Icon(
+                  //                 Icons.person,
+                  //                 color: AppColors.primary,
+                  //                 size: 24,
+                  //               ),
+                  //               const SizedBox(width: 12),
+                  //               Text(
+                  //                 'Customer Information',
+                  //                 style: TextStyle(
+                  //                   fontSize: 18,
+                  //                   fontWeight: FontWeight.bold,
+                  //                   color: AppColors.primary,
+                  //                 ),
+                  //               ),
+                  //               const Spacer(),
+                  //               // ✅ Privacy indicator for cancelled/paid bookings
+                  //               if (currentBooking.status ==
+                  //                       BookingStatus.cancelled ||
+                  //                   currentBooking.status == BookingStatus.paid)
+                  //                 Container(
+                  //                   padding: const EdgeInsets.symmetric(
+                  //                     horizontal: 8,
+                  //                     vertical: 4,
+                  //                   ),
+                  //                   decoration: BoxDecoration(
+                  //                     color: _getPrivacyIndicatorColor(
+                  //                       currentBooking.status,
+                  //                     ),
+                  //                     borderRadius: BorderRadius.circular(12),
+                  //                   ),
+                  //                   child: Row(
+                  //                     mainAxisSize: MainAxisSize.min,
+                  //                     children: [
+                  //                       Icon(
+                  //                         Icons.visibility_off,
+                  //                         size: 12,
+                  //                         color: Colors.white,
+                  //                       ),
+                  //                       const SizedBox(width: 4),
+                  //                       Text(
+                  //                         'PRIVATE',
+                  //                         style: TextStyle(
+                  //                           fontSize: 10,
+                  //                           fontWeight: FontWeight.bold,
+                  //                           color: Colors.white,
+                  //                         ),
+                  //                       ),
+                  //                     ],
+                  //                   ),
+                  //                 ),
+                  //             ],
+                  //           ),
+                  //           const SizedBox(height: 16),
+
+                  //           // ✅ Customer Name - Always show
+                  //           _buildDetailRowName(
+                  //             Icons.account_circle,
+                  //             'Customer Name',
+                  //             currentBooking.customerName ?? 'Loading...',
+                  //           ),
+
+                  //           // ✅ CRITICAL: Privacy Logic - Hide contact details for cancelled/paid
+                  //           if (currentBooking.status !=
+                  //                   BookingStatus.cancelled &&
+                  //               currentBooking.status != BookingStatus.paid) ...[
+                  //             // Phone if valid and present (only for non-cancelled/paid)
+                  //             if (currentBooking.customerPhone != null &&
+                  //                 currentBooking.customerPhone!.isNotEmpty &&
+                  //                 currentBooking.customerPhone != 'No Phone')
+                  //               _buildDetailRowWithCall(
+                  //                 Icons.phone,
+                  //                 'Phone Number',
+                  //                 currentBooking.customerPhone!,
+                  //               ),
+
+                  //             // Address if valid and present (only for non-cancelled/paid)
+                  //             if ((currentBooking.customerAddress ?? '')
+                  //                 .isNotEmpty)
+                  //               _buildDetailRowWithNavigation(
+                  //                 Icons.location_on,
+                  //                 'Service Location',
+                  //                 currentBooking.customerAddress!,
+                  //               ),
+                  //           ] else ...[
+                  //             // ✅ Privacy notice for cancelled/paid bookings
+                  //             const SizedBox(height: 12),
+                  //             Container(
+                  //               padding: const EdgeInsets.all(12),
+                  //               decoration: BoxDecoration(
+                  //                 color: _getPrivacyNoticeColor(
+                  //                   currentBooking.status,
+                  //                 ),
+                  //                 borderRadius: BorderRadius.circular(8),
+                  //                 border: Border.all(
+                  //                   color: _getPrivacyNoticeBorderColor(
+                  //                     currentBooking.status,
+                  //                   ),
+                  //                 ),
+                  //               ),
+                  //               child: Row(
+                  //                 children: [
+                  //                   Icon(
+                  //                     Icons.info_outline,
+                  //                     size: 16,
+                  //                     color: _getPrivacyNoticeTextColor(
+                  //                       currentBooking.status,
+                  //                     ),
+                  //                   ),
+                  //                   const SizedBox(width: 8),
+                  //                   Expanded(
+                  //                     child: Text(
+                  //                       'Customer contact details and service location are protected for privacy.',
+                  //                       style: TextStyle(
+                  //                         fontSize: 13,
+                  //                         color: _getPrivacyNoticeTextColor(
+                  //                           currentBooking.status,
+                  //                         ),
+                  //                         fontWeight: FontWeight.w500,
+                  //                       ),
+                  //                     ),
+                  //                   ),
+                  //                 ],
+                  //               ),
+                  //             ),
+                  //           ],
+                  //         ],
+                  //       ),
+                  //     ),
+                  //   ),
+                  const SizedBox(height: 16),
+                  _buildCustomerInfoCard(currentBooking),
+
+                  const SizedBox(height: 16),
+
+                  // Booking Timeline Card - ENHANCED
+                  Card(
+                    elevation: 4,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.timeline,
+                                color: AppColors.primary,
+                                size: 24,
+                              ),
+                              const SizedBox(width: 12),
+                              Text(
+                                'Booking Timeline',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primary,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 16),
+
+                          // ✅ ENHANCED Timeline with Real-time Updates
+                          StreamBuilder<DocumentSnapshot>(
+                            stream: FirebaseFirestore.instance
+                                .collection('bookings')
+                                .doc(currentBooking.id)
+                                .snapshots(),
+                            builder: (context, snapshot) {
+                              // Use live data if available
+                              Map<String, dynamic>? liveData;
+                              if (snapshot.hasData && snapshot.data!.exists) {
+                                liveData =
+                                    snapshot.data!.data()
+                                        as Map<String, dynamic>?;
+                              }
+
+                              final workStartTime =
+                                  liveData?['workStartTime'] as Timestamp?;
+                              final completedAt =
+                                  liveData?['completedAt'] as Timestamp?;
+                              final acceptedAt =
+                                  liveData?['acceptedAt'] as Timestamp? ??
+                                  (currentBooking.acceptedAt != null
+                                      ? Timestamp.fromDate(
+                                          currentBooking.acceptedAt!,
+                                        )
+                                      : null);
+                              final paymentDate =
+                                  liveData?['paymentConfirmedAt'] as Timestamp?;
+                              final currentStatus =
+                                  liveData?['status'] as String? ??
+                                  currentBooking.status.name;
+
+                              return Column(
+                                children: [
+                                  // 1. Created On
+                                  _buildTimelineRow(
+                                    Icons.calendar_today,
+                                    'Created On',
+                                    Helpers.formatDateTime(
+                                      currentBooking.createdAt,
+                                    ),
+                                    Colors.blue,
+                                  ),
+
+                                  // 2. Scheduled Date
+                                  _buildTimelineRow(
+                                    Icons.schedule,
+                                    'Scheduled Date',
+                                    Helpers.formatDateTime(
+                                      currentBooking.scheduledDateTime,
+                                    ),
+                                    Colors.orange,
+                                  ),
+
+                                  // 3. Accepted On (if accepted)
+                                  if (acceptedAt != null)
+                                    _buildTimelineRow(
+                                      Icons.thumb_up,
+                                      'Accepted On',
+                                      Helpers.formatDateTime(
+                                        acceptedAt.toDate(),
+                                      ),
+                                      Colors.green,
+                                    ),
+
+                                  // 4. Work Started (if started)
+                                  if (workStartTime != null)
+                                    _buildTimelineRow(
+                                      Icons.construction,
+                                      'Work Started',
+                                      Helpers.formatDateTime(
+                                        workStartTime.toDate(),
+                                      ),
+                                      AppColors.primary,
+                                    ),
+
+                                  // 5. Completed On (if completed)
+                                  if (completedAt != null)
+                                    _buildTimelineRow(
+                                      Icons.check_circle,
+                                      'Completed On',
+                                      Helpers.formatDateTime(
+                                        completedAt.toDate(),
+                                      ),
+                                      AppColors.success,
+                                    ),
+
+                                  // 6. Payment Completed (if paid)
+                                  if (paymentDate != null)
+                                    _buildTimelineRow(
+                                      Icons.payment,
+                                      'Payment Completed',
+                                      Helpers.formatDateTime(
+                                        paymentDate.toDate(),
+                                      ),
+                                      Colors.purple,
+                                    )
+                                  else if (currentStatus == 'completed')
+                                    _buildTimelineRow(
+                                      Icons.payment,
+                                      'Payment Status',
+                                      'Awaiting customer payment',
+                                      Colors.orange,
+                                    ),
+                                ],
+                              );
+                            },
+                          ),
+                          const SizedBox(height: 16),
+
+                          _buildCustomerRatingSection(currentBooking),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                  const SizedBox(height: 20),
+
+                  if (currentBooking.status == BookingStatus.pending ||
+                      currentBooking.status == BookingStatus.confirmed ||
+                      currentBooking.status == BookingStatus.inProgress ||
+                      currentBooking.status == BookingStatus.completed)
+                    Column(
+                      children: [
+                        _buildActionButtons(), // ✅ Use the method here
+                        const SizedBox(height: 16),
+                      ],
+                    ),
                 ],
               ),
             );
-          }
-
-          return SingleChildScrollView(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Service Information
-                _buildDetailCard(
-                  title: 'Service Details',
-                  icon: Icons.build_circle,
-                  children: [
-                    _buildDetailRow('Service', currentBooking.serviceName),
-                    _buildDetailRow(
-                      'Description',
-                      currentBooking.description.isNotEmpty
-                          ? currentBooking.description
-                          : 'No description provided',
-                    ),
-                    _buildDetailRow(
-                      'Booked Date',
-                      Helpers.formatDateTime(currentBooking.createdAt),
-                    ),
-                    _buildDetailRow(
-                      'Scheduled Date',
-                      Helpers.formatDateTime(currentBooking.scheduledDateTime),
-                    ),
-                    _buildDetailRow(
-                      'Amount',
-                      Helpers.formatCurrency(currentBooking.totalAmount),
-                    ),
-                  ],
-                ),
-
-                const SizedBox(height: 16),
-
-                // // Customer Information Card
-                // if (currentBooking.status != BookingStatus.completed)
-                //   Card(
-                //     elevation: 4,
-                //     shape: RoundedRectangleBorder(
-                //       borderRadius: BorderRadius.circular(12),
-                //     ),
-                //     child: Padding(
-                //       padding: const EdgeInsets.all(20),
-                //       child: Column(
-                //         crossAxisAlignment: CrossAxisAlignment.start,
-                //         children: [
-                //           Row(
-                //             children: [
-                //               Icon(
-                //                 Icons.person,
-                //                 color: AppColors.primary,
-                //                 size: 24,
-                //               ),
-                //               const SizedBox(width: 12),
-                //               Text(
-                //                 'Customer Information',
-                //                 style: TextStyle(
-                //                   fontSize: 18,
-                //                   fontWeight: FontWeight.bold,
-                //                   color: AppColors.primary,
-                //                 ),
-                //               ),
-                //               const Spacer(),
-                //               // ✅ Privacy indicator for cancelled/paid bookings
-                //               if (currentBooking.status ==
-                //                       BookingStatus.cancelled ||
-                //                   currentBooking.status == BookingStatus.paid)
-                //                 Container(
-                //                   padding: const EdgeInsets.symmetric(
-                //                     horizontal: 8,
-                //                     vertical: 4,
-                //                   ),
-                //                   decoration: BoxDecoration(
-                //                     color: _getPrivacyIndicatorColor(
-                //                       currentBooking.status,
-                //                     ),
-                //                     borderRadius: BorderRadius.circular(12),
-                //                   ),
-                //                   child: Row(
-                //                     mainAxisSize: MainAxisSize.min,
-                //                     children: [
-                //                       Icon(
-                //                         Icons.visibility_off,
-                //                         size: 12,
-                //                         color: Colors.white,
-                //                       ),
-                //                       const SizedBox(width: 4),
-                //                       Text(
-                //                         'PRIVATE',
-                //                         style: TextStyle(
-                //                           fontSize: 10,
-                //                           fontWeight: FontWeight.bold,
-                //                           color: Colors.white,
-                //                         ),
-                //                       ),
-                //                     ],
-                //                   ),
-                //                 ),
-                //             ],
-                //           ),
-                //           const SizedBox(height: 16),
-
-                //           // ✅ Customer Name - Always show
-                //           _buildDetailRowName(
-                //             Icons.account_circle,
-                //             'Customer Name',
-                //             currentBooking.customerName ?? 'Loading...',
-                //           ),
-
-                //           // ✅ CRITICAL: Privacy Logic - Hide contact details for cancelled/paid
-                //           if (currentBooking.status !=
-                //                   BookingStatus.cancelled &&
-                //               currentBooking.status != BookingStatus.paid) ...[
-                //             // Phone if valid and present (only for non-cancelled/paid)
-                //             if (currentBooking.customerPhone != null &&
-                //                 currentBooking.customerPhone!.isNotEmpty &&
-                //                 currentBooking.customerPhone != 'No Phone')
-                //               _buildDetailRowWithCall(
-                //                 Icons.phone,
-                //                 'Phone Number',
-                //                 currentBooking.customerPhone!,
-                //               ),
-
-                //             // Address if valid and present (only for non-cancelled/paid)
-                //             if ((currentBooking.customerAddress ?? '')
-                //                 .isNotEmpty)
-                //               _buildDetailRowWithNavigation(
-                //                 Icons.location_on,
-                //                 'Service Location',
-                //                 currentBooking.customerAddress!,
-                //               ),
-                //           ] else ...[
-                //             // ✅ Privacy notice for cancelled/paid bookings
-                //             const SizedBox(height: 12),
-                //             Container(
-                //               padding: const EdgeInsets.all(12),
-                //               decoration: BoxDecoration(
-                //                 color: _getPrivacyNoticeColor(
-                //                   currentBooking.status,
-                //                 ),
-                //                 borderRadius: BorderRadius.circular(8),
-                //                 border: Border.all(
-                //                   color: _getPrivacyNoticeBorderColor(
-                //                     currentBooking.status,
-                //                   ),
-                //                 ),
-                //               ),
-                //               child: Row(
-                //                 children: [
-                //                   Icon(
-                //                     Icons.info_outline,
-                //                     size: 16,
-                //                     color: _getPrivacyNoticeTextColor(
-                //                       currentBooking.status,
-                //                     ),
-                //                   ),
-                //                   const SizedBox(width: 8),
-                //                   Expanded(
-                //                     child: Text(
-                //                       'Customer contact details and service location are protected for privacy.',
-                //                       style: TextStyle(
-                //                         fontSize: 13,
-                //                         color: _getPrivacyNoticeTextColor(
-                //                           currentBooking.status,
-                //                         ),
-                //                         fontWeight: FontWeight.w500,
-                //                       ),
-                //                     ),
-                //                   ),
-                //                 ],
-                //               ),
-                //             ),
-                //           ],
-                //         ],
-                //       ),
-                //     ),
-                //   ),
-                const SizedBox(height: 16),
-                _buildCustomerInfoCard(currentBooking),
-
-                const SizedBox(height: 16),
-
-                // Booking Timeline Card - ENHANCED
-                Card(
-                  elevation: 4,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Icon(
-                              Icons.timeline,
-                              color: AppColors.primary,
-                              size: 24,
-                            ),
-                            const SizedBox(width: 12),
-                            Text(
-                              'Booking Timeline',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primary,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-
-                        // ✅ ENHANCED Timeline with Real-time Updates
-                        StreamBuilder<DocumentSnapshot>(
-                          stream: FirebaseFirestore.instance
-                              .collection('bookings')
-                              .doc(currentBooking.id)
-                              .snapshots(),
-                          builder: (context, snapshot) {
-                            // Use live data if available
-                            Map<String, dynamic>? liveData;
-                            if (snapshot.hasData && snapshot.data!.exists) {
-                              liveData =
-                                  snapshot.data!.data()
-                                      as Map<String, dynamic>?;
-                            }
-
-                            final workStartTime =
-                                liveData?['workStartTime'] as Timestamp?;
-                            final completedAt =
-                                liveData?['completedAt'] as Timestamp?;
-                            final acceptedAt =
-                                liveData?['acceptedAt'] as Timestamp? ??
-                                (currentBooking.acceptedAt != null
-                                    ? Timestamp.fromDate(
-                                        currentBooking.acceptedAt!,
-                                      )
-                                    : null);
-                            final paymentDate =
-                                liveData?['paymentConfirmedAt'] as Timestamp?;
-                            final currentStatus =
-                                liveData?['status'] as String? ??
-                                currentBooking.status.name;
-
-                            return Column(
-                              children: [
-                                // 1. Created On
-                                _buildTimelineRow(
-                                  Icons.calendar_today,
-                                  'Created On',
-                                  Helpers.formatDateTime(
-                                    currentBooking.createdAt,
-                                  ),
-                                  Colors.blue,
-                                ),
-
-                                // 2. Scheduled Date
-                                _buildTimelineRow(
-                                  Icons.schedule,
-                                  'Scheduled Date',
-                                  Helpers.formatDateTime(
-                                    currentBooking.scheduledDateTime,
-                                  ),
-                                  Colors.orange,
-                                ),
-
-                                // 3. Accepted On (if accepted)
-                                if (acceptedAt != null)
-                                  _buildTimelineRow(
-                                    Icons.thumb_up,
-                                    'Accepted On',
-                                    Helpers.formatDateTime(acceptedAt.toDate()),
-                                    Colors.green,
-                                  ),
-
-                                // 4. Work Started (if started)
-                                if (workStartTime != null)
-                                  _buildTimelineRow(
-                                    Icons.construction,
-                                    'Work Started',
-                                    Helpers.formatDateTime(
-                                      workStartTime.toDate(),
-                                    ),
-                                    AppColors.primary,
-                                  ),
-
-                                // 5. Completed On (if completed)
-                                if (completedAt != null)
-                                  _buildTimelineRow(
-                                    Icons.check_circle,
-                                    'Completed On',
-                                    Helpers.formatDateTime(
-                                      completedAt.toDate(),
-                                    ),
-                                    AppColors.success,
-                                  ),
-
-                                // 6. Payment Completed (if paid)
-                                if (paymentDate != null)
-                                  _buildTimelineRow(
-                                    Icons.payment,
-                                    'Payment Completed',
-                                    Helpers.formatDateTime(
-                                      paymentDate.toDate(),
-                                    ),
-                                    Colors.purple,
-                                  )
-                                else if (currentStatus == 'completed')
-                                  _buildTimelineRow(
-                                    Icons.payment,
-                                    'Payment Status',
-                                    'Awaiting customer payment',
-                                    Colors.orange,
-                                  ),
-                              ],
-                            );
-                          },
-                        ),
-                        const SizedBox(height: 16),
-
-                        _buildCustomerRatingSection(currentBooking),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                if (currentBooking.status == BookingStatus.pending ||
-                    currentBooking.status == BookingStatus.confirmed ||
-                    currentBooking.status == BookingStatus.inProgress ||
-                    currentBooking.status == BookingStatus.completed)
-                  Column(
-                    children: [
-                      _buildActionButtons(), // ✅ Use the method here
-                      const SizedBox(height: 16),
-                    ],
-                  ),
-              ],
-            ),
-          );
-        },
+          },
+        ),
       ),
     );
   }

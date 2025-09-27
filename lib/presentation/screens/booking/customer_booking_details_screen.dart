@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/rating_model.dart';
@@ -14,6 +15,7 @@ import 'package:quickfix/presentation/providers/rating_providers.dart';
 import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
 import 'package:quickfix/presentation/screens/home/customer_rating_screen.dart';
 import 'package:quickfix/presentation/screens/payment/real_time_payment_screen.dart';
+import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 import 'package:quickfix/presentation/widgets/rating/rating_display_widget.dart';
 
 class CustomerBookingDetailScreen extends StatefulWidget {
@@ -199,13 +201,19 @@ class _CustomerBookingDetailScreenState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Booking Details'),
-        backgroundColor: AppColors.primary,
-        foregroundColor: Colors.white,
+    return BaseScreen(
+      onScreenEnter: () {
+        AdService.instance.loadInterstitial();
+        AdService.instance.loadRewarded();
+      },
+      body: Scaffold(
+        appBar: AppBar(
+          title: const Text('Booking Details'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+        ),
+        body: _buildBody(),
       ),
-      body: _buildBody(),
     );
   }
 
