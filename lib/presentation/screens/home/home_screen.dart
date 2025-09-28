@@ -46,10 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
     // await _requestPermissionIfNeeded();
 
-    if (mounted) {
-      await _loadData();
-      _hasInitialized = true;
-    }
+    await _loadData();
+    _hasInitialized = true;
   }
 
   // Future<void> _requestPermissionIfNeeded() async {
@@ -129,24 +127,34 @@ class _HomeScreenState extends State<HomeScreen> {
         AdService.instance.loadInterstitial();
         AdService.instance.loadRewarded();
       },
-      body: RefreshIndicator(
-        onRefresh: _refresh,
-        color: AppColors.primary,
-        backgroundColor: Colors.white,
-        child: Consumer<ServiceProvider>(
-          builder: (context, sp, child) {
-            return CustomScrollView(
-              physics: const AlwaysScrollableScrollPhysics(),
-              slivers: [
-                _buildCompactAppBar(),
-                SliverToBoxAdapter(child: _buildQuickAccessMenu()),
-                SliverToBoxAdapter(child: _buildSearchBar(context)),
-                SliverToBoxAdapter(child: _buildCategoryTabs()),
-                _buildServicesContent(),
-              ],
-            );
-          },
-        ),
+      body: FutureBuilder(
+        future: _initializeOnce(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState != ConnectionState.done) {
+            return Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          return Scaffold(
+            body: RefreshIndicator(
+              onRefresh: _refresh,
+              color: AppColors.primary,
+              backgroundColor: Colors.white,
+              child: Consumer<ServiceProvider>(
+                builder: (context, sp, child) {
+                  return CustomScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    slivers: [
+                      _buildCompactAppBar(),
+                      SliverToBoxAdapter(child: _buildQuickAccessMenu()),
+                      SliverToBoxAdapter(child: _buildSearchBar(context)),
+                      SliverToBoxAdapter(child: _buildCategoryTabs()),
+                      _buildServicesContent(),
+                    ],
+                  );
+                },
+              ),
+            ),
+          );
+        },
       ),
     );
   }

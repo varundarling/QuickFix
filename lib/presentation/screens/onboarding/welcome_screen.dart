@@ -220,7 +220,7 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                     ),
                     const SizedBox(height: 20),
                     const Text(
-                      'Welcome to QuickFix!',
+                      'Welcome to QuickFix...!',
                       style: TextStyle(
                         fontSize: 26,
                         fontWeight: FontWeight.bold,
@@ -240,7 +240,6 @@ class _WelcomeScreenState extends State<WelcomeScreen>
                   ],
                 ),
               ),
-
               const Spacer(),
             ],
           ),

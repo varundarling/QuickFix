@@ -18,14 +18,14 @@
         android:label="quickfix"
         android:icon="@mipmap/ic_launcher">
 
-        <service
+        <!-- <service
             android:name=".MyFirebaseMessagingService"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT"/>
             </intent-filter>
-        </service>
+        </service> -->
 
         <!-- AdMob app-id -->
         <meta-data
