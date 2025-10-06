@@ -675,7 +675,7 @@ class _CustomerBookingDetailScreenState
                 ),
                 icon: const Icon(Icons.payment, size: 20),
                 label: const Text(
-                  'Pay Now - Real Time',
+                  'Pay Now',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                 ),
               ),

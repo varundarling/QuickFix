@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class Helpers {
@@ -36,8 +37,8 @@ class Helpers {
   }
 
   // Currency formatting
-  static String formatCurrency(double amount, {String symbol = '₹'}) {
-    return '$symbol${amount.toStringAsFixed(0)}';
+  static String formatCurrency(double amount) {
+    return Currency.formatUsd(amount);
   }
 
   // Phone number formatting

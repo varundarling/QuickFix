@@ -510,13 +510,13 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                         color: AppColors.textPrimary,
                       ),
                     ),
-                    TextButton(
-                      onPressed: () {
-                        setState(() => _selectedIndex = 1);
-                        _tabController.animateTo(1);
-                      },
-                      child: const Text('View All'),
-                    ),
+                    // TextButton(
+                    //   onPressed: () {
+                    //     setState(() => _selectedIndex = 1);
+                    //     _tabController.animateTo(1);
+                    //   },
+                    //   child: const Text('View All'),
+                    // ),
                   ],
                 ),
                 const SizedBox(height: 12),

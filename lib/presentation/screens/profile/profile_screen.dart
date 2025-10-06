@@ -1,5 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:quickfix/core/utils/currency.dart';
+import 'package:quickfix/core/utils/validators.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
@@ -233,12 +236,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
             .where(
               (b) =>
                   (b.status == BookingStatus.completed ||
-                      b.status == BookingStatus.paid),
+                  b.status == BookingStatus.paid),
             )
-            .fold<double>(
-              0.0,
-              (sum, booking) => sum + (booking.totalAmount),
-            );
+            .fold<double>(0.0, (sum, booking) => sum + (booking.totalAmount));
 
         // ✅ Calculate active bookings (pending + confirmed + in progress)
         final activeBookings =
@@ -356,8 +356,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     Expanded(
                       child: _buildStatCard(
                         'Total Spent',
-                        '₹${totalSpent.toStringAsFixed(0)}',
-                        Icons.currency_rupee,
+                        Currency.formatUsd(totalSpent),
+                        Icons.attach_money,
                         Colors.green,
                       ),
                     ),
@@ -530,6 +530,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   label: 'Full Name',
                   prefixIcon: Icons.person,
                   hintText: 'Enter your full name',
+                  validator: (v) => Validators.name(v),
+                  maxLength: 50,
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -539,6 +541,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   prefixIcon: Icons.phone,
                   keyboardType: TextInputType.phone,
                   hintText: 'Enter your phone number',
+                  validator: (v) => Validators.phone(v),
+                  maxLength: 15,
+                  inputFormatters: [
+                    FilteringTextInputFormatter.allow(
+                      RegExp(r'[0-9+\-\s\(\)]'),
+                    ),
+                  ],
                 ),
                 const SizedBox(height: 16),
                 CustomTextField(
@@ -548,6 +557,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
                   prefixIcon: Icons.location_on,
                   maxLines: 2,
                   hintText: 'Enter your address',
+                  validator: (v) => (v == null || v.isEmpty)
+                      ? 'Please enter your address'
+                      : null,
                 ),
                 const SizedBox(height: 16),
                 PrimaryButton(

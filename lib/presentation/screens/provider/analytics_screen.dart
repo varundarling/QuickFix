@@ -182,7 +182,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                       child: _buildOverviewCard(
                         'Money Earned',
                         Helpers.formatCurrency(totalRevenue),
-                        Icons.currency_rupee_rounded,
+                        Icons.attach_money,
                         Colors.green,
                       ),
                     ),
@@ -504,7 +504,7 @@ class _AnalyticsScreenState extends State<AnalyticsScreen> {
                   child: _buildMonthlyCard(
                     'Money This Month',
                     Helpers.formatCurrency(monthlyRevenue),
-                    Icons.currency_rupee_rounded,
+                    Icons.attach_money,
                     Colors.green,
                   ),
                 ),

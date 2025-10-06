@@ -6,6 +6,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 @pragma('vm:entry-point')
@@ -574,7 +575,7 @@ class NotificationService {
   //       'createdAt': FieldValue.serverTimestamp(),
   //     });
 
-  //     
+  //
   //   } catch (e) {
   //     // Handle errors
   //   }
@@ -620,8 +621,6 @@ class NotificationService {
         'status': 'pending',
         'createdAt': FieldValue.serverTimestamp(),
       });
-
-      
     } catch (e) {
       //Handle errors
     }
@@ -635,7 +634,6 @@ class NotificationService {
     required double paymentAmount,
   }) async {
     try {
-
       // Get provider FCM token
       String? fcmToken = await _getProviderFCMToken(providerId);
 
@@ -648,7 +646,8 @@ class NotificationService {
         'fcmToken': fcmToken,
         'targetUserId': providerId,
         'title': '💰 Payment Received!',
-        'body': '$customerName paid ₹${paymentAmount.toInt()} for $serviceName',
+        'body':
+            '$customerName paid ${Currency.formatUsd(paymentAmount)} for $serviceName',
         'data': {
           'type': 'payment_received',
           'bookingId': bookingId,
@@ -666,7 +665,7 @@ class NotificationService {
             fcmToken: fcmToken,
             title: '💰 Payment Received!',
             body:
-                '$customerName paid ₹${paymentAmount.toInt()} for $serviceName',
+                '$customerName paid ${Currency.formatUsd(paymentAmount)} for $serviceName',
             data: {
               'type': 'payment_received',
               'bookingId': bookingId,
@@ -756,7 +755,6 @@ class NotificationService {
       // 3. Save preference locally
       final prefs = await SharedPreferences.getInstance();
       await prefs.setBool('notifications_enabled', true);
-
     } catch (e) {
       // Handle errors
     }

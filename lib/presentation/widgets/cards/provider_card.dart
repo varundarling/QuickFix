@@ -6,6 +6,7 @@ import 'package:location/location.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/location_service.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/provider_model.dart';
 import 'package:quickfix/data/models/service_model.dart';
@@ -437,11 +438,7 @@ class _ProviderCardState extends State<ProviderCard>
               ),
               child: Column(
                 children: [
-                  const Icon(
-                    Icons.currency_rupee,
-                    size: 20,
-                    color: Colors.white,
-                  ),
+                  const Icon(Icons.attach_money, size: 20, color: Colors.white),
                   const SizedBox(height: 4),
                   Text(
                     '${widget.provider!.hourlyRate!.toInt()}/day',
@@ -482,7 +479,7 @@ class _ProviderCardState extends State<ProviderCard>
               borderRadius: BorderRadius.circular(16),
             ),
             child: const Icon(
-              Icons.currency_rupee,
+              Icons.attach_money,
               size: 24,
               color: Colors.white,
             ),
@@ -502,7 +499,7 @@ class _ProviderCardState extends State<ProviderCard>
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '₹${widget.service!.basePrice.toInt()}/ day',
+                  '${Currency.formatUsd(widget.service!.basePrice)} / day',
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,

@@ -4,10 +4,11 @@ import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:quickfix/core/constants/strings.dart';
+import 'package:quickfix/core/utils/navigation_helper.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../providers/auth_provider.dart';
 import '../../../core/constants/app_colors.dart';
-import '../../../core/constants/app_strings.dart';
 import '../../../core/utils/validators.dart';
 import '../../widgets/common/custom_text_field.dart';
 import '../../widgets/buttons/primary_button.dart';
@@ -117,8 +118,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Header
                 Text(
                   _selectedUserType == 'provider'
-                      ? 'Join as Service Provider'
-                      : 'Create Account',
+                      ? Strings.providerSignUpTitle
+                      : Strings.customerSignUpTitle,
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -128,8 +129,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 const SizedBox(height: 8),
                 Text(
                   _selectedUserType == 'provider'
-                      ? 'Start earning by providing services'
-                      : 'Sign up to book trusted services',
+                      ? Strings.providerSignUpSubtitle
+                      : Strings.customerSignUpSubtitle,
                   style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
@@ -163,7 +164,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       const Spacer(),
                       TextButton(
                         onPressed: () => context.go('/user-type-selection'),
-                        child: const Text('Change'),
+                        child: const Text(Strings.change),
                       ),
                     ],
                   ),
@@ -196,27 +197,28 @@ class _SignUpScreenState extends State<SignUpScreen> {
                             : () async {
                                 final ok = await context
                                     .read<AuthProvider>()
-                                    .signUpWithGoogleStrict();
+                                    .signUpWithGoogleStrict(
+                                      userType: _selectedUserType,
+                                    );
                                 if (ok && context.mounted) {
                                   await context
                                       .read<AuthProvider>()
                                       .reloadUserData();
-                                  // await NavigationHelper.navigateBasedOnRole(
-                                  //   context,
-                                  // );
+                                  await NavigationHelper.navigateBasedOnRole(
+                                    context,
+                                    expectedUserType: _selectedUserType,
+                                  );
                                 } else if (context.mounted &&
                                     authProvider.errorMessage != null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text("SignUp Failed..."),
-                                    ),
+                                    SnackBar(content: Text("SignUp Failed...")),
                                   );
                                 }
                               },
                         label: Text(
                           authProvider.isGoogleSigningIn
-                              ? 'Signing up...'
-                              : 'Sign up with Google',
+                              ? Strings.signingUp
+                              : Strings.signUpWithGoogle,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -225,7 +227,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: AppColors.textSecondary.withValues(alpha: 0.3),
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.3,
+                            ),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -248,7 +252,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'OR',
+                        Strings.or,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -269,8 +273,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Name Field
                 CustomTextField(
                   controller: _nameController,
-                  label: 'Full Name',
-                  hintText: 'Enter your full name',
+                  label: Strings.fullName,
+                  hintText: Strings.fullNameHint,
                   prefixIcon: Icons.person_outline,
                   validator: Validators.name,
                 ),
@@ -279,8 +283,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Email Field
                 CustomTextField(
                   controller: _emailController,
-                  label: 'Email',
-                  hintText: 'Enter your email',
+                  label: Strings.email,
+                  hintText: Strings.emailHint,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: Icons.email_outlined,
                   validator: Validators.email,
@@ -290,8 +294,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Phone Field
                 CustomTextField(
                   controller: _phoneController,
-                  label: 'Phone Number',
-                  hintText: 'Enter your phone number',
+                  label: Strings.phoneNumber,
+                  hintText: Strings.phoneNumberHint,
                   keyboardType: TextInputType.phone,
                   prefixIcon: Icons.phone_outlined,
                   validator: Validators.phone,
@@ -301,8 +305,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Password Field
                 CustomTextField(
                   controller: _passwordController,
-                  label: 'Password',
-                  hintText: 'Enter your password',
+                  label: Strings.password,
+                  hintText: Strings.passwordHint,
                   obscureText: _obscurePassword,
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
@@ -324,8 +328,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                 // Confirm Password Field
                 CustomTextField(
                   controller: _confirmPasswordController,
-                  label: 'Confirm Password',
-                  hintText: 'Confirm your password',
+                  label: Strings.confirmPassword,
+                  hintText: Strings.confirmPassword,
                   obscureText: _obscureConfirmPassword,
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
@@ -370,7 +374,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                           padding: const EdgeInsets.only(top: 12),
                           child: RichText(
                             text: TextSpan(
-                              text: 'I agree to the ',
+                              text: Strings.agreeTo,
                               style: const TextStyle(
                                 fontSize: 14,
                                 color: AppColors.textSecondary,
@@ -378,7 +382,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                               ),
                               children: [
                                 TextSpan(
-                                  text: 'Terms & Conditions',
+                                  text: Strings.agreeTo,
                                   style: const TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w500,
@@ -390,7 +394,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                                 ),
                                 const TextSpan(text: ' and '),
                                 TextSpan(
-                                  text: 'Privacy Policy',
+                                  text: Strings.privacyPolicy,
                                   style: const TextStyle(
                                     color: AppColors.primary,
                                     fontWeight: FontWeight.w500,
@@ -419,7 +423,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       onPressed: authProvider.isSigningUp
                           ? null
                           : _handleSignUp,
-                      text: AppStrings.signUp,
+                      text: Strings.signUp,
                       isLoading: authProvider.isSigningUp,
                     );
                   },
@@ -431,13 +435,13 @@ class _SignUpScreenState extends State<SignUpScreen> {
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
                     const Text(
-                      "Already have an account? ",
+                      Strings.alreadyHaveAccount,
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
                       onPressed: () => context.go('/login'),
                       child: const Text(
-                        AppStrings.login,
+                        Strings.login,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,
@@ -465,10 +469,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           mode: LaunchMode.externalApplication,
         );
       } else {
-        _showLinkError('Terms & Conditions');
+        _showLinkError(Strings.termsAndConditions);
       }
     } catch (e) {
-      _showLinkError('Terms & Conditions');
+      _showLinkError(Strings.termsAndConditions);
     }
   }
 
@@ -483,10 +487,10 @@ class _SignUpScreenState extends State<SignUpScreen> {
           mode: LaunchMode.externalApplication,
         );
       } else {
-        _showLinkError('Privacy Policy');
+        _showLinkError(Strings.privacyPolicy);
       }
     } catch (e) {
-      _showLinkError('Privacy Policy');
+      _showLinkError(Strings.privacyPolicy);
     }
   }
 

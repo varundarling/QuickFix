@@ -25,6 +25,7 @@ class AuthProvider extends ChangeNotifier {
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
 
   StreamSubscription<DatabaseEvent>? _userStreamSubscription;
+  String? _pendingUserType;
 
   User? _user;
   UserModel? _userModel;
@@ -235,6 +236,7 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> _handleFirstTimeFirebaseGoogleUser(User user) async {
+    final selectedUserType = _pendingUserType ?? 'customer';
     // 1) Initialize encryption
     final generatedPassword = _generatePasswordFromGoogleData(user);
     await EncryptionService.initializeUserEncryption(
@@ -257,7 +259,7 @@ class AuthProvider extends ChangeNotifier {
     await FirebaseDatabase.instance.ref('users/${user.uid}').set({
       'encrypted_profile': encryptedData,
       'public_info': {
-        'userType': 'customer',
+        'userType': selectedUserType,
         'isActive': true,
         'joinDate': ServerValue.timestamp,
         'provider': 'google',
@@ -271,7 +273,7 @@ class AuthProvider extends ChangeNotifier {
     await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
       'name': user.displayName ?? '',
       'email': user.email ?? '',
-      'userType': 'customer',
+      'userType': selectedUserType,
       'photoUrl': user.photoURL ?? '',
       'isActive': true,
       'provider': 'google',
@@ -281,6 +283,11 @@ class AuthProvider extends ChangeNotifier {
     // 4) Mark onboarding as seen
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSeenOnboarding', true);
+    // Persist chosen role immediately to avoid fallback mis-routing
+    try {
+      await _saveUserType(selectedUserType);
+    } catch (_) {}
+    _pendingUserType = null;
   }
 
   // Future<void> _handleFirstTimeGoogleUser(
@@ -715,6 +722,30 @@ class AuthProvider extends ChangeNotifier {
           await _saveUserType(_userModel!.userType);
           return _userModel!.userType;
         }
+        // Direct lookup from RTDB to avoid defaulting incorrectly
+        try {
+          final snap = await FirebaseDatabase.instance
+              .ref('users/${_user!.uid}/public_info/userType')
+              .get();
+          if (snap.exists && snap.value is String) {
+            final directType = (snap.value as String).toLowerCase();
+            await _saveUserType(directType);
+            return directType;
+          }
+        } catch (_) {}
+        // Secondary lookup from Firestore if RTDB path missing
+        try {
+          final fs = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(_user!.uid)
+              .get();
+          final fsType = fs.data()?['userType'];
+          if (fs.exists && fsType is String && fsType.isNotEmpty) {
+            final t = fsType.toLowerCase();
+            await _saveUserType(t);
+            return t;
+          }
+        } catch (_) {}
       } catch (e) {
         // Log but don’t block UI
       }
@@ -730,6 +761,7 @@ class AuthProvider extends ChangeNotifier {
     // Default fallback
     return 'customer';
   }
+  
 
   Future<void> _startUserProfileListener() async {
     if (_user == null) return;
@@ -943,11 +975,15 @@ class AuthProvider extends ChangeNotifier {
     }
   }
 
-  Future<bool> loginWithGoogleStrict() =>
-      continueWithGoogleStrict(flow: GoogleAuthFlow.login);
+  Future<bool> loginWithGoogleStrict({String userType = 'customer'}) async {
+    _pendingUserType = userType; // Store for consistency
+    return await continueWithGoogleStrict(flow: GoogleAuthFlow.login);
+  }
 
-  Future<bool> signUpWithGoogleStrict() =>
-      continueWithGoogleStrict(flow: GoogleAuthFlow.signup);
+  Future<bool> signUpWithGoogleStrict({String userType = 'customer'}) async {
+    _pendingUserType = userType; // Store the intended user type
+    return await continueWithGoogleStrict(flow: GoogleAuthFlow.signup);
+  }
 
   Future<void> postAuthBootstrap() async {
     try {

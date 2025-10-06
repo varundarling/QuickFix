@@ -3,6 +3,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:geolocator/geolocator.dart';
@@ -10,6 +11,7 @@ import 'package:geocoding/geocoding.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/fcm_http_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
+import 'package:quickfix/core/utils/validators.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
@@ -153,6 +155,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 controller: _nameController,
                 label: 'Service Name',
                 hintText: 'e.g., Emergency Plumbing Repair',
+                maxLength: 60,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter service name';
@@ -202,6 +205,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                   controller: _otherCategoryController,
                   label: 'Enter Custom Category',
                   hintText: 'e.g., Gardening, Pet Care, Tutoring, etc.',
+                  maxLength: 40,
                   validator: (value) {
                     if (_showOtherCategoryField &&
                         (value == null || value.isEmpty)) {
@@ -346,15 +350,11 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 label: 'Mobile Number',
                 hintText: '9876543210',
                 keyboardType: TextInputType.phone,
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return 'Please enter your phone number';
-                  }
-                  if (value.length < 10) {
-                    return 'Please enter a valid phone number';
-                  }
-                  return null;
-                },
+                maxLength: 15,
+                inputFormatters: [
+                  FilteringTextInputFormatter.allow(RegExp(r'[0-9+\-\s\(\)]')),
+                ],
+                validator: Validators.phone,
               ),
               const SizedBox(height: 16),
 
@@ -418,6 +418,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
                 label: 'Description',
                 hintText: 'Describe your service in detail',
                 maxLines: 4,
+                maxLength: 500,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter description';
@@ -430,9 +431,10 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               // Base Price
               CustomTextField(
                 controller: _basePriceController,
-                label: 'Base Price (₹)',
+                label: 'Base Price (\$) / day',
                 hintText: '500',
                 keyboardType: TextInputType.number,
+                maxLength: 10,
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return 'Please enter base price';

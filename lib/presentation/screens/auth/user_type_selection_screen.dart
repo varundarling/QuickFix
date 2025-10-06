@@ -3,7 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
-import 'package:quickfix/core/constants/app_strings.dart';
+import 'package:quickfix/core/constants/strings.dart';
 
 class UserTypeSelectionScreen extends StatefulWidget {
   const UserTypeSelectionScreen({super.key});
@@ -219,7 +219,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     colors: [Colors.white, Color(0xFFF1F5F9)],
                   ).createShader(bounds),
                   child: Text(
-                    'Welcome to ${AppStrings.appName}',
+                    'Welcome to ${Strings.appName}',
                     style: const TextStyle(
                       fontSize: 18,
                       fontWeight: FontWeight.w800,

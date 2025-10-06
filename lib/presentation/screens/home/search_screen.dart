@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/ad_service.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 
@@ -233,7 +234,7 @@ class _SearchScreenState extends State<SearchScreen> {
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              '₹${service.basePrice.toInt()}',
+                              Currency.formatUsd(service.basePrice),
                               style: const TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,

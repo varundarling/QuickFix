@@ -60,34 +60,24 @@ class _QuickFixState extends State<QuickFix> with WidgetsBindingObserver {
         // await prefs.setBool('hasSeenOnboarding', true);
 
         // Ensure current session hides onboarding instantly
-        if (mounted && _showOnboarding == true) {
-          setState(() {
-            _showOnboarding = false;
-            _router = AppRouter.router(showOnboarding: _showOnboarding!);
-          });
-        }
+        // if (mounted && _showOnboarding == true) {
+        //   setState(() {
+        //     _showOnboarding = false;
+        //     _router = AppRouter.router(showOnboarding: _showOnboarding!);
+        //   });
+        // }
 
-        try {
-          final doc = await FirebaseFirestore.instance
-              .collection('users')
-              .doc(user.uid)
-              .get();
-          final userType =
-              (doc.data()?['userType'] as String?)?.toLowerCase() ?? 'customer';
-
-          final ctx = navigatorKey.currentContext;
-          if (ctx != null) {
-            if (userType == 'provider') {
-              GoRouter.of(ctx).go('/provider-dashboard');
-            } else {
-              GoRouter.of(ctx).go('/home');
-            }
-          }
-        } catch (_) {
-          // Fallback: at least go to customer home
-          final ctx = navigatorKey.currentContext;
-          if (ctx != null) GoRouter.of(ctx).go('/home');
-        }
+        // try {
+        //   final ctx = navigatorKey.currentContext;
+        //   if (ctx != null) {
+        //     // Defer to centralized role-based navigation without defaulting to customer
+        //     await NavigationHelper.navigateBasedOnRole(ctx);
+        //   }
+        // } catch (_) {
+        //   // If navigation cannot be determined yet, do nothing; screens will handle
+        // }
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setBool('hasSeenOnboarding', true);
       }
     });
   }

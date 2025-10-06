@@ -1,7 +1,9 @@
+import 'package:quickfix/core/constants/strings.dart';
+
 class Validators {
   static String? email(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Email is required';
+      return Strings.emailRequired;
     }
 
     final emailRegExp = RegExp(
@@ -9,7 +11,7 @@ class Validators {
     );
 
     if (!emailRegExp.hasMatch(value)) {
-      return 'Please enter a valid email';
+      return Strings.emailInvalid;
     }
 
     return null;
@@ -17,11 +19,11 @@ class Validators {
 
   static String? password(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Password is required';
+      return Strings.passwordRequired;
     }
 
     if (value.length < 6) {
-      return 'Password must be atleast 6 characters';
+      return Strings.passwordTooShort;
     }
 
     return null;
@@ -29,37 +31,62 @@ class Validators {
 
   static String? phone(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Phone number is required';
+      return Strings.phoneRequired;
     }
 
-    final phoneRegExp = RegExp(r'^(?:[+0]9)?[0-9]{10,12}$');
+    // Normalize: keep digits only
+    final digitsOnly = value.replaceAll(RegExp(r'[^0-9]'), '');
 
-    if (!phoneRegExp.hasMatch(value)) {
-      return 'Please enter a valid mobile number';
+    // Reject obviously invalid patterns (e.g., all same digit)
+    if (RegExp(r'^(\d)\1{9,}$').hasMatch(digitsOnly)) {
+      return Strings.phoneInvalid;
     }
 
-    return null;
+    // US-friendly rules:
+    // - Allow 10 digits (national) or 11 with leading country code '1'
+    // - If 11 digits, first must be '1'
+    if (digitsOnly.length == 10) {
+      return null;
+    }
+    if (digitsOnly.length == 11 && digitsOnly.startsWith('1')) {
+      return null;
+    }
+
+    return Strings.phoneInvalid;
   }
 
   static String? name(String? value) {
     if (value == null || value.isEmpty) {
-      return 'Name is required';
+      return Strings.nameRequired;
     }
 
     if (value.length < 2) {
-      return 'Name must be atleast 2 characters';
+      return Strings.nameTooShort;
     }
 
     return null;
   }
 
   static bool isValidPhoneNumber(String phone) {
-    final phoneRegex = RegExp(r'^[\+]?[1-9][\d]{0,15}$');
-    return phoneRegex.hasMatch(phone.replaceAll(RegExp(r'[\s\-\(\)]'), ''));
+    final digitsOnly = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (RegExp(r'^(\d)\1{9,}$').hasMatch(digitsOnly)) return false;
+    if (digitsOnly.length == 10) return true; // US national
+    if (digitsOnly.length == 11 && digitsOnly.startsWith('1')) return true; // +1
+    return false;
   }
 
   static String formatPhoneNumber(String phone) {
-    // Add your formatting logic
+    final digitsOnly = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    String normalized = digitsOnly;
+    if (digitsOnly.length == 11 && digitsOnly.startsWith('1')) {
+      normalized = digitsOnly.substring(1);
+    }
+    if (normalized.length == 10) {
+      final area = normalized.substring(0, 3);
+      final prefix = normalized.substring(3, 6);
+      final line = normalized.substring(6);
+      return '($area) $prefix-$line';
+    }
     return phone.trim();
   }
 }

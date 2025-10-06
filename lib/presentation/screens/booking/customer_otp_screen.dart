@@ -1,11 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/data/models/booking_model.dart';
-import 'package:quickfix/presentation/providers/auth_provider.dart';
 
 class CustomerOTPScreen extends StatefulWidget {
   final BookingModel booking;
@@ -23,37 +21,26 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
   @override
   void initState() {
     super.initState();
-    _loadCustomerOTP();
+    loadCustomerOTP();
   }
 
-  Future<void> _loadCustomerOTP() async {
+  Future<void> loadCustomerOTP() async {
+    setState(() => isLoading = true);
     try {
-      final authProvider = context.read<AuthProvider>();
-      final currentUserId = authProvider.getCurrentUserId();
-
-      if (currentUserId != null) {
-        // debugPrint(
-        //   '🔍 Loading customer OTP from Firestore for: $currentUserId',
-        // );
-
-        // ✅ This now uses Firestore instead of Realtime Database
-        final otp = await OTPService.instance.getCustomerOTP(currentUserId);
-
-        if (mounted) {
-          setState(() {
-            customerOTP = otp;
-            isLoading = false;
-          });
-          //debugPrint('✅ Customer OTP loaded from Firestore: $otp');
-        }
+      final bookingId = widget.booking.id;
+      // Try to fetch existing booking‐specific OTP
+      String? otp = await OTPService.instance.getOTPForBooking(bookingId);
+      // If none exists, create one
+      if (otp == null || otp.isEmpty) {
+        otp = await OTPService.instance.createOTPForBooking(bookingId);
       }
+      setState(() {
+        customerOTP = otp;
+        isLoading = false;
+      });
     } catch (e) {
-      //debugPrint('❌ Error loading customer OTP from Firestore: $e');
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-        });
-      }
+      //debugPrint('Error loading or creating OTP: $e');
+      setState(() => isLoading = false);
     }
   }
 
@@ -308,8 +295,12 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                                   decoration: BoxDecoration(
                                     gradient: LinearGradient(
                                       colors: [
-                                        AppColors.primary.withValues(alpha: 0.2),
-                                        AppColors.primary.withValues(alpha: 0.1),
+                                        AppColors.primary.withValues(
+                                          alpha: 0.2,
+                                        ),
+                                        AppColors.primary.withValues(
+                                          alpha: 0.1,
+                                        ),
                                       ],
                                     ),
                                     borderRadius: BorderRadius.circular(16),
@@ -396,7 +387,9 @@ class _CustomerOTPScreenState extends State<CustomerOTPScreen> {
                                     color: Colors.green.withValues(alpha: 0.1),
                                     borderRadius: BorderRadius.circular(12),
                                     border: Border.all(
-                                      color: Colors.green.withValues(alpha: 0.3),
+                                      color: Colors.green.withValues(
+                                        alpha: 0.3,
+                                      ),
                                     ),
                                   ),
                                   child: Row(

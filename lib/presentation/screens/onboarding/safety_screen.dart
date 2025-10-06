@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:go_router/go_router.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 
 class SafetyScreen extends StatefulWidget {
@@ -136,7 +134,9 @@ class _SafetyScreenState extends State<SafetyScreen>
                               child: Container(
                                 padding: const EdgeInsets.all(20),
                                 decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
+                                  color: AppColors.primary.withValues(
+                                    alpha: 0.1,
+                                  ),
                                   borderRadius: BorderRadius.circular(25),
                                 ),
                                 child: Icon(
@@ -307,41 +307,41 @@ class _SafetyScreenState extends State<SafetyScreen>
                 SizedBox(
                   height: screenHeight * 0.04,
                 ), // ✅ RESPONSIVE: 4% of screen height
-                // Final CTA and trust badge
-                Column(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(
-                        vertical: 16,
-                      ), // ✅ REDUCED: from 18 to 16
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(16),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            blurRadius: 15,
-                            offset: const Offset(0, 8),
-                          ),
-                        ],
-                      ),
-                      child: TextButton(
-                        onPressed: _finishOnboarding,
-                        child: const Text(
-                          'Get Started Now',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
-                        ),
-                      ),
-                    ),
- 
-                  ],
-                ),
 
+                // Final CTA and trust badge
+                // Column(
+                //   children: [
+                //     Container(
+                //       width: double.infinity,
+                //       padding: const EdgeInsets.symmetric(
+                //         vertical: 16,
+                //       ), // ✅ REDUCED: from 18 to 16
+                //       decoration: BoxDecoration(
+                //         color: Colors.white,
+                //         borderRadius: BorderRadius.circular(16),
+                //         boxShadow: [
+                //           BoxShadow(
+                //             color: AppColors.primary.withValues(alpha: 0.2),
+                //             blurRadius: 15,
+                //             offset: const Offset(0, 8),
+                //           ),
+                //         ],
+                //       ),
+                //       child: TextButton(
+                //         onPressed: _finishOnboarding,
+                //         child: const Text(
+                //           'Get Started Now',
+                //           style: TextStyle(
+                //             fontSize: 18,
+                //             fontWeight: FontWeight.bold,
+                //             color: AppColors.primary,
+                //           ),
+                //         ),
+                //       ),
+                //     ),
+
+                //   ],
+                // ),
                 SizedBox(height: screenHeight * 0.02), // ✅ FINAL SPACING
               ],
             ),
@@ -407,14 +407,5 @@ class _SafetyScreenState extends State<SafetyScreen>
         ],
       ),
     );
-  }
-
-  Future<void> _finishOnboarding() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('hasSeenOnboarding', true);
-
-    if (mounted) {
-      context.go('/user-type-selection');
-    }
   }
 }

@@ -42,7 +42,7 @@ class PaymentResult {
       actualPaidAmount: (numAmount).toDouble(),
       currency: (data['currency']?.toString().isNotEmpty ?? false)
           ? data['currency'].toString()
-          : 'INR',
+          : 'USD',
       method: data['method']?.toString() ?? 'unknown',
       status: data['status']?.toString() ?? 'success',
       createdAt: created,
@@ -64,7 +64,7 @@ class PaymentService {
   Future<PaymentResult> recordSuccessfulPayment({
     required String bookingId,
     required double actualPaidAmount,
-    String currency = 'INR',
+    String currency = 'USD',
     required String method,
     required String
     paymentId, // Pass gateway payment_id; required for idempotency

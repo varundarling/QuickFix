@@ -640,7 +640,7 @@ class _CustomerBookingsScreenState extends State<CustomerBookingsScreen>
               Row(
                 children: [
                   const Icon(
-                    Icons.currency_rupee,
+                    Icons.attach_money,
                     size: 16,
                     color: AppColors.success,
                   ),

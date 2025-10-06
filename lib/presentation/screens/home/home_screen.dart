@@ -3,7 +3,7 @@ import 'package:location/location.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
-import 'package:quickfix/core/constants/app_strings.dart';
+import 'package:quickfix/core/constants/strings.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
@@ -192,7 +192,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             Row(
                               children: [
                                 const Text(
-                                  AppStrings.findServices,
+                                  Strings.searchHint, // fallback; add key in Strings if missing
                                   style: TextStyle(
                                     color: Colors.white70,
                                     fontSize: 16,

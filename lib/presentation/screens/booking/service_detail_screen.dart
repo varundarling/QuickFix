@@ -8,6 +8,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/services/location_service.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:quickfix/core/utils/helpers.dart';
 import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
@@ -744,9 +745,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.currency_rupee, color: Colors.white, size: 18),
+                const Icon(Icons.attach_money, color: Colors.white, size: 18),
                 Text(
-                  '${widget.service.basePrice.toInt()}',
+                  Currency.formatUsd(widget.service.basePrice),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,
@@ -882,9 +883,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                Icon(Icons.currency_rupee, size: 18, color: AppColors.success),
+                Icon(Icons.attach_money, size: 18, color: AppColors.success),
                 Text(
-                  '${widget.service.basePrice.toInt()}',
+                  Currency.formatUsd(widget.service.basePrice),
                   style: TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -892,7 +893,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ),
                 ),
                 Text(
-                  ' / service',
+                  ' / day',
                   style: TextStyle(
                     fontSize: 14,
                     color: AppColors.textSecondary,
@@ -2036,12 +2037,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   Row(
                     children: [
                       Icon(
-                        Icons.currency_rupee,
+                        Icons.attach_money,
                         size: 16,
                         color: AppColors.success,
                       ),
                       Text(
-                        '${widget.service.basePrice.toInt()}',
+                        Currency.formatUsd(widget.service.basePrice),
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,

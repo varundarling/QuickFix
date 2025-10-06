@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
-import 'package:quickfix/core/constants/app_strings.dart';
+import 'package:quickfix/core/constants/strings.dart';
 import 'package:quickfix/core/utils/validators.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/widgets/buttons/primary_button.dart';
@@ -78,8 +78,8 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Header
                 Text(
                   _selectedUserType == 'provider'
-                      ? 'Provider Login'
-                      : 'Welcome Back!',
+                      ? Strings.providerLoginTitle
+                      : Strings.loginTitle,
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.bold,
@@ -90,8 +90,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
                 Text(
                   _selectedUserType == 'provider'
-                      ? 'Login to manage your services'
-                      : 'Login to book trusted services',
+                      ? Strings.providerLoginSubtitle
+                      : Strings.customerLoginSubtitle,
                   style: const TextStyle(
                     fontSize: 16,
                     color: AppColors.textSecondary,
@@ -122,7 +122,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Logging in as ${_selectedUserType == 'provider' ? 'Service Provider' : 'Customer'}',
+                          _selectedUserType == 'provider'
+                              ? Strings.loggingInAsProvider
+                              : Strings.loggingInAsCustomer,
                           style: const TextStyle(
                             color: AppColors.primary,
                             fontWeight: FontWeight.w600,
@@ -139,7 +141,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           minimumSize: const Size(60, 32),
                         ),
                         child: const Text(
-                          'Change',
+                          Strings.change,
                           style: TextStyle(
                             fontSize: 12,
                             fontWeight: FontWeight.w600,
@@ -176,27 +178,28 @@ class _LoginScreenState extends State<LoginScreen> {
                             : () async {
                                 final ok = await context
                                     .read<AuthProvider>()
-                                    .loginWithGoogleStrict();
+                                    .loginWithGoogleStrict(
+                                      userType: _selectedUserType,
+                                    );
                                 if (ok && context.mounted) {
                                   await context
                                       .read<AuthProvider>()
                                       .reloadUserData();
-                                  // await NavigationHelper.navigateBasedOnRole(
-                                  //   context,
-                                  // );
+                                  await NavigationHelper.navigateBasedOnRole(
+                                    context,
+                                    expectedUserType: _selectedUserType,
+                                  );
                                 } else if (context.mounted &&
                                     authProvider.errorMessage != null) {
                                   ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text("Login Failed..."),
-                                    ),
+                                    SnackBar(content: Text("Login Failed...")),
                                   );
                                 }
                               },
                         label: Text(
                           authProvider.isGoogleSigningIn
-                              ? 'Signing in...'
-                              : 'Continue with Google',
+                              ? Strings.signingIn
+                              : Strings.continueWithGoogle,
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
@@ -205,7 +208,9 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         style: OutlinedButton.styleFrom(
                           side: BorderSide(
-                            color: AppColors.textSecondary.withValues(alpha: 0.3),
+                            color: AppColors.textSecondary.withValues(
+                              alpha: 0.3,
+                            ),
                           ),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
@@ -227,7 +232,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
                       child: Text(
-                        'OR',
+                        Strings.or,
                         style: TextStyle(
                           color: AppColors.textSecondary,
                           fontSize: 14,
@@ -248,19 +253,20 @@ class _LoginScreenState extends State<LoginScreen> {
                 //Email
                 CustomTextField(
                   controller: _emailController,
-                  label: 'Email',
-                  hintText: 'Enter your Email',
+                  label: Strings.email,
+                  hintText: Strings.emailHint,
                   keyboardType: TextInputType.emailAddress,
                   prefixIcon: Icons.email_outlined,
                   validator: Validators.email,
+                  maxLength: 100,
                 ),
                 const SizedBox(height: 20),
 
                 //password field
                 CustomTextField(
                   controller: _passwordController,
-                  label: 'Password',
-                  hintText: 'Enter your Password',
+                  label: Strings.password,
+                  hintText: Strings.passwordHint,
                   obscureText: _obscurePassword,
                   prefixIcon: Icons.lock_outlined,
                   suffixIcon: IconButton(
@@ -276,6 +282,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     },
                   ),
                   validator: Validators.password,
+                  maxLength: 64,
                 ),
                 const SizedBox(height: 30),
 
@@ -286,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       onPressed: authProvider.isSigningIn
                           ? null
                           : _handlingLogin,
-                      text: AppStrings.login,
+                      text: Strings.login,
                       isLoading: authProvider.isSigningIn,
                     );
                   },
@@ -304,7 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     TextButton(
                       onPressed: () => context.go('/signup'),
                       child: const Text(
-                        AppStrings.signUp,
+                        Strings.signUp,
                         style: TextStyle(
                           color: AppColors.primary,
                           fontWeight: FontWeight.w600,

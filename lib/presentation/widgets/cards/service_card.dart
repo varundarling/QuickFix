@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
+import 'package:quickfix/core/utils/currency.dart';
 import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/presentation/providers/favourites_provider.dart';
@@ -385,9 +386,9 @@ class _ServiceCardState extends State<ServiceCard>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.currency_rupee, size: 18, color: AppColors.success),
+          const Icon(Icons.attach_money, size: 18, color: AppColors.success),
           Text(
-            '${widget.service.basePrice.toInt()}',
+            Currency.formatUsd(widget.service.basePrice),
             style: const TextStyle(
               color: AppColors.success,
               fontSize: 16,

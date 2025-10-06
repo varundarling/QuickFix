@@ -8,6 +8,7 @@ import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/auth_provider.dart';
 import 'package:quickfix/core/utils/helpers.dart';
+import 'package:quickfix/presentation/screens/home/customer_rating_screen.dart';
 
 class RealTimePaymentScreen extends StatefulWidget {
   final BookingModel booking;
@@ -20,7 +21,7 @@ class RealTimePaymentScreen extends StatefulWidget {
 
 class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
   bool _isProcessing = false;
-  String _selectedPaymentMethod = '';
+  String _selectedPaymentMethod = 'cash';
 
   final List<Map<String, dynamic>> _paymentMethods = [
     {
@@ -29,7 +30,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       'description': 'Pay using Google Pay, PhonePe, Paytm, etc.',
       'icon': Icons.qr_code,
       'color': Colors.green,
-      'available': true,
+      'available': false,
     },
     {
       'id': 'card',
@@ -37,7 +38,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       'description': 'Pay using Visa, Mastercard, RuPay',
       'icon': Icons.credit_card,
       'color': Colors.blue,
-      'available': true,
+      'available': false,
     },
     {
       'id': 'wallet',
@@ -45,7 +46,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       'description': 'PayPal, Amazon Pay, etc.',
       'icon': Icons.account_balance_wallet,
       'color': Colors.purple,
-      'available': true,
+      'available': false,
     },
     {
       'id': 'netbanking',
@@ -53,7 +54,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
       'description': 'Direct bank transfer',
       'icon': Icons.account_balance,
       'color': Colors.orange,
-      'available': true,
+      'available': false,
     },
     {
       'id': 'cash',
@@ -69,11 +70,11 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Real-time Payment'),
+        title: const Text('Payments'),
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -135,7 +136,7 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
             // Payment Method Options
             ..._paymentMethods.map((method) => _buildPaymentMethodCard(method)),
 
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
 
             // Pay Now Button
             SizedBox(
@@ -177,31 +178,31 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
             const SizedBox(height: 16),
 
             // Security Info
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.green.withValues(alpha: 01),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(Icons.security, color: Colors.green, size: 20),
-                  SizedBox(width: 12),
-                  Expanded(
-                    child: Text(
-                      '🔒 Your payment is secured with 256-bit SSL encryption',
-                      style: TextStyle(
-                        color: Colors.green,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+            // Container(
+            //   width: double.infinity,
+            //   padding: const EdgeInsets.all(16),
+            //   decoration: BoxDecoration(
+            //     color: Colors.green.withValues(alpha: 01),
+            //     borderRadius: BorderRadius.circular(12),
+            //     border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+            //   ),
+            //   child: const Row(
+            //     children: [
+            //       Icon(Icons.security, color: Colors.green, size: 20),
+            //       SizedBox(width: 12),
+            //       Expanded(
+            //         child: Text(
+            //           '🔒 Your payment is secured with 256-bit SSL encryption',
+            //           style: TextStyle(
+            //             color: Colors.green,
+            //             fontSize: 14,
+            //             fontWeight: FontWeight.w500,
+            //           ),
+            //         ),
+            //       ),
+            //     ],
+            //   ),
+            // ),
           ],
         ),
       ),
@@ -331,7 +332,11 @@ class _RealTimePaymentScreenState extends State<RealTimePaymentScreen> {
 
         await Future.delayed(const Duration(seconds: 1));
         if (mounted) {
-          Navigator.of(context).popUntil((route) => route.isFirst);
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(
+              builder: (_) => CustomerRatingScreen(booking: widget.booking),
+            ),
+          );
         }
       }
     } catch (e) {
