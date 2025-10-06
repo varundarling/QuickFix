@@ -478,7 +478,7 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Method to open Privacy Policy
   void _openPrivacyPolicy() async {
-    const String privacyUrl = 'https://yourwebsite.com/privacy-policy';
+    const String privacyUrl = 'https://quickfixus.blogspot.com/2025/10/quickfix-privacy-policy.html';
 
     try {
       if (await canLaunchUrl(Uri.parse(privacyUrl))) {
