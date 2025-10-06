@@ -9,16 +9,16 @@ class AdService {
 
   // Test Ad Unit IDs
   static final String _bannerId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/6300978111'
-      : 'ca-app-pub-3940256099942544/2934735716';
+      ? 'ca-app-pub-7339218345159620/8722776432'
+      : 'ca-app-pub-7339218345159620/8722776432';
 
   static final String _interstitialId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/1033173712'
-      : 'ca-app-pub-3940256099942544/4411468910';
+      ? 'ca-app-pub-7339218345159620/7884353398'
+      : 'ca-app-pub-7339218345159620/7884353398';
 
   static final String _rewardedId = Platform.isAndroid
-      ? 'ca-app-pub-3940256099942544/5224354917'
-      : 'ca-app-pub-3940256099942544/1712485313';
+      ? 'ca-app-pub-7339218345159620/3913318790'
+      : 'ca-app-pub-7339218345159620/3913318790';
 
   InterstitialAd? _interstitialAd;
   RewardedAd? _rewardedAd;
