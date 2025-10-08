@@ -11,7 +11,8 @@ import 'package:quickfix/presentation/screens/onboarding/how_it_works_screen.dar
 import 'package:quickfix/presentation/screens/onboarding/safety_screen.dart';
 
 class OnboardingMainScreen extends StatefulWidget {
-  const OnboardingMainScreen({super.key});
+  final VoidCallback? onComplete;
+  const OnboardingMainScreen({super.key, this.onComplete});
 
   @override
   State<OnboardingMainScreen> createState() => _OnboardingMainScreenState();
@@ -35,7 +36,14 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
     await prefs.setBool('hasSeenOnboarding', true);
 
     // Navigate to your existing UserTypeSelectionScreen
-    if (context.mounted) context.go('/user-type-selection');
+    if (widget.onComplete != null) {
+      widget.onComplete!();
+    } else {
+      // Fallback navigation if no callback provided
+      if (context.mounted) {
+        context.go('/user-type-selection');
+      }
+    }
   }
 
   @override

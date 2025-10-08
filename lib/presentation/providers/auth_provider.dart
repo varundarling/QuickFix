@@ -1,14 +1,10 @@
 // ignore_for_file: prefer_final_fields, use_build_context_synchronously
 
 import 'dart:async';
-import 'dart:convert';
-
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:crypto/crypto.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
-import 'package:google_sign_in/google_sign_in.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:quickfix/core/services/encryption_service.dart';
 import 'package:quickfix/core/services/firebase_service.dart';
@@ -22,7 +18,8 @@ class AuthProvider extends ChangeNotifier {
   final FirebaseService _firebaseService = FirebaseService.instance;
 
   // ✅ FIXED: GoogleSignIn is now a singleton - no constructor parameters
-  final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
+  static const String kEncryptedKey = 'encrypted_profile';
+  static const String kPublicKey = 'public_info';
 
   StreamSubscription<DatabaseEvent>? _userStreamSubscription;
   String? _pendingUserType;
@@ -339,7 +336,7 @@ class AuthProvider extends ChangeNotifier {
     try {
       // 🔄 Handling existing Google user
 
-      final hasEncryption = await EncryptionService.hasEncryptionSetup(
+      final hasEncryption = EncryptionService.hasEncryptionSetup(
         user.uid,
       );
 
@@ -361,32 +358,26 @@ class AuthProvider extends ChangeNotifier {
   }
 
   String _generatePasswordFromGoogleData(User user) {
-    final data = '${user.email}_${user.uid}_quickfix_google_2025';
-    final bytes = utf8.encode(data);
-    var digest = sha256.convert(bytes);
-    return digest.toString();
+    final email = (user.email ?? '').trim().toLowerCase();
+    return '${email}_${user.uid}_QuickFixAndroid2025';
   }
 
   Future<void> signOut() async {
     try {
       if (_user != null) {
-        await _clearUserType();
         EncryptionService.clearSession(_user!.uid);
       }
 
-      // await _ensureGoogleInitialized();
-      await _googleSignIn.signOut();
       await _firebaseService.signOut();
-
       _user = null;
       _userModel = null;
       _clearError();
 
-      //👋 User signed out and user type cleared
+      debugPrint('✅ [AUTH] Signed out successfully');
       notifyListeners();
     } catch (e) {
-      //❌ Sign out error
-      _setError(_getErrorMessage(e));
+      debugPrint('❌ [AUTH] Sign out error: $e');
+      _setError('Failed to sign out');
     }
   }
 
@@ -421,13 +412,6 @@ class AuthProvider extends ChangeNotifier {
     return userType;
   }
 
-  Future<void> _clearUserType() async {
-    final prefs = await SharedPreferences.getInstance();
-    final key = 'user_type_${_user!.uid}';
-    await prefs.remove(key);
-    //🗑️ Cleared saved user type
-  }
-
   Future<void> _setupNotifications() async {
     if (_user == null) return;
 
@@ -456,20 +440,22 @@ class AuthProvider extends ChangeNotifier {
   }
 
   AuthProvider() {
+    debugPrint('🔄 [AUTH] AuthProvider initializing...');
+
     _firebaseService.auth.authStateChanges().listen((User? user) async {
-      //🔄 Auth state changed: ${user?.uid}
+      debugPrint('🔄 [AUTH] Auth state changed: ${user?.uid}');
+
+      // Cleanup previous state
+      await _stopUserProfileListener();
+      _userModel = null;
       _user = user;
 
       if (user != null) {
-        //✅ User authenticated: ${user.email}
-
-        // ✅ CRITICAL: Ensure proper initialization sequence
+        debugPrint('✅ [AUTH] User authenticated: ${user.email}');
         await _initializeUserSession(user);
       } else {
-        _stopUserProfileListener();
-        _userModel = null;
-        _isInitialized = true; // ✅ Mark as initialized even when logged out
-        //❌ User logged out
+        _isInitialized = true;
+        debugPrint('❌ [AUTH] User logged out');
       }
       notifyListeners();
     });
@@ -477,155 +463,100 @@ class AuthProvider extends ChangeNotifier {
 
   Future<void> _initializeUserSession(User user) async {
     try {
-      //🔄 Initializing user session for: ${user.uid}
+      debugPrint('🔄 [AUTH] Initializing session for: ${user.uid}');
 
-      // ✅ STEP 1: Restore encryption session first
+      // STEP 1: Restore encryption session
       await _restoreEncryptionSession(user);
 
-      // ✅ STEP 2: Load user profile with retry logic
-      await _loadUserModelWithRetry();
+      // STEP 2: Load user data
+      await _loadUserDataWithRetry();
 
-      // ✅ STEP 3: Start real-time listener only after profile is loaded
+      // STEP 3: Start real-time listener
       await _startUserProfileListener();
 
-      // ✅ STEP 4: Setup notifications
-      await _setupNotifications();
-
       _isInitialized = true;
-      //✅ User session initialized successfully
+      debugPrint('✅ [AUTH] Session initialized successfully');
     } catch (e) {
-      //❌ Error initializing user session: $e
-      _isInitialized = true; // Mark as initialized to prevent infinite loading
+      debugPrint('❌ [AUTH] Session initialization error: $e');
+      _isInitialized = true;
+      _setError('Failed to load profile. Please try again.');
     }
   }
 
-  Future<Map<String, dynamic>?> _safeDecryptUserData(
-    String encryptedData,
-    String userUID,
-    BuildContext? context,
-  ) async {
-    try {
-      // First, ensure encryption session is ready
-      if (!EncryptionService.isSessionReady(userUID)) {
-        // 🔐 Session not ready, attempting to restore...
-        final restored = await EncryptionService.restoreEncryptionSession(
-          userUID,
-        );
+  Future<void> _loadUserDataWithRetry({int maxRetries = 3}) async {
+    debugPrint('🔄 [AUTH] Loading user data with retries...');
 
-        if (!restored) {
-          // ❌ Failed to restore encryption session
-          await _handleEncryptionFailure(context);
-          return null;
+    for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        debugPrint('🔄 [AUTH] Load attempt $attempt of $maxRetries');
+
+        final doc = await _firebaseService.getUserData(_user!.uid);
+        if (doc.exists) {
+          final data = doc.value as Map<dynamic, dynamic>;
+          await _handleUserDataUpdate(Map<String, dynamic>.from(data));
+
+          if (_userModel != null) {
+            debugPrint('✅ [AUTH] User model loaded: ${_userModel!.name}');
+            return;
+          }
+        } else {
+          debugPrint('⚠️ [AUTH] No user data found in database');
+          break;
+        }
+      } catch (e) {
+        debugPrint('❌ [AUTH] Load attempt $attempt failed: $e');
+
+        if (attempt < maxRetries) {
+          final delay = Duration(milliseconds: 300 * attempt);
+          debugPrint('⏳ [AUTH] Waiting ${delay.inMilliseconds}ms before retry');
+          await Future.delayed(delay);
         }
       }
-
-      return await EncryptionService.decryptUserData(encryptedData, userUID);
-    } catch (e) {
-      // ❌ Decryption failed: $e
-      if (e.toString().contains('No decryption key')) {
-        await _handleEncryptionFailure(context);
-        return null;
-      }
-      rethrow;
-    }
-  }
-
-  Future<void> _handleEncryptionFailure(BuildContext? context) async {
-    // 🔑 Handling encryption failure...
-
-    try {
-      // For Google users, try to regenerate encryption
-      if (_user?.providerData.any((info) => info.providerId == 'google.com') ==
-          true) {
-        //🔄 Attempting to regenerate Google user encryption...
-        final generatedPassword = _generatePasswordFromGoogleData(_user!);
-        await EncryptionService.initializeUserEncryption(
-          generatedPassword,
-          _user!.uid,
-        );
-        //✅ Google user encryption regenerated
-        return;
-      }
-    } catch (e) {
-      //❌ Failed to regenerate encryption: $e
     }
 
-    // Show user-friendly error and prompt re-authentication
-    if (context != null) {
-      _showReAuthenticationDialog(context);
-    } else {
-      // Set error state if no context available
-      _setError('Session expired. Please login again to continue.');
-    }
-  }
-
-  // Show re-authentication dialog
-  void _showReAuthenticationDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        title: const Text(
-          '🔐 Session Expired',
-          style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-        content: const Text(
-          'Your secure session has expired. Please login again to continue using the app safely.',
-          style: TextStyle(fontSize: 14),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await signOut();
-              // Navigate to login screen
-              Navigator.of(context).pushReplacementNamed('/login');
-            },
-            child: const Text(
-              'Login Again',
-              style: TextStyle(fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
-      ),
-    );
+    debugPrint('❌ [AUTH] All load attempts failed');
   }
 
   Future<void> _restoreEncryptionSession(User user) async {
     try {
-      // 1) Check if session is already ready
+      debugPrint('🔐 [AUTH] Restoring encryption session...');
 
-      // Check if encryption is already set up
-      final hasEncryption = await EncryptionService.hasEncryptionSetup(
-        user.uid,
-      );
-
-      if (hasEncryption) {
-        // Try to restore from device storage
-        final masterKey = await EncryptionService.getMasterKey(user.uid);
-        if (masterKey != null) {
-          // Successfully restored session
-          return;
-        }
+      // Check if session already exists
+      if (EncryptionService.isSessionReady(user.uid)) {
+        debugPrint('✅ [AUTH] Session already ready');
+        return;
       }
 
-      // ✅ For Google users, regenerate the password-based encryption
-      if (user.providerData.any((info) => info.providerId == 'google.com')) {
-        // Regenerate encryption key
+      // Try to restore from secure storage first
+      final restored = await EncryptionService.restoreEncryptionSession(
+        user.uid,
+      );
+      if (restored) {
+        debugPrint('✅ [AUTH] Session restored from storage');
+        return;
+      }
+
+      // For Google users, regenerate deterministic password
+      final isGoogleUser = user.providerData.any(
+        (info) => info.providerId == 'google.com',
+      );
+
+      if (isGoogleUser) {
+        debugPrint('🔄 [AUTH] Regenerating Google user encryption...');
         final generatedPassword = _generatePasswordFromGoogleData(user);
         await EncryptionService.initializeUserEncryption(
           generatedPassword,
           user.uid,
         );
-        // Successfully regenerated
+        debugPrint('✅ [AUTH] Google user encryption regenerated');
       } else {
-        // ✅ For email users, we need them to re-enter password if session is lost
-        // This is a security measure
-        throw Exception('Please Re-Login.');
+        // For email users, they need to re-login if session is lost
+        debugPrint('⚠️ [AUTH] Email user - session lost, need re-login');
+        throw Exception('Session expired. Please login again.');
       }
     } catch (e) {
-      // Log but don’t block UI
-      // Don't throw - let the app continue and handle missing profile gracefully
+      debugPrint('❌ [AUTH] Encryption session restoration failed: $e');
+      // Don't throw - let app continue with public info only
     }
   }
 
@@ -761,88 +692,113 @@ class AuthProvider extends ChangeNotifier {
     // Default fallback
     return 'customer';
   }
-  
 
   Future<void> _startUserProfileListener() async {
     if (_user == null) return;
 
-    await _userStreamSubscription?.cancel();
-    // Starting Realtime DB listener for: ${_user!.uid}
+    await _stopUserProfileListener();
+    debugPrint('🔄 [AUTH] Starting real-time listener');
 
     _userStreamSubscription = FirebaseDatabase.instance
         .ref('users')
         .child(_user!.uid)
         .onValue
         .listen(
-          (DatabaseEvent event) {
-            // Real-time update received
+          (DatabaseEvent event) async {
+            debugPrint('📡 [AUTH] Real-time update received');
             final DataSnapshot snapshot = event.snapshot;
 
             if (snapshot.exists && snapshot.value != null) {
-              try {
-                final data = Map<String, dynamic>.from(snapshot.value as Map);
-                // Handle the update
-
-                _handleUserDataUpdate(data);
-              } catch (e) {
-                // Log but don’t block UI
-              }
-            } else {
-              // No data exists
+              final data = Map<String, dynamic>.from(snapshot.value as Map);
+              await _handleUserDataUpdate(data);
             }
           },
           onError: (error) {
-            // Log but don’t block UI
+            debugPrint('❌ [AUTH] Real-time listener error: $error');
           },
         );
   }
 
   Future<void> _handleUserDataUpdate(Map<String, dynamic> data) async {
     try {
-      if (data.containsKey('encrypted_profile')) {
-        final encryptedProfile = data['encrypted_profile'] as String;
-        final publicInfo = data['public_info'] as Map<dynamic, dynamic>?;
+      debugPrint('🔄 [AUTH] Processing user data update...');
 
-        // ✅ Use safe decryption method
-        final decryptedData = await _safeDecryptUserData(
-          encryptedProfile,
-          _user!.uid,
-          null, // No context available here
-        );
+      // Normalize keys (handle both old and new formats)
+      final normalized = _normalizeProfileSnapshot(data);
 
-        if (decryptedData != null) {
-          final combinedData = Map<String, dynamic>.from(decryptedData);
-          if (publicInfo != null) {
-            combinedData.addAll(Map<String, dynamic>.from(publicInfo));
+      if (normalized.containsKey(kEncryptedKey)) {
+        final encryptedProfile = normalized[kEncryptedKey] as String;
+        final publicInfo = normalized[kPublicKey] as Map<dynamic, dynamic>?;
+
+        // Try to decrypt the profile
+        try {
+          // Ensure session is ready before decryption
+          if (!EncryptionService.isSessionReady(_user!.uid)) {
+            debugPrint('⚠️ [AUTH] Session not ready, attempting restore...');
+            await _restoreEncryptionSession(_user!);
           }
 
-          _userModel = UserModel.fromRealtimeDatabase(combinedData);
-          // Full profile available
-        } else {
-          // Fall back to public info only if decryption fails
+          final decryptedData = await EncryptionService.decryptUserData(
+            encryptedProfile,
+            _user!.uid,
+          );
+
+          if (decryptedData != null) {
+            // Merge encrypted data with public info
+            final combinedData = Map<String, dynamic>.from(decryptedData);
+            if (publicInfo != null) {
+              combinedData.addAll(Map<String, dynamic>.from(publicInfo));
+            }
+
+            _userModel = UserModel.fromRealtimeDatabase(combinedData);
+            debugPrint('✅ [AUTH] Full encrypted profile loaded');
+          } else {
+            throw Exception('Decryption returned null');
+          }
+        } catch (e) {
+          debugPrint('❌ [AUTH] Decryption failed: $e');
+
+          // Fall back to public info only
           if (publicInfo != null) {
             _userModel = UserModel.fromRealtimeDatabase(
               Map<String, dynamic>.from(publicInfo),
             );
-            // Indicate limited profile
+            debugPrint('⚠️ [AUTH] Using public info only (decryption failed)');
+          } else {
+            debugPrint('❌ [AUTH] No fallback data available');
           }
         }
       } else {
+        // No encryption, use data as-is
         _userModel = UserModel.fromRealtimeDatabase(data);
-        // No encryption present, use public info only
+        debugPrint('✅ [AUTH] Using unencrypted profile data');
       }
 
       notifyListeners();
     } catch (e) {
-      // Log but don’t block UI
-      _setError('Failed to load user profile. Please try again.');
+      debugPrint('❌ [AUTH] Error handling user data update: $e');
+      _setError('Failed to load user profile.');
     }
   }
 
-  void _stopUserProfileListener() {
-    _userStreamSubscription?.cancel();
+  Map<String, dynamic> _normalizeProfileSnapshot(Map raw) {
+    final map = Map<String, dynamic>.from(raw);
+
+    // Handle legacy key names
+    if (!map.containsKey(kEncryptedKey) &&
+        map.containsKey('encryptedprofile')) {
+      map[kEncryptedKey] = map['encryptedprofile'];
+    }
+    if (!map.containsKey(kPublicKey) && map.containsKey('publicinfo')) {
+      map[kPublicKey] = map['publicinfo'];
+    }
+
+    return map;
+  }
+
+  Future<void> _stopUserProfileListener() async {
+    await _userStreamSubscription?.cancel();
     _userStreamSubscription = null;
-    // Stop notifications as well
   }
 
   Future<void> _loadUserModel() async {
@@ -885,7 +841,7 @@ class AuthProvider extends ChangeNotifier {
       await _firebaseService.signInWithEmailPassword(email, password);
 
       if (_user != null) {
-        await EncryptionService.getMasterKey(_user!.uid, password: password);
+        await EncryptionService.getMasterKey(_user!.uid, password);
       }
 
       // Shared after-auth work for identical UX
@@ -1160,10 +1116,10 @@ class AuthProvider extends ChangeNotifier {
         Map<String, dynamic> existingData = {};
         if (snapshot.exists) {
           try {
-            existingData = await EncryptionService.decryptUserData(
+            existingData = (await EncryptionService.decryptUserData(
               snapshot.value as String,
               _user!.uid,
-            );
+            ))!;
           } catch (e) {
             // If decryption fails, log but continue with empty existing data
           }
@@ -1207,7 +1163,6 @@ class AuthProvider extends ChangeNotifier {
 
   void _clearError() {
     _errorMessage = null;
-    notifyListeners();
   }
 
   @override
@@ -1237,10 +1192,13 @@ class AuthProvider extends ChangeNotifier {
   }
 
   Future<void> reloadUserData() async {
-    if (_user == null) return;
+    if (_user == null) {
+      debugPrint('⚠️ [AUTH] Cannot reload: No user logged in');
+      return;
+    }
 
     try {
-      // Manually reloading user data...
+      debugPrint('🔄 [AUTH] Manual reload requested');
 
       final snapshot = await FirebaseDatabase.instance
           .ref('users')
@@ -1250,12 +1208,12 @@ class AuthProvider extends ChangeNotifier {
       if (snapshot.exists && snapshot.value != null) {
         final data = Map<String, dynamic>.from(snapshot.value as Map);
         await _handleUserDataUpdate(data);
-        // Data reloaded successfully
+        debugPrint('✅ [AUTH] Manual reload completed');
       } else {
-        // No data found during manual reload
+        debugPrint('⚠️ [AUTH] No data found during manual reload');
       }
     } catch (e) {
-      // Log but don’t throw
+      debugPrint('❌ [AUTH] Manual reload failed: $e');
     }
   }
 

@@ -348,7 +348,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               CustomTextField(
                 controller: _mobileNumberController,
                 label: 'Mobile Number',
-                hintText: '9876543210',
+                hintText: 'e.g., (693) 542 5421',
                 keyboardType: TextInputType.phone,
                 maxLength: 15,
                 inputFormatters: [

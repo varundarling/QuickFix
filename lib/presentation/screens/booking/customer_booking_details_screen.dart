@@ -4,6 +4,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/ad_service.dart';
@@ -12,7 +14,6 @@ import 'package:quickfix/data/models/booking_model.dart';
 import 'package:quickfix/data/models/rating_model.dart';
 import 'package:quickfix/presentation/providers/booking_provider.dart';
 import 'package:quickfix/presentation/providers/rating_providers.dart';
-import 'package:quickfix/presentation/screens/booking/customer_otp_screen.dart';
 import 'package:quickfix/presentation/screens/home/customer_rating_screen.dart';
 import 'package:quickfix/presentation/screens/payment/real_time_payment_screen.dart';
 import 'package:quickfix/presentation/widgets/common/base_screen.dart';
@@ -487,6 +488,95 @@ class _CustomerBookingDetailScreenState
 
           const SizedBox(height: 16),
 
+          if (booking.status == BookingStatus.pending) ...[
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFe3f2fd), Colors.white],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                borderRadius: BorderRadius.circular(12),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.safeWithOpacity(0.08),
+                    blurRadius: 10,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      // Gradient background icon
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppColors.primary.safeWithOpacity(0.9),
+                              AppColors.primary.safeWithOpacity(0.7),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.primary.safeWithOpacity(0.4),
+                              blurRadius: 8,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: const Icon(
+                          Icons.notifications_active,
+                          color: Colors.white,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          'Waiting for confirmation...',
+                          style: TextStyle(
+                            color: AppColors.textPrimary,
+                            fontSize: 18,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    'The provider has been notified and will confirm your booking shortly.',
+                    style: TextStyle(
+                      color: AppColors.textSecondary,
+                      fontSize: 15,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 14),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      minHeight: 6,
+                      backgroundColor: AppColors.primary.safeWithOpacity(0.15),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        AppColors.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
           _buildProgressSection(booking),
 
           // Legacy OTP Card (keep for backward compatibility but hide if new OTP section is shown)
@@ -528,13 +618,29 @@ class _CustomerBookingDetailScreenState
                     const SizedBox(height: 16),
                     ElevatedButton.icon(
                       onPressed: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) =>
-                                CustomerOTPScreen(booking: booking),
-                          ),
-                        );
+                        final scheduled = booking.selectedDate!;
+                        final today = DateTime.now();
+                        final fmt = DateFormat('dd-MM-yyyy');
+                        if (fmt.format(today) == fmt.format(scheduled)) {
+                          context.go('/customer-otp/${booking.id}');
+                        } else {
+                          showDialog(
+                            context: context,
+                            builder: (_) => AlertDialog(
+                              title: const Text('Not Scheduled Today'),
+                              content: Text(
+                                'Your service is scheduled for ${fmt.format(scheduled)}.'
+                                'The code is available only on the scheduled date.',
+                              ),
+                              actions: [
+                                TextButton(
+                                  onPressed: () => Navigator.of(context).pop(),
+                                  child: const Text('OK'),
+                                ),
+                              ],
+                            ),
+                          );
+                        }
                       },
                       style: ElevatedButton.styleFrom(
                         backgroundColor: Colors.orange,

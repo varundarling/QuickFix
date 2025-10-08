@@ -314,7 +314,10 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                     decoration: BoxDecoration(
                       gradient: LinearGradient(
                         colors: isSelected
-                            ? [color.withValues(alpha: 0.2), color.withValues(alpha: 0.1)]
+                            ? [
+                                color.withValues(alpha: 0.2),
+                                color.withValues(alpha: 0.1),
+                              ]
                             : [
                                 Colors.grey.withValues(alpha: 0.1),
                                 Colors.grey.withValues(alpha: 0.05),
@@ -494,7 +497,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                   child: _buildAnimatedButton(
                     isEnabled: _selectedUserType != null,
                     onPressed: _selectedUserType != null
-                        ? _continueToSignup
+                        ? continueToSignup
                         : null,
                     child: Container(
                       height: 60, // ✅ LARGER HEIGHT
@@ -550,7 +553,7 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                       ),
                       child: ElevatedButton(
                         onPressed: _selectedUserType != null
-                            ? _continueToSignup
+                            ? continueToSignup
                             : null,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.transparent,
@@ -625,17 +628,17 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
                             ? [
                                 // ✅ ENHANCED: Better shadow for visibility
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF1E40AF,
-                                  ).withValues(alpha: 0.4 * _buttonAnimation.value),
+                                  color: const Color(0xFF1E40AF).withValues(
+                                    alpha: 0.4 * _buttonAnimation.value,
+                                  ),
                                   blurRadius: 15,
                                   offset: const Offset(0, 5),
                                   spreadRadius: 1,
                                 ),
                                 BoxShadow(
-                                  color: const Color(
-                                    0xFF3B82F6,
-                                  ).withValues(alpha: 0.2 * _buttonAnimation.value),
+                                  color: const Color(0xFF3B82F6).withValues(
+                                    alpha: 0.2 * _buttonAnimation.value,
+                                  ),
                                   blurRadius: 25,
                                   offset: const Offset(0, 0),
                                   spreadRadius: 3,
@@ -723,10 +726,17 @@ class _UserTypeSelectionScreenState extends State<UserTypeSelectionScreen>
     // Return to normal scale
   }
 
-  void _continueToSignup({String? defaultType}) {
-    final userType = _selectedUserType ?? defaultType ?? 'customer';
-    // debugPrint('🚀 Navigating to signup with userType: $userType');
-    context.go('/signup?userType=$userType');
+  void continueToSignup() {
+    debugPrint(
+      '💡 [UserTypeSelection] Continue to signup - selectedUserType: $_selectedUserType',
+    );
+
+    if (_selectedUserType != null) {
+      // ✅ Use direct navigation instead of context.go
+      context.go('/signup?userType=$_selectedUserType');
+    } else {
+      debugPrint('❌ [UserTypeSelection] No user type selected');
+    }
   }
 
   void _continueToLogin({String? defaultType}) {

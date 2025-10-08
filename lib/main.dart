@@ -3,10 +3,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:quickfix/core/notifications/notification_channel.dart';
-import 'package:quickfix/core/notifications/notification_permission_manager.dart';
-import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/core/services/notification_service.dart';
 import 'package:quickfix/core/utils/logger.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
@@ -18,7 +15,7 @@ import 'package:quickfix/core/services/firebase_service.dart';
 @pragma('vm:entry-point')
 Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
-  //debugPrint('📱 Background message received: ${message.messageId}');
+  debugPrint('📱 Background message received: ${message.messageId}');
 }
 
 Future<void> main() async {
@@ -39,10 +36,9 @@ Future<void> main() async {
   await NotificationChannels.createChannels(); // ensure channels exist before any local notif [high/urgent]
   await NotificationService.instance.initialize();
 
-  // Request permissions at app open (notifications + location) and get FCM token
-  await _preflightPermissions(); // ✅ NEW
+  // REMOVED: Permission requests - will be handled in HomeScreen/ProviderDashboard
 
-  // Listen for token refresh events
+  // Listen for token refresh events (keep this for when permissions are granted later)
   FCMTokenManager.initializeTokenListener();
 
   // One-time provider setup (existing)
@@ -57,65 +53,16 @@ Future<void> main() async {
   runApp(const QuickFix());
 }
 
-Future _preflightPermissions() async {
-  try {
-    await NotificationPermissionManager.requestNotificationPermission();
-  } catch (e) {
-    Log.w('Notification permission request failed: $e');
-  }
-
-  try {
-    await FCMTokenManager.getToken();
-  } catch (e) {
-    Log.w('FCM token prefetch failed: $e');
-  }
-
-  try {
-    final granted = await LocationService.instance.requestPermission();
-    if (!granted) {
-      Log.w('Location permission denied at startup');
-    }
-    final isEnabled = await LocationService.instance.isLocationEnabled();
-    if (!isEnabled) {
-      await LocationService.instance.enableLocationService();
-    }
-  } catch (e) {
-    Log.w('Location preflight failed: $e');
-  }
-}
-
+// Keep FCM Token Manager for when permissions are granted later
 class FCMTokenManager {
-  static Future requestNotificationPermission() async {
+  static Future<String?> getToken() async {
     try {
-      PermissionStatus status = await Permission.notification.status;
-      if (status.isGranted) {
-        Log.d('Notification permission already granted');
-        return true;
-      }
-      if (status.isDenied) {
-        status = await Permission.notification.request();
-        return status.isGranted;
-      }
-      return false;
-    } catch (e) {
-      Log.e('Error requesting notification permission: $e');
-      return false;
-    }
-  }
-
-  static Future getToken() async {
-    try {
-      bool permissionGranted = await requestNotificationPermission();
-      if (!permissionGranted) {
-        Log.w('Cannot get FCM token: Permission denied');
-        return null;
-      }
-
+      // Only get token if permissions are already granted
       NotificationSettings settings = await FirebaseMessaging.instance
-          .requestPermission(alert: true, badge: true, sound: true);
+          .getNotificationSettings();
 
       if (settings.authorizationStatus != AuthorizationStatus.authorized) {
-        Log.w('FCM permission denied');
+        Log.w('FCM permission not granted yet');
         return null;
       }
 

@@ -2,10 +2,12 @@
 
 import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:quickfix/core/services/ad_service.dart';
+import 'package:quickfix/core/services/location_service.dart';
 import 'package:quickfix/core/services/otp_service.dart';
 import 'package:quickfix/core/services/progress_tracking_service.dart';
 import 'package:quickfix/presentation/providers/service_provider.dart';
@@ -16,6 +18,7 @@ import 'package:quickfix/presentation/widgets/cards/provider_card.dart';
 import 'package:quickfix/presentation/widgets/common/banner_ad_widget.dart';
 import 'package:quickfix/presentation/widgets/common/base_screen.dart';
 import 'package:quickfix/presentation/widgets/dialogs/profile_completion_dialog.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/booking_provider.dart';
 import '../../../core/constants/app_colors.dart';
@@ -90,6 +93,37 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
     }
   }
 
+  Future<void> _requestPermissionsOnFirstTime() async {
+    final prefs = await SharedPreferences.getInstance();
+    final hasRequestedPermissions =
+        prefs.getBool('dashboard_permissions_requested') ?? false;
+
+    if (!hasRequestedPermissions) {
+      // Mark as requested to prevent showing again
+      await prefs.setBool('dashboard_permissions_requested', true);
+
+      // Request native location permission
+      try {
+        await LocationService.instance.requestPermission();
+        debugPrint('Location permission requested');
+      } catch (e) {
+        debugPrint('Location permission error: $e');
+      }
+
+      // Request native notification permission
+      try {
+        await FirebaseMessaging.instance.requestPermission(
+          alert: true,
+          badge: true,
+          sound: true,
+        );
+        debugPrint('Notification permission requested');
+      } catch (e) {
+        debugPrint('Notification permission error: $e');
+      }
+    }
+  }
+
   void _navigateToCreateService() async {
     final authProvider = context.read<AuthProvider>();
     if (!authProvider.isProviderProfileComplete) {
@@ -124,8 +158,9 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
         );
       }
     });
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _initializeDashboard();
+    WidgetsBinding.instance.addPostFrameCallback((_) async{
+      await _requestPermissionsOnFirstTime();
+      await _initializeDashboard();
     });
   }
 
@@ -641,14 +676,14 @@ class _ProviderDashboardScreenState extends State<ProviderDashboardScreen>
                   ),
                 ),
               ),
-              _buildActionTile(
-                icon: Icons.help_outline,
-                title: 'Help & Support',
-                subtitle: 'Get help with your account',
-                onTap: () => ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('Support coming soon!')),
-                ),
-              ),
+              // _buildActionTile(
+              //   icon: Icons.help_outline,
+              //   title: 'Help & Support',
+              //   subtitle: 'Get help with your account',
+              //   onTap: () => ScaffoldMessenger.of(context).showSnackBar(
+              //     const SnackBar(content: Text('Support coming soon!')),
+              //   ),
+              // ),
               _buildActionTile(
                 icon: Icons.settings_outlined,
                 title: 'Settings',

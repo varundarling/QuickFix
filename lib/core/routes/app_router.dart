@@ -80,7 +80,13 @@ class RoleResolver {
 class AppRouter {
   static GoRouter router({required bool showOnboarding}) {
     return GoRouter(
-      initialLocation: showOnboarding ? '/onboarding' : '/splash',
+      initialLocation: (() {
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          return '/splash';
+        }
+        return showOnboarding ? '/onboarding' : '/user-type-selection';
+      })(),
       navigatorKey: navigatorKey,
       refreshListenable: GoRouterRefreshStream(
         FirebaseAuth.instance.authStateChanges(),
@@ -215,7 +221,6 @@ class AppRouter {
 
         GoRoute(
           path: '/provider-profile',
-          name: 'provider-profile',
           builder: (context, state) => const ProviderProfileScreen(),
         ),
 

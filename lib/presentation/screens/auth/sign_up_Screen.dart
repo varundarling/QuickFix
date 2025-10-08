@@ -163,7 +163,9 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       ),
                       const Spacer(),
                       TextButton(
-                        onPressed: () => context.go('/user-type-selection'),
+                        onPressed: () {
+                          context.go('/user-type-selection');
+                        },
                         child: const Text(Strings.change),
                       ),
                     ],
@@ -439,7 +441,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
                       style: TextStyle(color: AppColors.textSecondary),
                     ),
                     TextButton(
-                      onPressed: () => context.go('/login'),
+                      onPressed: () =>
+                          context.go('/login?userType=$_selectedUserType'),
                       child: const Text(
                         Strings.login,
                         style: TextStyle(
@@ -478,7 +481,8 @@ class _SignUpScreenState extends State<SignUpScreen> {
 
   // Method to open Privacy Policy
   void _openPrivacyPolicy() async {
-    const String privacyUrl = 'https://quickfixus.blogspot.com/2025/10/quickfix-privacy-policy.html';
+    const String privacyUrl =
+        'https://quickfixus.blogspot.com/2025/10/quickfix-privacy-policy.html';
 
     try {
       if (await canLaunchUrl(Uri.parse(privacyUrl))) {

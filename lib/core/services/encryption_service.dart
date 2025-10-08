@@ -1,22 +1,24 @@
 import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
+import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class EncryptionService {
-  static const FlutterSecureStorage _secureStorage = FlutterSecureStorage(
+  // ANDROID-ONLY: Simple secure storage configuration for local caching
+  static const FlutterSecureStorage secureStorage = FlutterSecureStorage(
     aOptions: AndroidOptions(encryptedSharedPreferences: true),
-    iOptions: IOSOptions(groupId: 'your.app.group.id'),
   );
 
-  // Generate master key from password
-  static Future<String> _deriveMasterKey(
-    String password,
-    String userUID,
-  ) async {
-    final salt = utf8.encode('${userUID}quickfix_salt_2025');
-    final passwordBytes = utf8.encode(password);
+  // Session storage for quick access
+  static final Map<String, String> sessionKeys = {};
 
+  // Generate master key from password
+  static Future<String> deriveMasterKey(String password, String userUID) async {
+    final salt = utf8.encode('${userUID}quickfixsalt2025');
+    final passwordBytes = utf8.encode(password);
     var hmacSha256 = Hmac(sha256, salt);
     var digest = hmacSha256.convert(passwordBytes);
 
@@ -30,74 +32,217 @@ class EncryptionService {
   }
 
   // Generate device convenience key
-  static Future<String> _generateDeviceKey() async {
+  static Future<String> generateDeviceKey() async {
     final random = Random.secure();
     final bytes = List<int>.generate(32, (i) => random.nextInt(256));
     return base64.encode(bytes);
   }
 
-  // Initialize encryption for user (called during signup/login)
+  // Generate or get device salt for encryption
+  static Future<String> _getOrCreateDeviceSalt(String userUID) async {
+    try {
+      // Try to get existing salt from Firebase first
+      final snapshot = await FirebaseDatabase.instance
+          .ref('users/$userUID/security/device_salt')
+          .get();
+
+      if (snapshot.exists && snapshot.value != null) {
+        return snapshot.value.toString();
+      }
+
+      // Generate new salt if doesn't exist
+      final random = Random.secure();
+      final bytes = List<int>.generate(32, (i) => random.nextInt(256));
+      final newSalt = base64.encode(bytes);
+
+      // Store in Firebase for future use
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/device_salt')
+          .set(newSalt);
+
+      return newSalt;
+    } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Error with device salt: $e');
+      // Fallback to user-specific salt
+      final fallbackSalt = utf8.encode('${userUID}_fallback_salt_2025');
+      return base64.encode(fallbackSalt);
+    }
+  }
+
+  // Initialize encryption for user - NOW STORES IN FIREBASE
   static Future<void> initializeUserEncryption(
     String password,
     String userUID,
   ) async {
-    // Generate master key from password
-    final masterKey = await _deriveMasterKey(password, userUID);
+    try {
+      debugPrint('🔐 [ENCRYPTION] Initializing encryption for: $userUID');
 
-    // Generate device convenience key
-    final deviceKey = await _generateDeviceKey();
+      // Generate master key from password (deterministic)
+      final masterKey = await deriveMasterKey(password, userUID);
 
-    // Encrypt master key with device key for convenience storage
-    final encryptedMasterKey = _simpleEncrypt(masterKey, deviceKey);
+      // Get or create device salt for this user
+      final deviceSalt = await _getOrCreateDeviceSalt(userUID);
 
-    // Store device key and encrypted master key
-    await _secureStorage.write(key: 'device_key_$userUID', value: deviceKey);
-    await _secureStorage.write(
-      key: 'master_key_$userUID',
-      value: encryptedMasterKey,
-    );
+      // Encrypt master key with device salt
+      final encryptedMasterKey = simpleEncrypt(masterKey, deviceSalt);
 
-    // Store master key in memory for current session
-    _sessionKeys[userUID] = masterKey;
+      // Store encrypted master key in Firebase Database
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/encrypted_master_key')
+          .set(encryptedMasterKey);
+
+      // Also cache locally for faster access
+      await secureStorage.write(
+        key: 'cached_masterkey_$userUID',
+        value: encryptedMasterKey,
+      );
+      await secureStorage.write(key: 'cached_salt_$userUID', value: deviceSalt);
+
+      // Store master key in memory for current session
+      sessionKeys[userUID] = masterKey;
+
+      // Store sync timestamp
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/last_key_sync')
+          .set(ServerValue.timestamp);
+
+      debugPrint(
+        '✅ [ENCRYPTION] Encryption initialized and stored in Firebase',
+      );
+    } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Failed to initialize encryption: $e');
+      rethrow;
+    }
   }
 
-  // Session storage for quick access
-  static final Map<String, String> _sessionKeys = {};
-
-  // Get master key (try device convenience first, fallback to password)
+  // Get master key with Firebase fallback
   static Future<String?> getMasterKey(
-    String userUID, {
+    String userUID, [
     String? password,
-  }) async {
-    // Check session first
-    if (_sessionKeys.containsKey(userUID)) {
-      return _sessionKeys[userUID];
-    }
-
-    // Try device convenience key
+  ]) async {
     try {
-      final deviceKey = await _secureStorage.read(key: 'device_key_$userUID');
-      final encryptedMasterKey = await _secureStorage.read(
-        key: 'master_key_$userUID',
-      );
+      // Check session first (fastest)
+      if (sessionKeys.containsKey(userUID)) {
+        debugPrint('✅ [ENCRYPTION] Using cached session key');
+        return sessionKeys[userUID];
+      }
 
-      if (deviceKey != null && encryptedMasterKey != null) {
-        final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
-        _sessionKeys[userUID] = masterKey;
+      // Try local cache first
+      try {
+        final cachedEncryptedKey = await secureStorage.read(
+          key: 'cached_masterkey_$userUID',
+        );
+        final cachedSalt = await secureStorage.read(
+          key: 'cached_salt_$userUID',
+        );
+
+        if (cachedEncryptedKey != null && cachedSalt != null) {
+          final masterKey = simpleDecrypt(cachedEncryptedKey, cachedSalt);
+          if (isValidKey(masterKey)) {
+            sessionKeys[userUID] = masterKey;
+            debugPrint('✅ [ENCRYPTION] Restored from local cache');
+            return masterKey;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [ENCRYPTION] Local cache read failed: $e');
+      }
+
+      // Try Firebase Database
+      try {
+        final encryptedKeySnapshot = await FirebaseDatabase.instance
+            .ref('users/$userUID/security/encrypted_master_key')
+            .get();
+
+        final deviceSaltSnapshot = await FirebaseDatabase.instance
+            .ref('users/$userUID/security/device_salt')
+            .get();
+
+        if (encryptedKeySnapshot.exists && deviceSaltSnapshot.exists) {
+          final encryptedMasterKey = encryptedKeySnapshot.value.toString();
+          final deviceSalt = deviceSaltSnapshot.value.toString();
+
+          final masterKey = simpleDecrypt(encryptedMasterKey, deviceSalt);
+
+          if (isValidKey(masterKey)) {
+            sessionKeys[userUID] = masterKey;
+
+            // Cache locally for faster access next time
+            await secureStorage.write(
+              key: 'cached_masterkey_$userUID',
+              value: encryptedMasterKey,
+            );
+            await secureStorage.write(
+              key: 'cached_salt_$userUID',
+              value: deviceSalt,
+            );
+
+            debugPrint('✅ [ENCRYPTION] Restored from Firebase Database');
+            return masterKey;
+          } else {
+            debugPrint('⚠️ [ENCRYPTION] Invalid stored key, clearing...');
+            await clearStoredKeys(userUID);
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [ENCRYPTION] Firebase read failed: $e');
+      }
+
+      // Fallback to password derivation
+      if (password != null) {
+        final masterKey = await deriveMasterKey(password, userUID);
+        sessionKeys[userUID] = masterKey;
+
+        // Store the key in Firebase for future cross-device use
+        try {
+          await _storeKeyInFirebase(userUID, masterKey);
+        } catch (e) {
+          debugPrint('⚠️ [ENCRYPTION] Failed to store key in Firebase: $e');
+        }
+
+        debugPrint(
+          '✅ [ENCRYPTION] Derived from password and stored in Firebase',
+        );
         return masterKey;
       }
+
+      debugPrint('❌ [ENCRYPTION] No key source available');
+      return null;
     } catch (e) {
-      // Ignore errors and fallback to password derivation
+      debugPrint('❌ [ENCRYPTION] Error getting master key: $e');
+      return null;
     }
+  }
 
-    // Fallback to password derivation
-    if (password != null) {
-      final masterKey = await _deriveMasterKey(password, userUID);
-      _sessionKeys[userUID] = masterKey;
-      return masterKey;
+  // Store key in Firebase Database
+  static Future<void> _storeKeyInFirebase(
+    String userUID,
+    String masterKey,
+  ) async {
+    try {
+      final deviceSalt = await _getOrCreateDeviceSalt(userUID);
+      final encryptedMasterKey = simpleEncrypt(masterKey, deviceSalt);
+
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/encrypted_master_key')
+          .set(encryptedMasterKey);
+
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/last_key_sync')
+          .set(ServerValue.timestamp);
+
+      // Also cache locally
+      await secureStorage.write(
+        key: 'cached_masterkey_$userUID',
+        value: encryptedMasterKey,
+      );
+      await secureStorage.write(key: 'cached_salt_$userUID', value: deviceSalt);
+
+      debugPrint('✅ [ENCRYPTION] Key stored in Firebase Database');
+    } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Failed to store key in Firebase: $e');
+      rethrow;
     }
-
-    return null;
   }
 
   // Encrypt user data
@@ -105,42 +250,46 @@ class EncryptionService {
     Map<String, dynamic> data,
     String userUID,
   ) async {
-    final masterKey = _sessionKeys[userUID];
+    final masterKey = sessionKeys[userUID];
     if (masterKey == null) {
       throw Exception('No encryption key available. Please re-authenticate.');
     }
 
-    final jsonData = jsonEncode(data);
-    return _simpleEncrypt(jsonData, masterKey);
+    try {
+      final jsonData = jsonEncode(data);
+      final encrypted = simpleEncrypt(jsonData, masterKey);
+      debugPrint('✅ [ENCRYPTION] Data encrypted successfully');
+      return encrypted;
+    } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Encryption failed: $e');
+      throw Exception('Failed to encrypt data');
+    }
   }
 
   // Decrypt user data
-  static Future<Map<String, dynamic>> decryptUserData(
+  static Future<Map<String, dynamic>?> decryptUserData(
     String encryptedData,
     String userUID,
   ) async {
     try {
-      // Ensure session is ready before attempting decryption
-      final sessionReady = await ensureSessionReady(userUID);
-
-      if (!sessionReady) {
-        throw Exception('No decryption key available. Please re-authenticate.');
-      }
-
-      final masterKey = _sessionKeys[userUID];
+      final masterKey = sessionKeys[userUID];
       if (masterKey == null) {
-        throw Exception('No decryption key available. Please re-authenticate.');
+        debugPrint('❌ [ENCRYPTION] No session key available for decryption');
+        throw Exception('No decryption key available');
       }
 
-      final decryptedJson = _simpleDecrypt(encryptedData, masterKey);
-      return jsonDecode(decryptedJson);
+      final decryptedJson = simpleDecrypt(encryptedData, masterKey);
+      final result = jsonDecode(decryptedJson) as Map<String, dynamic>;
+      debugPrint('✅ [ENCRYPTION] Data decrypted successfully');
+      return result;
     } catch (e) {
-      rethrow;
+      debugPrint('❌ [ENCRYPTION] Decryption failed: $e');
+      throw Exception('Failed to decrypt data: ${e.toString()}');
     }
   }
 
-  // Simple XOR encryption (you can replace with AES for production)
-  static String _simpleEncrypt(String data, String key) {
+  // Simple XOR encryption
+  static String simpleEncrypt(String data, String key) {
     final dataBytes = utf8.encode(data);
     final keyBytes = base64.decode(key);
     final encrypted = <int>[];
@@ -152,7 +301,7 @@ class EncryptionService {
     return base64.encode(encrypted);
   }
 
-  static String _simpleDecrypt(String encryptedData, String key) {
+  static String simpleDecrypt(String encryptedData, String key) {
     final encryptedBytes = base64.decode(encryptedData);
     final keyBytes = base64.decode(key);
     final decrypted = <int>[];
@@ -164,105 +313,190 @@ class EncryptionService {
     return utf8.decode(decrypted);
   }
 
-  // Clear session (logout)
+  // Session management
   static void clearSession(String userUID) {
-    _sessionKeys.remove(userUID);
+    sessionKeys.remove(userUID);
+    debugPrint('🗑️ [ENCRYPTION] Session cleared');
   }
 
-  // Check if user has encryption setup
-  static Future<bool> hasEncryptionSetup(String userUID) async {
-    final deviceKey = await _secureStorage.read(key: 'device_key_$userUID');
-    return deviceKey != null;
+  static bool hasEncryptionSetup(String userUID) {
+    // Quick check - if we have a session key, encryption is set up
+    if (sessionKeys.containsKey(userUID)) return true;
+
+    // Otherwise would need async check, but for simplicity return false
+    return false;
   }
 
+  // Restore encryption session from Firebase with local cache fallback
   static Future<bool> restoreEncryptionSession(String userUID) async {
     try {
-
-      // Check if we already have a session key
-      if (_sessionKeys.containsKey(userUID)) {
+      if (sessionKeys.containsKey(userUID)) {
+        debugPrint('✅ [ENCRYPTION] Session already exists');
         return true;
       }
 
-      // Try to restore from secure storage
-      final deviceKey = await _secureStorage.read(key: 'device_key_$userUID');
-      final encryptedMasterKey = await _secureStorage.read(
-        key: 'master_key_$userUID',
-      );
+      // Try local cache first
+      try {
+        final cachedEncryptedKey = await secureStorage.read(
+          key: 'cached_masterkey_$userUID',
+        );
+        final cachedSalt = await secureStorage.read(
+          key: 'cached_salt_$userUID',
+        );
 
-      if (deviceKey != null && encryptedMasterKey != null) {
+        if (cachedEncryptedKey != null && cachedSalt != null) {
+          final masterKey = simpleDecrypt(cachedEncryptedKey, cachedSalt);
+          if (isValidKey(masterKey)) {
+            sessionKeys[userUID] = masterKey;
+            debugPrint('✅ [ENCRYPTION] Session restored from local cache');
+            return true;
+          }
+        }
+      } catch (e) {
+        debugPrint('⚠️ [ENCRYPTION] Local cache failed, trying Firebase: $e');
+      }
+
+      // Try Firebase Database
+      final encryptedKeySnapshot = await FirebaseDatabase.instance
+          .ref('users/$userUID/security/encrypted_master_key')
+          .get();
+
+      final deviceSaltSnapshot = await FirebaseDatabase.instance
+          .ref('users/$userUID/security/device_salt')
+          .get();
+
+      if (encryptedKeySnapshot.exists && deviceSaltSnapshot.exists) {
         try {
-          final masterKey = _simpleDecrypt(encryptedMasterKey, deviceKey);
+          final encryptedMasterKey = encryptedKeySnapshot.value.toString();
+          final deviceSalt = deviceSaltSnapshot.value.toString();
 
-          // Validate the restored key by attempting a test operation
-          if (_isValidKey(masterKey)) {
-            _sessionKeys[userUID] = masterKey;
+          final masterKey = simpleDecrypt(encryptedMasterKey, deviceSalt);
+
+          if (isValidKey(masterKey)) {
+            sessionKeys[userUID] = masterKey;
+
+            // Update local cache
+            await secureStorage.write(
+              key: 'cached_masterkey_$userUID',
+              value: encryptedMasterKey,
+            );
+            await secureStorage.write(
+              key: 'cached_salt_$userUID',
+              value: deviceSalt,
+            );
+
+            debugPrint(
+              '✅ [ENCRYPTION] Session restored successfully from Firebase',
+            );
             return true;
           }
         } catch (e) {
-          // Clear corrupted keys
-          await _clearCorruptedKeys(userUID);
+          debugPrint('❌ [ENCRYPTION] Failed to decrypt stored key: $e');
         }
       }
+
+      debugPrint('❌ [ENCRYPTION] No valid stored session found');
       return false;
     } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Error restoring session: $e');
       return false;
     }
   }
 
-  static bool _isValidKey(String key) {
+  // Helper methods
+  static bool isValidKey(String key) {
     try {
-      // Key should be a valid base64 string with reasonable length
       final decoded = base64.decode(key);
-      return decoded.length >= 16; // Minimum reasonable key length
+      return decoded.length >= 16;
     } catch (e) {
       return false;
     }
   }
 
-  static Future<void> _clearCorruptedKeys(String userUID) async {
+  // Clear stored keys from both Firebase and local cache
+  static Future<void> clearStoredKeys(String userUID) async {
     try {
-      await _secureStorage.delete(key: 'device_key_$userUID');
-      await _secureStorage.delete(key: 'master_key_$userUID');
+      // Clear from Firebase Database
+      await FirebaseDatabase.instance.ref('users/$userUID/security').remove();
+
+      // Clear from local cache
+      await secureStorage.delete(key: 'cached_masterkey_$userUID');
+      await secureStorage.delete(key: 'cached_salt_$userUID');
+
+      // Clear session
+      sessionKeys.remove(userUID);
+
+      debugPrint('🗑️ [ENCRYPTION] All stored keys cleared');
     } catch (e) {
-      // Ignore errors during cleanup
+      debugPrint('❌ [ENCRYPTION] Error clearing stored keys: $e');
     }
-  }
-
-  static bool isSessionHealthy(String userUID) {
-    if (!_sessionKeys.containsKey(userUID)) {
-      return false;
-    }
-
-    final key = _sessionKeys[userUID];
-    return key != null && _isValidKey(key);
   }
 
   static Future<bool> ensureSessionReady(String userUID) async {
+    if (isSessionReady(userUID)) return true;
+    return await restoreEncryptionSession(userUID);
+  }
+
+  static bool isSessionReady(String userUID) {
+    return sessionKeys.containsKey(userUID);
+  }
+
+  // Sync encryption key across all user devices
+  static Future<void> syncEncryptionKeyAcrossDevices(String userUID) async {
     try {
-      // Check if session is already ready
-      if (isSessionReady(userUID)) {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) return;
+
+      // Get the master key from current session
+      final masterKey = sessionKeys[userUID];
+      if (masterKey == null) return;
+
+      // Store in Firebase with current timestamp
+      await _storeKeyInFirebase(userUID, masterKey);
+
+      debugPrint('✅ [ENCRYPTION] Key synced across devices');
+    } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Failed to sync key across devices: $e');
+    }
+  }
+
+  // Check if key needs to be synced from another device
+  static Future<bool> checkForKeyUpdates(String userUID) async {
+    try {
+      // Check if there's a key in Firebase and compare with local cache
+      final firebaseSnapshot = await FirebaseDatabase.instance
+          .ref('users/$userUID/security/encrypted_master_key')
+          .get();
+
+      await FirebaseDatabase.instance
+          .ref('users/$userUID/security/last_key_sync')
+          .get();
+
+      if (firebaseSnapshot.exists && !sessionKeys.containsKey(userUID)) {
+        // Key exists in Firebase but not in current session
+        await restoreEncryptionSession(userUID);
         return true;
       }
 
-      // Try to restore session
-      return await restoreEncryptionSession(userUID);
+      return false;
     } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Failed to check for key updates: $e');
       return false;
     }
   }
 
-  static bool isSessionReady(String userUID) {
-    final hasSession = _sessionKeys.containsKey(userUID);
-    return hasSession;
-  }
-
-  static Future<bool> tryRestoreGoogleUserSession(String userUID) async {
+  // Force refresh key from Firebase (useful when logging in from new device)
+  static Future<bool> forceRefreshFromFirebase(String userUID) async {
     try {
+      // Clear local cache to force Firebase read
+      await secureStorage.delete(key: 'cached_masterkey_$userUID');
+      await secureStorage.delete(key: 'cached_salt_$userUID');
+      sessionKeys.remove(userUID);
 
-      // Generate Google password (you'll need the user object)
-      // This should be called from AuthProvider with the actual user object
-      return true; // Implementation depends on your existing encryption service
+      // Restore from Firebase
+      return await restoreEncryptionSession(userUID);
     } catch (e) {
+      debugPrint('❌ [ENCRYPTION] Failed to force refresh from Firebase: $e');
       return false;
     }
   }
