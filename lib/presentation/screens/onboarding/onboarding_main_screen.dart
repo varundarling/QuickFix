@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/presentation/screens/onboarding/welcome_screen.dart';
 import 'package:quickfix/presentation/screens/onboarding/customer_explanation_screen.dart';
@@ -22,24 +23,21 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
   final PageController _pageController = PageController();
   int _currentPage = 0;
 
-  final List<Widget> _pages = [
-    const WelcomeScreen(),
-    const CustomerExplanationScreen(),
-    const ProviderExplanationScreen(),
-    const HowItWorksScreen(),
-    const SafetyScreen(),
+  final List<Widget> _pages = const [
+    WelcomeScreen(),
+    CustomerExplanationScreen(),
+    ProviderExplanationScreen(),
+    HowItWorksScreen(),
+    SafetyScreen(),
   ];
 
   Future<void> _finishOnboarding() async {
-    // Mark onboarding as completed
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSeenOnboarding', true);
 
-    // Navigate to your existing UserTypeSelectionScreen
     if (widget.onComplete != null) {
       widget.onComplete!();
     } else {
-      // Fallback navigation if no callback provided
       if (context.mounted) {
         context.go('/user-type-selection');
       }
@@ -49,97 +47,131 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      // 👇 Give a solid background so no black shows behind pages
+      backgroundColor: AppColors.primary,
       body: Stack(
         children: [
-          // Background with QuickFix branding
-          Container(
-            decoration: const BoxDecoration(
-              gradient: AppColors.primaryGradient,
-            ),
-          ),
-
+          // 🔹 Fullscreen PageView behind
           PageView(
             controller: _pageController,
+            // 👇 Remove bouncing/overscroll so you can't "pull" to a black page
+            physics: const ClampingScrollPhysics(),
             onPageChanged: (int page) {
-              setState(() {
-                _currentPage = page;
-              });
+              setState(() => _currentPage = page);
             },
             children: _pages,
           ),
 
-          // Navigation controls
+          // 🔹 Floating bottom controls (Skip, dots, Next, helper text)
           Positioned(
-            bottom: 50,
             left: 0,
             right: 0,
-            child: _buildBottomNavigation(),
-          ),
-        ],
-      ),
-    );
-  }
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: const EdgeInsets.only(left: 16, right: 16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Row: Skip  •  Dots  •  Next
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        // Transparent Skip
+                        TextButton(
+                          onPressed: _finishOnboarding,
+                          style: TextButton.styleFrom(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            foregroundColor: Colors.white.withOpacity(0.85),
+                          ),
+                          child: const Text(
+                            'Skip',
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
 
-  Widget _buildBottomNavigation() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          // Skip button
-          TextButton(
-            onPressed: () => _finishOnboarding(),
-            child: const Text(
-              'Skip',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
+                        // Dots
+                        Row(
+                          children: List.generate(
+                            _pages.length,
+                            (index) => AnimatedContainer(
+                              duration: const Duration(milliseconds: 220),
+                              curve: Curves.easeOut,
+                              width: _currentPage == index ? 18 : 8,
+                              height: 8,
+                              margin: const EdgeInsets.symmetric(horizontal: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(
+                                  _currentPage == index ? 0.9 : 0.45,
+                                ),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                            ),
+                          ),
+                        ),
 
-          // Page indicators
-          Row(
-            children: List.generate(
-              _pages.length,
-              (index) => Container(
-                width: _currentPage == index ? 12 : 8,
-                height: 8,
-                margin: const EdgeInsets.symmetric(horizontal: 4),
-                decoration: BoxDecoration(
-                  color: _currentPage == index
-                      ? Colors.white
-                      : Colors.white.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(4),
+                        // Semi-transparent "glass" Next/Get started
+                        GestureDetector(
+                          onTap: () {
+                            if (_currentPage == _pages.length - 1) {
+                              _finishOnboarding();
+                            } else {
+                              _pageController.nextPage(
+                                duration: const Duration(milliseconds: 300),
+                                curve: Curves.easeInOut,
+                              );
+                            }
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 18,
+                              vertical: 6,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.18),
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.35),
+                                width: 1.2,
+                              ),
+                            ),
+                            child: Text(
+                              _currentPage == _pages.length - 1
+                                  ? 'Get started'
+                                  : 'Next',
+                              style: const TextStyle(
+                                fontSize: 14,
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 4),
+
+                    // Floating helper text
+                    Text(
+                      'Swipe left or tap Next to continue.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.white.withOpacity(0.95),
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-            ),
-          ),
-
-          // Next/Done button
-          ElevatedButton(
-            onPressed: () {
-              if (_currentPage == _pages.length - 1) {
-                _finishOnboarding();
-              } else {
-                _pageController.nextPage(
-                  duration: const Duration(milliseconds: 300),
-                  curve: Curves.easeInOut,
-                );
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: AppColors.primary,
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(25),
-              ),
-            ),
-            child: Text(
-              _currentPage == _pages.length - 1 ? 'Get Started' : 'Next',
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
           ),
         ],

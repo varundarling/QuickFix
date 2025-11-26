@@ -1,249 +1,217 @@
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 
-class WelcomeScreen extends StatefulWidget {
+class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
 
   @override
-  State<WelcomeScreen> createState() => _WelcomeScreenState();
-}
-
-class _WelcomeScreenState extends State<WelcomeScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _logoController;
-  late AnimationController _textController;
-  late Animation<double> _logoAnimation;
-  late Animation<double> _textAnimation;
-
-  @override
-  void initState() {
-    super.initState();
-    _logoController = AnimationController(
-      duration: const Duration(seconds: 1),
-      vsync: this,
-    );
-    _textController = AnimationController(
-      duration: const Duration(milliseconds: 800),
-      vsync: this,
-    );
-
-    _logoAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _logoController, curve: Curves.elasticOut),
-    );
-
-    _textAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _textController, curve: Curves.easeOutBack),
-    );
-
-    _startAnimations();
-  }
-
-  void _startAnimations() {
-    if (mounted) {
-      _logoController.forward();
-
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _textController.forward();
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _logoController.dispose();
-    _textController.dispose();
-    super.dispose();
-  }
-
-  double _safeOpacity(double value) {
-    return value.clamp(0.0, 1.0).toDouble();
-  }
-
-  @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
+    final primaryTextColor = Colors.white;
+    final secondaryTextColor = Colors.white.withOpacity(0.9);
+
     return Container(
-      // ✅ UPDATED: Blue and white theme
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [
-            Colors.white,
-            Color(0xFFF8FAFF), // Very light blue
-            AppColors.primary,
-          ],
-          stops: [0.0, 0.3, 1.0],
+      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const SizedBox(height: 12),
+
+                    // 👑 Top hero + heading
+                    Column(
+                      children: [
+                        _buildHeroLogo(),
+                        const SizedBox(height: 24),
+                        Text(
+                          'Welcome to QuickFix',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 30,
+                            fontWeight: FontWeight.bold,
+                            color: primaryTextColor,
+                          ),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          'All your home services in one app. Fast, reliable, and hassle-free.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15.5,
+                            color: secondaryTextColor,
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+
+                    // 🌟 Simple feature chips
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Here’s what you can do:',
+                          style: TextStyle(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: primaryTextColor.withOpacity(0.95),
+                          ),
+                        ),
+                        const SizedBox(height: 12),
+                        _featureChip(
+                          context,
+                          icon: Icons.flash_on,
+                          title: 'Book in seconds',
+                          subtitle: 'Choose a service and time that suits you.',
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 10),
+                        _featureChip(
+                          context,
+                          icon: Icons.verified_user,
+                          title: 'Trusted professionals',
+                          subtitle: 'See ratings and reviews before booking.',
+                          isDark: isDark,
+                        ),
+                        const SizedBox(height: 10),
+                        _featureChip(
+                          context,
+                          icon: Icons.home_repair_service_outlined,
+                          title: 'Everything in one place',
+                          subtitle: 'Repairs, cleaning, maintenance & more.',
+                          isDark: isDark,
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 40), // space above bottom nav
+                  ],
+                ),
+              ),
+            );
+          },
         ),
       ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            children: [
-              // const Spacer(flex: 1),
+    );
+  }
 
-              // Animated Logo
-              AnimatedBuilder(
-                animation: _logoAnimation,
-                builder: (context, child) {
-                  return Transform.scale(
-                    scale: _safeOpacity(_logoAnimation.value),
-                    child: Container(
-                      width: 140,
-                      height: 140,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(35),
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 25,
-                            offset: const Offset(0, 10),
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.build_circle,
-                        size: 70,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const SizedBox(height: 30),
-
-              // Animated Text
-              AnimatedBuilder(
-                animation: _textAnimation,
-                builder: (context, child) {
-                  final opacityValue = _safeOpacity(_textAnimation.value);
-
-                  return Transform.translate(
-                    offset: Offset(0, 30 * (1 - opacityValue)),
-                    child: Opacity(
-                      opacity: opacityValue,
-                      child: Column(
-                        children: [
-                          // App Name
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 30,
-                              vertical: 15,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.primary,
-                              borderRadius: BorderRadius.circular(25),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: AppColors.primary.withValues(alpha: 0.3),
-                                  blurRadius: 15,
-                                  offset: const Offset(0, 8),
-                                ),
-                              ],
-                            ),
-                            child: const Text(
-                              'QuickFix',
-                              style: TextStyle(
-                                fontSize: 42,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                letterSpacing: 1,
-                              ),
-                            ),
-                          ),
-
-                          const SizedBox(height: 20),
-
-                          // Tagline
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 25,
-                              vertical: 12,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: AppColors.primary.withValues(alpha: 0.2),
-                                width: 1.5,
-                              ),
-                            ),
-                            child: Text(
-                              'Your Home Services Marketplace',
-                              style: TextStyle(
-                                fontSize: 16,
-                                color: AppColors.primary.withValues(alpha: 0.8),
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
-                },
-              ),
-
-              const Spacer(),
-
-              // Welcome Card
-              Container(
-                padding: const EdgeInsets.all(30),
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(25),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.primary.withValues(alpha: 0.1),
-                      blurRadius: 20,
-                      offset: const Offset(0, 10),
-                    ),
-                  ],
+  /// 🧩 Hero with BIG APP LOGO inside a glowing circle
+  Widget _buildHeroLogo() {
+    return SizedBox(
+      height: 180,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // Outer glow circle
+          Container(
+            width: 170,
+            height: 170,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white,
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 16,
+                  offset: const Offset(0, 6),
                 ),
-                child: Column(
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: AppColors.primary.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(20),
-                      ),
-                      child: const Icon(
-                        Icons.waving_hand,
-                        size: 32,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    const Text(
-                      'Welcome to QuickFix...!',
-                      style: TextStyle(
-                        fontSize: 26,
-                        fontWeight: FontWeight.bold,
-                        color: AppColors.primary,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      'Connect with trusted professionals or grow your business by offering services in your community.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 16,
-                        color: AppColors.primary.withValues(alpha: 0.7),
-                        height: 1.5,
-                      ),
-                    ),
-                  ],
+              ],
+            ),
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: ClipOval(
+                child: Image.asset(
+                  // 🔴 Replace with your real asset path
+                  'assets/logo/app_logo.png',
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    // Fallback icon so app doesn't crash if asset missing in dev
+                    return const Icon(
+                      Icons.home_repair_service_outlined,
+                      size: 60,
+                      color: AppColors.primary,
+                    );
+                  },
                 ),
               ),
-              const Spacer(),
-            ],
+            ),
           ),
-        ),
+        ],
+      ),
+    );
+  }
+
+  // 💡 Simple, clean feature chip
+  Widget _featureChip(
+    BuildContext context, {
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required bool isDark,
+  }) {
+    final bgColor = isDark
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.96);
+    final borderColor = isDark
+        ? Colors.white.withOpacity(0.12)
+        : AppColors.primary.withOpacity(0.12);
+    final mainTextColor = isDark
+        ? Colors.white
+        : Colors.black.withOpacity(0.85);
+    final subTextColor = mainTextColor.withOpacity(0.9);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: bgColor,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: borderColor),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, size: 18, color: AppColors.primary),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: mainTextColor,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 12.5,
+                    color: subTextColor,
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -19,23 +19,20 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: const Duration(milliseconds: 1200),
+      duration: const Duration(milliseconds: 900),
       vsync: this,
     );
 
-    _fadeAnimation = Tween<double>(
-      begin: 0.0,
-      end: 1.0,
-    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
-
+    _fadeAnimation = CurvedAnimation(
+      parent: _controller,
+      curve: Curves.easeOut,
+    );
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.3),
+      begin: const Offset(0, 0.15),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    if (mounted) {
-      _controller.forward();
-    }
+    _controller.forward();
   }
 
   @override
@@ -44,242 +41,202 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
     super.dispose();
   }
 
-  double _safeOpacity(double value) {
-    return value.clamp(0.0, 1.0).toDouble();
-  }
+  double _safe(double v) => v.clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // ✅ UPDATED: Blue and white theme
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
-            Color(0xFF4A90E2), // Lighter blue
-            Colors.white,
-          ],
-          stops: [0.0, 0.6, 1.0],
-        ),
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: AnimatedBuilder(
-            animation: _controller,
-            builder: (context, child) {
-              return Opacity(
-                opacity: _safeOpacity(_fadeAnimation.value),
-                child: SlideTransition(
-                  position: _slideAnimation,
-                  child: Column(
-                    children: [
-                      // const Spacer(),
-                      const SizedBox(height: 10,),
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark
+        ? Colors.black.withOpacity(0.75)
+        : Colors.white.withOpacity(0.97);
 
-                      // Hero illustration
-                      Container(
-                        width: 220,
-                        height: 220,
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(110),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            width: 3,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              blurRadius: 25,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
+    return Container(
+      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: AnimatedBuilder(
+          animation: _controller,
+          builder: (_, __) {
+            return Opacity(
+              opacity: _safe(_fadeAnimation.value),
+              child: SlideTransition(
+                position: _slideAnimation,
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return SingleChildScrollView(
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(
+                          minHeight: constraints.maxHeight,
                         ),
-                        child: Stack(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
-                            // Main customer icon
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(25),
+                            const SizedBox(height: 6),
+
+                            // Hero + title
+                            Column(
+                              children: [
+                                _buildHero(),
+                                const SizedBox(height: 20),
+                                const Text(
+                                  'Need help at home?',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 26,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
                                 ),
-                                child: const Icon(
-                                  Icons.person_outline,
-                                  size: 60,
-                                  color: AppColors.primary,
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Find electricians, plumbers, cleaners and more – all in one place.',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    color: Colors.white.withOpacity(0.9),
+                                    height: 1.4,
+                                  ),
                                 ),
-                              ),
+                              ],
                             ),
 
-                            // Floating service icons
-                            Positioned(
-                              top: 25,
-                              right: 35,
-                              child: _buildFloatingIcon(
-                                Icons.cleaning_services,
-                                0.0,
-                              ),
+                            // 🔹 Each service in its own box/card
+                            Column(
+                              children: [
+                                _buildServiceCard(
+                                  context: context,
+                                  cardColor: cardColor,
+                                  icon: Icons.search,
+                                  title: 'Browse services',
+                                  subtitle:
+                                      'Choose the right service for your home.',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildServiceCard(
+                                  context: context,
+                                  cardColor: cardColor,
+                                  icon: Icons.calendar_today,
+                                  title: 'Book in seconds',
+                                  subtitle:
+                                      'Pick a date and time that works for you.',
+                                ),
+                                const SizedBox(height: 12),
+                                _buildServiceCard(
+                                  context: context,
+                                  cardColor: cardColor,
+                                  icon: Icons.verified_user,
+                                  title: 'Trust your provider',
+                                  subtitle:
+                                      'See ratings and reviews before you book.',
+                                ),
+                              ],
                             ),
-                            Positioned(
-                              bottom: 35,
-                              left: 25,
-                              child: _buildFloatingIcon(
-                                Icons.electrical_services,
-                                0.2,
-                              ),
-                            ),
-                            Positioned(
-                              top: 60,
-                              left: 20,
-                              child: _buildFloatingIcon(Icons.plumbing, 0.4),
-                            ),
-                            Positioned(
-                              bottom: 25,
-                              right: 20,
-                              child: _buildFloatingIcon(Icons.carpenter, 0.6),
-                            ),
+
+                            const SizedBox(height: 36),
                           ],
                         ),
                       ),
-
-                      const SizedBox(height: 30),
-
-                      // Title and description
-                      const Text(
-                        'Need Home Services?',
-                        style: TextStyle(
-                          fontSize: 32,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      Text(
-                        'Book trusted professionals for all your home service needs',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.white.withValues(alpha: 0.9),
-                          height: 1.4,
-                        ),
-                      ),
-
-                      const SizedBox(height: 30),
-
-                      // Feature cards
-                      _buildFeatureCard(
-                        Icons.search,
-                        'Browse Services',
-                        'Find the perfect service for your needs',
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      _buildFeatureCard(
-                        Icons.calendar_today,
-                        'Book Instantly',
-                        'Schedule services at your convenience',
-                      ),
-
-                      const SizedBox(height: 16),
-
-                      _buildFeatureCard(
-                        Icons.verified_user,
-                        'Trusted Professionals',
-                        'All providers are verified and rated',
-                      ),
-
-                      const Spacer(),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildFloatingIcon(IconData icon, double delay) {
-    return TweenAnimationBuilder<double>(
-      duration: Duration(milliseconds: (1000 + delay * 200).round()),
-      tween: Tween(begin: 0.0, end: 1.0),
-      builder: (context, value, child) {
-        return Transform.scale(
-          scale: _safeOpacity(value),
-          child: Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.circular(18),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.primary.withValues(alpha: 0.3),
-                  blurRadius: 8,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Icon(icon, size: 18, color: Colors.white),
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildFeatureCard(IconData icon, String title, String description) {
+  Widget _buildHero() {
     return Container(
-      padding: const EdgeInsets.all(20),
+      width: 150,
+      height: 150,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(110),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.18),
+          width: 3,
+        ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
+            color: AppColors.primary.withOpacity(0.25),
+            blurRadius: 24,
+            offset: const Offset(0, 10),
           ),
         ],
       ),
+      child: Stack(
+        children: [
+          Center(
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.08),
+                borderRadius: BorderRadius.circular(24),
+              ),
+              child: const Icon(
+                Icons.person_outline,
+                size: 60,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 🔹 One card per service (separate boxes like earlier)
+  Widget _buildServiceCard({
+    required BuildContext context,
+    required Color cardColor,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
+      ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 50,
-            height: 50,
+            width: 34,
+            height: 34,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(icon, color: AppColors.primary, size: 24),
+            child: Icon(icon, size: 20, color: AppColors.primary),
           ),
-          const SizedBox(width: 16),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  description,
+                  subtitle,
                   style: TextStyle(
-                    fontSize: 14,
-                    color: AppColors.primary.withValues(alpha: 0.7),
+                    fontSize: 13,
+                    color: textColor.withOpacity(0.95),
+                    height: 1.3,
                   ),
                 ),
               ],

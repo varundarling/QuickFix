@@ -1,404 +1,188 @@
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 
-class SafetyScreen extends StatefulWidget {
+class SafetyScreen extends StatelessWidget {
   const SafetyScreen({super.key});
 
   @override
-  State<SafetyScreen> createState() => _SafetyScreenState();
-}
-
-class _SafetyScreenState extends State<SafetyScreen>
-    with TickerProviderStateMixin {
-  late AnimationController _shieldController;
-  late AnimationController _itemsController;
-  late Animation<double> _shieldAnimation;
-  late List<Animation<double>> _itemAnimations;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _shieldController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
-      vsync: this,
-    );
-
-    _itemsController = AnimationController(
-      duration: const Duration(milliseconds: 1200),
-      vsync: this,
-    );
-
-    _shieldAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(parent: _shieldController, curve: Curves.elasticOut),
-    );
-
-    _itemAnimations = List.generate(4, (index) {
-      final double begin = (index * 0.15).clamp(0.0, 0.8);
-      final double end = (begin + 0.6).clamp(begin + 0.1, 1.0);
-
-      return Tween<double>(begin: 0.0, end: 1.0).animate(
-        CurvedAnimation(
-          parent: _itemsController,
-          curve: Interval(begin, end, curve: Curves.easeOutBack),
-        ),
-      );
-    });
-
-    if (mounted) {
-      _shieldController.forward();
-      Future.delayed(const Duration(milliseconds: 500), () {
-        if (mounted) {
-          _itemsController.forward();
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    _shieldController.dispose();
-    _itemsController.dispose();
-    super.dispose();
-  }
-
-  double _safeOpacity(double value) {
-    return value.clamp(0.0, 1.0).toDouble();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    final screenHeight = MediaQuery.of(context).size.height;
-    final screenWidth = MediaQuery.of(context).size.width;
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final cardColor = isDark
+        ? Colors.black.withOpacity(0.75)
+        : Colors.white.withOpacity(0.97);
 
     return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF1E40AF), AppColors.primary, Color(0xFFF1F5F9)],
-          stops: [0.0, 0.5, 1.0],
-        ),
-      ),
-      child: SafeArea(
-        child: SingleChildScrollView(
-          // ✅ CRITICAL: Enable scrolling for entire screen
-          padding: EdgeInsets.symmetric(
-            horizontal: screenWidth * 0.05, // ✅ RESPONSIVE: 5% of screen width
-            vertical: 16, // ✅ REDUCED: from 24 to 16
-          ),
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minHeight:
-                  screenHeight -
-                  120, // ✅ RESPONSIVE: Minimum height based on screen
-            ),
-            child: Column(
-              children: [
-                SizedBox(
-                  height: screenHeight * 0.02,
-                ), // ✅ RESPONSIVE: 2% of screen height
-                // Main shield animation
-                AnimatedBuilder(
-                  animation: _shieldAnimation,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: _safeOpacity(_shieldAnimation.value),
-                      child: Container(
-                        width:
-                            screenWidth *
-                            0.4, // ✅ RESPONSIVE: 40% of screen width
-                        height:
-                            screenWidth *
-                            0.4, // ✅ RESPONSIVE: Square based on width
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(
-                            screenWidth * 0.2,
-                          ),
-                          border: Border.all(
-                            color: AppColors.primary.withValues(alpha: 0.2),
-                            width: 3,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.primary.withValues(alpha: 0.2),
-                              blurRadius: 20,
-                              offset: const Offset(0, 10),
-                            ),
-                          ],
-                        ),
-                        child: Stack(
-                          children: [
-                            Center(
-                              child: Container(
-                                padding: const EdgeInsets.all(20),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withValues(
-                                    alpha: 0.1,
-                                  ),
-                                  borderRadius: BorderRadius.circular(25),
-                                ),
-                                child: Icon(
-                                  Icons.verified_user,
-                                  size:
-                                      screenWidth *
-                                      0.15, // ✅ RESPONSIVE: 15% of screen width
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                            ),
-
-                            // Security badges
-                            Positioned(
-                              top: 15,
-                              right: 15,
-                              child: Container(
-                                padding: const EdgeInsets.all(6),
-                                decoration: BoxDecoration(
-                                  color: Colors.green,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: const Icon(
-                                  Icons.security,
-                                  size: 16,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-
-                            Positioned(
-                              bottom: 15,
-                              left: 15,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary,
-                                  borderRadius: BorderRadius.circular(10),
-                                ),
-                                child: const Icon(
-                                  Icons.check_circle,
-                                  size: 14,
-                                  color: Colors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-                SizedBox(
-                  height: screenHeight * 0.04,
-                ), // ✅ RESPONSIVE: 4% of screen height
-                // Title
-                const Text(
-                  'Your Safety First',
-                  style: TextStyle(
-                    fontSize: 28, // ✅ REDUCED: from 32 to 28
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                ),
-
-                SizedBox(
-                  height: screenHeight * 0.015,
-                ), // ✅ RESPONSIVE: 1.5% of screen height
-
-                Text(
-                  'We ensure every interaction is safe and secure',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    fontSize: 16, // ✅ REDUCED: from 18 to 16
-                    color: Colors.white.withValues(alpha: 0.9),
-                  ),
-                ),
-
-                SizedBox(
-                  height: screenHeight * 0.04,
-                ), // ✅ RESPONSIVE: 4% of screen height
-                // Safety features
-                Column(
+      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return SingleChildScrollView(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    AnimatedBuilder(
-                      animation: _itemAnimations[0],
-                      builder: (context, child) => Transform.translate(
-                        offset: Offset(
-                          50 * (1 - _safeOpacity(_itemAnimations[0].value)),
-                          0,
-                        ), // ✅ REDUCED: from 100 to 50
-                        child: Opacity(
-                          opacity: _safeOpacity(_itemAnimations[0].value),
-                          child: _buildSafetyItem(
-                            Icons.verified,
-                            'Identity Verified',
-                            'All service providers undergo thorough verification',
+                    const SizedBox(height: 12),
+
+                    // ⭐ NEW – Circular hero like other screens
+                    Column(
+                      children: [
+                        Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: Colors.white,
+                            border: Border.all(
+                              color: AppColors.primary.withOpacity(0.18),
+                              width: 3,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.primary.withOpacity(0.25),
+                                blurRadius: 22,
+                                offset: const Offset(0, 10),
+                              ),
+                            ],
+                          ),
+                          child: Center(
+                            child: Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: AppColors.primary.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(22),
+                              ),
+                              child: const Icon(
+                                Icons.shield_outlined,
+                                size: 48,
+                                color: AppColors.primary,
+                              ),
+                            ),
                           ),
                         ),
-                      ),
-                    ),
 
-                    SizedBox(
-                      height: screenHeight * 0.015,
-                    ), // ✅ RESPONSIVE: 1.5% of screen height
+                        const SizedBox(height: 18),
 
-                    AnimatedBuilder(
-                      animation: _itemAnimations[1],
-                      builder: (context, child) => Transform.translate(
-                        offset: Offset(
-                          -50 * (1 - _safeOpacity(_itemAnimations[1].value)),
-                          0,
-                        ), // ✅ REDUCED: from -100 to -50
-                        child: Opacity(
-                          opacity: _safeOpacity(_itemAnimations[1].value),
-                          child: _buildSafetyItem(
-                            Icons.star_rate,
-                            'Rated & Reviewed',
-                            'Real reviews from real customers you can trust',
+                        const Text(
+                          'Your safety matters',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
                           ),
                         ),
-                      ),
-                    ),
 
-                    SizedBox(height: screenHeight * 0.015),
+                        const SizedBox(height: 10),
 
-                    AnimatedBuilder(
-                      animation: _itemAnimations[2],
-                      builder: (context, child) => Transform.translate(
-                        offset: Offset(
-                          50 * (1 - _safeOpacity(_itemAnimations[2].value)),
-                          0,
-                        ),
-                        child: Opacity(
-                          opacity: _safeOpacity(_itemAnimations[2].value),
-                          child: _buildSafetyItem(
-                            Icons.payment,
-                            'Secure Payments',
-                            'Your payment information is always protected',
+                        Text(
+                          'We take multiple steps to keep every booking safe and transparent.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 15,
+                            color: Colors.white.withOpacity(0.9),
+                            height: 1.4,
                           ),
                         ),
-                      ),
+                      ],
                     ),
 
-                    // SizedBox(height: screenHeight * 0.015),
+                    // Safety Points (Cards)
+                    Column(
+                      children: [
+                        _safetyCard(
+                          context: context,
+                          cardColor: cardColor,
+                          icon: Icons.verified_user,
+                          title: 'Verified professionals',
+                          subtitle:
+                              'Every provider is verified before joining QuickFix.',
+                        ),
+                        const SizedBox(height: 12),
 
-                    // AnimatedBuilder(
-                    //   animation: _itemAnimations[3],
-                    //   builder: (context, child) => Transform.translate(
-                    //     offset: Offset(
-                    //       -50 * (1 - _safeOpacity(_itemAnimations[3].value)),
-                    //       0,
-                    //     ),
-                    //     child: Opacity(
-                    //       opacity: _safeOpacity(_itemAnimations[3].value),
-                    //       child: _buildSafetyItem(
-                    //         Icons.support_agent,
-                    //         '24/7 Support',
-                    //         'Our team is always here to help when you need us',
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
+                        _safetyCard(
+                          context: context,
+                          cardColor: cardColor,
+                          icon: Icons.star_rate_rounded,
+                          title: 'Ratings & reviews',
+                          subtitle:
+                              'See what other customers say before you book.',
+                        ),
+                        const SizedBox(height: 12),
+
+                        _safetyCard(
+                          context: context,
+                          cardColor: cardColor,
+                          icon: Icons.payments,
+                          title: 'Transparent payments',
+                          subtitle:
+                              'Know the charges upfront before confirming a booking.',
+                        ),
+                      ],
+                    ),
+
+                    const SizedBox(height: 36),
                   ],
                 ),
-
-                SizedBox(
-                  height: screenHeight * 0.04,
-                ), // ✅ RESPONSIVE: 4% of screen height
-
-                // Final CTA and trust badge
-                // Column(
-                //   children: [
-                //     Container(
-                //       width: double.infinity,
-                //       padding: const EdgeInsets.symmetric(
-                //         vertical: 16,
-                //       ), // ✅ REDUCED: from 18 to 16
-                //       decoration: BoxDecoration(
-                //         color: Colors.white,
-                //         borderRadius: BorderRadius.circular(16),
-                //         boxShadow: [
-                //           BoxShadow(
-                //             color: AppColors.primary.withValues(alpha: 0.2),
-                //             blurRadius: 15,
-                //             offset: const Offset(0, 8),
-                //           ),
-                //         ],
-                //       ),
-                //       child: TextButton(
-                //         onPressed: _finishOnboarding,
-                //         child: const Text(
-                //           'Get Started Now',
-                //           style: TextStyle(
-                //             fontSize: 18,
-                //             fontWeight: FontWeight.bold,
-                //             color: AppColors.primary,
-                //           ),
-                //         ),
-                //       ),
-                //     ),
-
-                //   ],
-                // ),
-                SizedBox(height: screenHeight * 0.02), // ✅ FINAL SPACING
-              ],
-            ),
-          ),
+              ),
+            );
+          },
         ),
       ),
     );
   }
 
-  Widget _buildSafetyItem(IconData icon, String title, String description) {
+  // 🔹 Safety card builder
+  Widget _safetyCard({
+    required BuildContext context,
+    required Color cardColor,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
+
     return Container(
-      padding: const EdgeInsets.all(16), // ✅ REDUCED: from 20 to 16
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.1),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
+        color: cardColor,
+        borderRadius: BorderRadius.circular(18),
       ),
       child: Row(
         children: [
           Container(
-            width: 45, // ✅ REDUCED: from 50 to 45
-            height: 45, // ✅ REDUCED: from 50 to 45
+            width: 32,
+            height: 32,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
+              color: AppColors.primary.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(
-              icon,
-              color: AppColors.primary,
-              size: 22, // ✅ REDUCED: from 24 to 22
-            ),
+            child: Icon(icon, size: 18, color: AppColors.primary),
           ),
-          const SizedBox(width: 14), // ✅ REDUCED: from 16 to 14
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
-                  style: const TextStyle(
-                    fontSize: 15, // ✅ REDUCED: from 16 to 15
-                    fontWeight: FontWeight.bold,
-                    color: AppColors.primary,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
                   ),
                 ),
-                const SizedBox(height: 3), // ✅ REDUCED: from 4 to 3
+                const SizedBox(height: 4),
                 Text(
-                  description,
+                  subtitle,
                   style: TextStyle(
-                    fontSize: 13, // ✅ REDUCED: from 14 to 13
-                    color: AppColors.primary.withValues(alpha: 0.7),
+                    fontSize: 13,
+                    color: textColor.withOpacity(0.95),
+                    height: 1.3,
                   ),
                 ),
               ],
