@@ -5,11 +5,13 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:quickfix/data/models/service_model.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_details_screen.dart';
 import 'package:quickfix/presentation/screens/booking/customer_booking_screen.dart';
+import 'package:quickfix/presentation/screens/booking/service_detail_screen.dart';
 import 'package:quickfix/presentation/screens/home/customer_settings_screen.dart';
 import 'package:quickfix/presentation/screens/home/favourites_screen.dart';
 import 'package:quickfix/presentation/screens/home/home_screen.dart';
@@ -158,6 +160,15 @@ class AppRouter {
             final userType =
                 state.uri.queryParameters['userType'] ?? 'customer';
             return LoginScreen(preselectedUserType: userType);
+          },
+        ),
+
+        GoRoute(
+          path: '/service-detail/:serviceId',
+          name: 'service-detail',
+          builder: (context, state) {
+            final service = state.extra as ServiceModel;
+            return ServiceDetailScreen(service: service);
           },
         ),
 

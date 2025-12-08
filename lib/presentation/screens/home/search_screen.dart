@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 import 'package:quickfix/core/services/ad_service.dart';
 import 'package:quickfix/core/utils/currency.dart';
@@ -169,7 +170,7 @@ class _SearchScreenState extends State<SearchScreen> {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
       child: InkWell(
         onTap: () {
-          // Navigate to service details or booking screen
+          // Navigate to service details screen
           _navigateToServiceDetails(service);
         },
         borderRadius: BorderRadius.circular(12),
@@ -396,20 +397,12 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
+  // ✅ NEW: Navigate to service details using GoRouter
   void _navigateToServiceDetails(ServiceModel service) {
-    // Navigate to service booking or details screen
-    // For now, just show a snackbar with service info
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Selected: ${service.name}'),
-        backgroundColor: AppColors.success,
-        duration: const Duration(seconds: 2),
-      ),
+    // Navigate to service details screen with service ID and pass service object
+    context.push(
+      '/service-detail/${service.id}',
+      extra: service, // Pass the complete service object
     );
-
-    // You can replace this with actual navigation:
-    // context.push('/service-details/${service.id}');
-    // or
-    // context.push('/book-service/${service.id}');
   }
 }

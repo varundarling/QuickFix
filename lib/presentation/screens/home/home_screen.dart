@@ -28,20 +28,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   LocationData? _currentLocation;
   bool _isRefreshing = false;
   bool _disposed = false;
+  final ScrollController _scrollController = ScrollController();
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
 
-    // ✅ REMOVED: All initialization logic - data is already preloaded from splash
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       if (!mounted || _disposed) return;
-      if (mounted) {
-        // Just get current location for UI updates
-        await _requestPermissionsOnFirstTime();
-        await _initializeLocation();
-      }
+      await _requestPermissionsOnFirstTime();
+      await _initializeLocation();
     });
   }
 
@@ -52,7 +49,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final loc = await _locationService.getCurrentLocation();
       if (!mounted || _disposed) return;
 
-      if (loc != null) {
+      if (loc != null && mounted) {
         setState(() => _currentLocation = loc);
       }
     } catch (e) {
@@ -60,7 +57,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // ✅ Manual refresh with visible animation
   Future<void> _refresh() async {
     if (_isRefreshing || !mounted || _disposed) return;
 
@@ -74,10 +70,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       if (!mounted || _disposed) return;
 
       final sp = context.read<ServiceProvider>();
-
       final loc = await _locationService.getCurrentLocation();
 
       if (!mounted || _disposed) return;
+
       if (loc != null && mounted) {
         setState(() => _currentLocation = loc);
         await sp.loadAllServices(
@@ -93,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       debugPrint('❌ [HOME] Manual refresh error: $e');
     } finally {
       if (mounted && !_disposed) {
-        // ✅ SAFETY CHECK BEFORE setState
         setState(() => _isRefreshing = false);
       }
     }
@@ -105,10 +100,8 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         prefs.getBool('home_permissions_requested') ?? false;
 
     if (!hasRequestedPermissions) {
-      // Mark as requested to prevent showing again
       await prefs.setBool('home_permissions_requested', true);
 
-      // Request native location permission
       try {
         await LocationService.instance.requestPermission();
         debugPrint('Location permission requested');
@@ -116,7 +109,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
         debugPrint('Location permission error: $e');
       }
 
-      // Request native notification permission
       try {
         await FirebaseMessaging.instance.requestPermission(
           alert: true,
@@ -130,19 +122,17 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     }
   }
 
-  // Navigate with refresh on return
   Future<void> _navigateWithRefreshOnReturn(String route) async {
     if (!mounted || _disposed) return;
 
     await context.push(route);
 
-    if (mounted) {
+    if (mounted && !_disposed) {
       debugPrint('🔄 [HOME] Refreshing after return from $route');
       _silentRefresh();
     }
   }
 
-  // Silent refresh that doesn't affect UI
   Future<void> _silentRefresh() async {
     if (!mounted || _disposed) return;
 
@@ -150,13 +140,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final sp = context.read<ServiceProvider>();
       final loc = await _locationService.getCurrentLocation();
 
-      if (loc != null && mounted) {
+      if (loc != null && mounted && !_disposed) {
         setState(() => _currentLocation = loc);
         await sp.loadAllServices(
           userLat: loc.latitude!,
           userLng: loc.longitude!,
         );
-      } else if (mounted) {
+      } else if (mounted && !_disposed) {
         await sp.loadAllServices(userLat: 0, userLng: 0);
       }
     } catch (e) {
@@ -167,7 +157,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
-    if (state == AppLifecycleState.resumed && mounted) {
+    if (state == AppLifecycleState.resumed && mounted && !_disposed) {
       _silentRefresh();
     }
   }
@@ -177,103 +167,95 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (_disposed) {
       return const Scaffold(body: SizedBox.shrink());
     }
+
     return BaseScreen(
       onScreenEnter: () {
         if (!_disposed) {
-          // ✅ SAFETY CHECK
           AdService.instance.loadInterstitial();
           AdService.instance.loadRewarded();
         }
       },
-      // ✅ REMOVED: FutureBuilder and loading logic - show UI immediately
       body: Scaffold(
+        backgroundColor: AppColors.background,
+        // ✅ NEW: Persistent AppBar with heading always visible
+        appBar: AppBar(
+          elevation: 0,
+          backgroundColor: AppColors.primary,
+          title: Consumer<AuthProvider>(
+            builder: (context, authProvider, child) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Hi, ${authProvider.userModel?.name ?? 'there'}',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      const Text(
+                        Strings.searchHint,
+                        style: TextStyle(color: Colors.white70, fontSize: 13),
+                      ),
+                      if (_isRefreshing) ...[
+                        const SizedBox(width: 8),
+                        const SizedBox(
+                          width: 10,
+                          height: 10,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 1.5,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              Colors.white70,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
+                  ),
+                ],
+              );
+            },
+          ),
+          actions: [
+            // ✅ NEW: Refresh button in app bar
+            IconButton(
+              onPressed: _isRefreshing ? null : _refresh,
+              icon: Icon(
+                Icons.refresh,
+                color: _isRefreshing ? Colors.white38 : Colors.white,
+              ),
+              tooltip: 'Refresh',
+            ),
+          ],
+        ),
         body: RefreshIndicator(
           onRefresh: _refresh,
           color: AppColors.primary,
           backgroundColor: Colors.white,
           strokeWidth: 3.0,
-          displacement: 40.0,
           child: Consumer<ServiceProvider>(
             builder: (context, sp, child) {
               return CustomScrollView(
+                controller: _scrollController,
                 physics: const AlwaysScrollableScrollPhysics(),
                 slivers: [
-                  _buildCompactAppBar(),
+                  // ✅ Quick Access Menu
                   SliverToBoxAdapter(child: _buildQuickAccessMenu()),
+
+                  // ✅ Search Bar
                   SliverToBoxAdapter(child: _buildSearchBar(context)),
+
+                  // ✅ Category Tabs
                   SliverToBoxAdapter(child: _buildCategoryTabs()),
+
+                  // ✅ Services Content
                   _buildServicesContent(),
                 ],
               );
             },
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildCompactAppBar() {
-    return SliverAppBar(
-      expandedHeight: 80,
-      floating: false,
-      pinned: true,
-      backgroundColor: AppColors.primary,
-      flexibleSpace: FlexibleSpaceBar(
-        background: Container(
-          decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
-          child: SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Consumer<AuthProvider>(
-                builder: (context, authProvider, child) {
-                  return Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Text(
-                              'Hi, ${authProvider.userModel?.name ?? 'there'}',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Row(
-                              children: [
-                                const Text(
-                                  Strings.searchHint,
-                                  style: TextStyle(
-                                    color: Colors.white70,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                                if (_isRefreshing) ...[
-                                  const SizedBox(width: 8),
-                                  const SizedBox(
-                                    width: 12,
-                                    height: 12,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 1.5,
-                                      valueColor: AlwaysStoppedAnimation<Color>(
-                                        Colors.white70,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  );
-                },
-              ),
-            ),
           ),
         ),
       ),
@@ -390,7 +372,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
 
   Widget _buildSearchBar(BuildContext context) {
     return Container(
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       child: TextField(
         decoration: InputDecoration(
           hintText: 'Search for services…',
@@ -410,7 +392,11 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             MaterialPageRoute(
               builder: (_) => SearchScreen(services: sp.services),
             ),
-          );
+          ).then((_) {
+            if (mounted && !_disposed) {
+              _silentRefresh();
+            }
+          });
         },
         readOnly: true,
       ),
@@ -423,18 +409,28 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       margin: const EdgeInsets.symmetric(vertical: 8),
       child: Consumer<ServiceProvider>(
         builder: (context, sp, child) {
+          final categories = sp.categories;
+
+          if (categories.isEmpty) {
+            return const SizedBox.shrink();
+          }
+
           return ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: sp.categories.length,
+            itemCount: categories.length,
             itemBuilder: (context, i) {
-              final category = sp.categories[i];
+              final category = categories[i];
               final isSelected = sp.selectedCategory == category;
               return Container(
                 margin: const EdgeInsets.only(right: 12),
                 child: FilterChip(
                   label: Text(category),
-                  onSelected: (_) => sp.setSelectedCategory(category),
+                  onSelected: (_) {
+                    if (!_disposed && mounted) {
+                      sp.setSelectedCategory(category);
+                    }
+                  },
                   backgroundColor: Colors.white,
                   selectedColor: AppColors.primary,
                   labelStyle: TextStyle(
@@ -457,8 +453,6 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       builder: (context, sp, child) {
         final services = sp.getServicesByCategory();
 
-        // ✅ REMOVED: Initial loading check - just show content immediately
-
         if (_currentLocation == null) {
           return SliverFillRemaining(
             hasScrollBody: false,
@@ -473,33 +467,37 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
           );
         }
 
-        // ✅ Show services immediately with smooth opacity during manual refresh
         return SliverAnimatedOpacity(
           opacity: _isRefreshing ? 0.6 : 1.0,
           duration: const Duration(milliseconds: 300),
-          sliver: SliverList.builder(
-            itemCount: services.length,
-            itemBuilder: (context, index) {
-              final s = services[index];
-              return ServiceCard(
-                service: s,
-                userLatitude: _currentLocation?.latitude,
-                userLongitude: _currentLocation?.longitude,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => ServiceDetailScreen(service: s),
-                    ),
-                  ).then((_) {
-                    if (mounted) {
-                      _silentRefresh();
-                    }
-                  });
-                },
-                showFavoriteButton: true,
-              );
-            },
+          sliver: SliverPadding(
+            padding: const EdgeInsets.only(bottom: 16),
+            sliver: SliverList.builder(
+              itemCount: services.length,
+              itemBuilder: (context, index) {
+                final s = services[index];
+                return ServiceCard(
+                  service: s,
+                  userLatitude: _currentLocation?.latitude,
+                  userLongitude: _currentLocation?.longitude,
+                  onTap: () {
+                    if (_disposed) return;
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ServiceDetailScreen(service: s),
+                      ),
+                    ).then((_) {
+                      if (mounted && !_disposed) {
+                        _silentRefresh();
+                      }
+                    });
+                  },
+                  showFavoriteButton: true,
+                );
+              },
+            ),
           ),
         );
       },
@@ -549,7 +547,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     )
                   : const Icon(Icons.refresh),
               label: Text(_isRefreshing ? 'Checking...' : 'Try Again'),
@@ -603,7 +604,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
             ),
             const SizedBox(height: 8),
             Text(
-              'We couldn\'t find any services in your area right now. Please try after sometime...',
+              'We couldn\'t find any services in your area right now. Please try again later.',
               style: TextStyle(
                 fontSize: 16,
                 color: AppColors.textSecondary,
@@ -618,7 +619,10 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
                   ? const SizedBox(
                       width: 16,
                       height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
                     )
                   : const Icon(Icons.refresh),
               label: Text(_isRefreshing ? 'Refreshing...' : 'Refresh'),
@@ -640,6 +644,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   @override
   void dispose() {
     _disposed = true;
+    _scrollController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
