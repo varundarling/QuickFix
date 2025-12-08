@@ -70,8 +70,8 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
-        ? Colors.black.withOpacity(0.75)
-        : Colors.white.withOpacity(0.97);
+        ? Colors.black.withValues(alpha: 0.75)
+        : Colors.white.withValues(alpha: 0.97);
 
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
@@ -79,7 +79,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: AnimatedBuilder(
           animation: _controller,
-          builder: (_, __) {
+          builder: (_, _) {
             return Opacity(
               opacity: _safe(_controller.value),
               child: SlideTransition(
@@ -116,7 +116,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 15.5,
-                                    color: Colors.white.withOpacity(0.9),
+                                    color: Colors.white.withValues(alpha: 0.9),
                                     height: 1.4,
                                   ),
                                 ),
@@ -196,12 +196,12 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(110),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.18),
+          color: AppColors.primary.withValues(alpha: 0.18),
           width: 3,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.25),
+            color: AppColors.primary.withValues(alpha: 0.25),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -211,7 +211,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(24),
           ),
           child: const Icon(
@@ -235,11 +235,11 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     required Color cardColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
+    final textColor = isDark ? Colors.white : Colors.black.withValues(alpha: 0.85);
 
     return AnimatedBuilder(
       animation: _stepAnimations[index],
-      builder: (_, __) {
+      builder: (_, _) {
         final v = _stepAnimations[index].value;
         return Transform.scale(
           scale: v,
@@ -297,7 +297,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
                         subtitle,
                         style: TextStyle(
                           fontSize: 13,
-                          color: textColor.withOpacity(0.95),
+                          color: textColor.withValues(alpha: 0.95),
                           height: 1.3,
                         ),
                       ),

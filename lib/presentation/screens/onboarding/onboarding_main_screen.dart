@@ -86,7 +86,7 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                               horizontal: 8,
                               vertical: 4,
                             ),
-                            foregroundColor: Colors.white.withOpacity(0.85),
+                            foregroundColor: Colors.white.withValues(alpha: 0.85),
                           ),
                           child: const Text(
                             'Skip',
@@ -108,8 +108,8 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                               height: 8,
                               margin: const EdgeInsets.symmetric(horizontal: 4),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(
-                                  _currentPage == index ? 0.9 : 0.45,
+                                color: Colors.white.withValues(
+                                  alpha: _currentPage == index ? 0.9 : 0.45,
                                 ),
                                 borderRadius: BorderRadius.circular(4),
                               ),
@@ -135,10 +135,10 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                               vertical: 6,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.18),
+                              color: Colors.white.withValues(alpha: 0.18),
                               borderRadius: BorderRadius.circular(24),
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.35),
+                                color: Colors.white.withValues(alpha: 0.35),
                                 width: 1.2,
                               ),
                             ),
@@ -165,7 +165,7 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         fontSize: 13,
-                        color: Colors.white.withOpacity(0.95),
+                        color: Colors.white.withValues(alpha: 0.95),
                         fontWeight: FontWeight.w500,
                       ),
                     ),

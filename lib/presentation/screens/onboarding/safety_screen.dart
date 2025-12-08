@@ -8,8 +8,8 @@ class SafetyScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
-        ? Colors.black.withOpacity(0.75)
-        : Colors.white.withOpacity(0.97);
+        ? Colors.black.withValues(alpha: 0.75)
+        : Colors.white.withValues(alpha: 0.97);
 
     return Container(
       decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
@@ -35,12 +35,14 @@ class SafetyScreen extends StatelessWidget {
                             shape: BoxShape.circle,
                             color: Colors.white,
                             border: Border.all(
-                              color: AppColors.primary.withOpacity(0.18),
+                              color: AppColors.primary.withValues(alpha: 0.18),
                               width: 3,
                             ),
                             boxShadow: [
                               BoxShadow(
-                                color: AppColors.primary.withOpacity(0.25),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.25,
+                                ),
                                 blurRadius: 22,
                                 offset: const Offset(0, 10),
                               ),
@@ -51,7 +53,9 @@ class SafetyScreen extends StatelessWidget {
                               width: 80,
                               height: 80,
                               decoration: BoxDecoration(
-                                color: AppColors.primary.withOpacity(0.08),
+                                color: AppColors.primary.withValues(
+                                  alpha: 0.08,
+                                ),
                                 borderRadius: BorderRadius.circular(22),
                               ),
                               child: const Icon(
@@ -82,7 +86,7 @@ class SafetyScreen extends StatelessWidget {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 15,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha: 0.9),
                             height: 1.4,
                           ),
                         ),
@@ -143,7 +147,9 @@ class SafetyScreen extends StatelessWidget {
     required String subtitle,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
+    final textColor = isDark
+        ? Colors.white
+        : Colors.black.withValues(alpha: 0.85);
 
     return Container(
       width: double.infinity,
@@ -158,7 +164,7 @@ class SafetyScreen extends StatelessWidget {
             width: 32,
             height: 32,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
+              color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
             ),
             child: Icon(icon, size: 18, color: AppColors.primary),
@@ -181,7 +187,7 @@ class SafetyScreen extends StatelessWidget {
                   subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: textColor.withOpacity(0.95),
+                    color: textColor.withValues(alpha: 0.95),
                     height: 1.3,
                   ),
                 ),
