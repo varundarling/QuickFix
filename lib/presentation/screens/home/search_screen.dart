@@ -397,12 +397,11 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  // ✅ NEW: Navigate to service details using GoRouter
+  // Navigate to service details using GoRouter
   void _navigateToServiceDetails(ServiceModel service) {
-    // Navigate to service details screen with service ID and pass service object
     context.push(
       '/service-detail/${service.id}',
-      extra: service, // Pass the complete service object
+      extra: service,
     );
   }
 }

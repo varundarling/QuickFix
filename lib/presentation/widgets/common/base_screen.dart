@@ -1,5 +1,3 @@
-// lib/presentation/widgets/base_screen.dart
-
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/services/ad_service.dart';
@@ -28,7 +26,7 @@ class _BaseScreenState extends State<BaseScreen> {
     super.initState();
     // Preload banner once
     widget.onScreenEnter?.call();
-    _interstitialTimer = Timer(const Duration(minutes: 7), () {
+    _interstitialTimer = Timer(const Duration(minutes: 15), () {
       AdService.instance.showInterstitial();
     });
   }

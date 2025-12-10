@@ -17,7 +17,7 @@ class EncryptionService {
 
   // Generate master key from password
   static Future<String> deriveMasterKey(String password, String userUID) async {
-    final salt = utf8.encode('${userUID}quickfixsalt2025');
+    final salt = utf8.encode('${userUID}quickfix2025');
     final passwordBytes = utf8.encode(password);
     var hmacSha256 = Hmac(sha256, salt);
     var digest = hmacSha256.convert(passwordBytes);

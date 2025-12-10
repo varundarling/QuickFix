@@ -6,6 +6,8 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:quickfix/data/models/service_model.dart';
+import 'package:quickfix/presentation/screens/admin/admin_dashboard_screen.dart';
+import 'package:quickfix/presentation/screens/admin/admin_role_selection_screen.dart';
 import 'package:quickfix/presentation/screens/auth/login_screen.dart';
 import 'package:quickfix/presentation/screens/auth/sign_Up_Screen.dart';
 import 'package:quickfix/presentation/screens/auth/user_type_selection_screen.dart';
@@ -82,17 +84,12 @@ class RoleResolver {
 class AppRouter {
   static GoRouter router({required bool showOnboarding}) {
     return GoRouter(
-      initialLocation: (() {
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          return '/splash';
-        }
-        return showOnboarding ? '/onboarding' : '/user-type-selection';
-      })(),
+      // ✅ Always start from splash on cold start
+      initialLocation: '/splash',
       navigatorKey: navigatorKey,
       refreshListenable: GoRouterRefreshStream(
         FirebaseAuth.instance.authStateChanges(),
-      ), // reactive
+      ),
       redirect: (context, state) async {
         final user = FirebaseAuth.instance.currentUser;
         final isLoggedIn = user != null;
@@ -104,33 +101,62 @@ class AppRouter {
             state.matchedLocation == '/user-type-selection' ||
             isOnboardingPath;
 
-        // Logged out: only allow auth/onboarding; drive splash
+        // ================= NOT LOGGED IN =================
         if (!isLoggedIn) {
+          // From splash → decide between onboarding or user-type-selection
           if (state.matchedLocation == '/splash') {
             return showOnboarding ? '/onboarding' : '/user-type-selection';
           }
+
+          // If trying to go anywhere else, force them to onboarding / user-type-selection
           if (!isAuthPath && state.matchedLocation != '/splash') {
             return showOnboarding ? '/onboarding' : '/user-type-selection';
           }
+
+          // Stay on auth/onboarding routes without redirect
           return null;
         }
 
-        // Logged in: enforce landing only from splash/onboarding/auth
+        // ================= LOGGED IN =================
+        // Only force landing when coming from auth/onboarding/splash paths
         final mustLand =
             isAuthPath ||
             state.matchedLocation == '/splash' ||
             state.matchedLocation == '/onboarding';
-        if (!mustLand) return null;
+
+        if (!mustLand) {
+          // Already inside app (home, provider-dashboard, admin-role, etc.) → no redirect
+          return null;
+        }
 
         // Resolve role; if not ready, don't misroute
-        final role = await RoleResolver.getRole(
-          user.uid,
-        ); // implement lookup + cache
-        if (role == null) return null;
+        final role = await RoleResolver.getRole(user.uid);
+        if (role == null) {
+          // If we don't know the role yet, don't redirect (avoid loops)
+          return null;
+        }
 
         final r = role.toLowerCase().replaceAll('_', '');
+
+        // ✅ ADMIN: send to admin role selection
+        if (r == 'admin') {
+          if (state.matchedLocation == '/admin-role') return null;
+          return '/admin-role';
+        }
+
+        // ✅ PROVIDER: send to provider dashboard
         final isProvider = r == 'provider' || r == 'serviceprovider';
-        return isProvider ? '/provider-dashboard' : '/home';
+        if (isProvider) {
+          if (state.matchedLocation == '/provider-dashboard' ||
+              state.matchedLocation.startsWith('/provider-dashboard/')) {
+            return null;
+          }
+          return '/provider-dashboard';
+        }
+
+        // ✅ CUSTOMER (default): send to home
+        if (state.matchedLocation == '/home') return null;
+        return '/home';
       },
       routes: [
         GoRoute(
@@ -182,6 +208,17 @@ class AppRouter {
           },
         ),
 
+        GoRoute(
+          path: '/admin-role',
+          name: 'admin-role',
+          builder: (context, state) => const AdminRoleSelectionScreen(),
+        ),
+        GoRoute(
+          path: '/admin-dashboard',
+          name: 'admin-dashboard',
+          builder: (context, state) => const AdminDashboardScreen(),
+        ),
+
         // Customer Routes
         GoRoute(
           path: '/home',
@@ -210,7 +247,7 @@ class AppRouter {
           },
         ),
 
-        // ✅ NEW: Favorites Screen
+        // Favorites Screen
         GoRoute(
           path: '/favorites',
           name: 'favorites',
@@ -244,7 +281,6 @@ class AppRouter {
           },
         ),
 
-        // Add this to your GoRouter routes:
         GoRoute(
           path: '/provider-dashboard/:tab',
           name: 'provider-dashboard-tab',
@@ -255,13 +291,10 @@ class AppRouter {
           },
         ),
 
-        // In app_router.dart - ADD these routes
         GoRoute(
           path: '/payment/:bookingId',
           name: 'payment',
           builder: (context, state) {
-            // You'll need to pass the booking object or fetch it
-            // For now, returning a placeholder
             return const Scaffold(body: Center(child: Text('Payment Screen')));
           },
         ),
@@ -270,7 +303,6 @@ class AppRouter {
           path: '/customer-payment/:bookingId',
           name: 'customer-payment',
           builder: (context, state) {
-            // You'll need to pass the booking object or fetch it
             return const Scaffold(
               body: Center(child: Text('Customer Payment Screen')),
             );
@@ -296,7 +328,6 @@ class AppRouter {
           name: 'customer-otp',
           builder: (context, state) {
             state.pathParameters['bookingId']!;
-            // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Customer OTP Screen')),
             );
@@ -308,7 +339,6 @@ class AppRouter {
           name: 'otp-verification',
           builder: (context, state) {
             state.pathParameters['bookingId']!;
-            // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('OTP Verification Screen')),
             );
@@ -320,7 +350,6 @@ class AppRouter {
           name: 'service-progress',
           builder: (context, state) {
             state.pathParameters['bookingId']!;
-            // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Service Progress Screen')),
             );
@@ -332,7 +361,6 @@ class AppRouter {
           name: 'real-time-payment',
           builder: (context, state) {
             state.pathParameters['bookingId']!;
-            // You'll need to fetch the booking or pass it through extra
             return const Scaffold(
               body: Center(child: Text('Real-time Payment Screen')),
             );
