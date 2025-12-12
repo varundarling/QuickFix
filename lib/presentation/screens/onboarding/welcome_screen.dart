@@ -9,7 +9,7 @@ class WelcomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final primaryTextColor = Colors.white;
-    final secondaryTextColor = Colors.white.withOpacity(0.9);
+    final secondaryTextColor = Colors.white.withValues(alpha: 0.9);
 
     // Transparent top-level so shared gradient shows through.
     return SizedBox.expand(
@@ -61,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: primaryTextColor.withOpacity(0.95),
+                            color: primaryTextColor.withValues(alpha: 0.95),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -116,7 +116,7 @@ class WelcomeScreen extends StatelessWidget {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.12),
+                  color: Colors.black.withValues(alpha: 0.12),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -152,16 +152,15 @@ class WelcomeScreen extends StatelessWidget {
     required bool isDark,
   }) {
     final bgColor = isDark
-        ? Colors.white.withOpacity(0.06)
-        : Colors.white.withOpacity(0.96);
+        ? Colors.white.withValues(alpha: 0.06)
+        : Colors.white.withValues(alpha: 0.96);
     final borderColor = isDark
-        ? Colors.white.withOpacity(0.12)
-        : AppColors.primary.withOpacity(0.12);
+        ? Colors.white.withValues(alpha: 0.12)
+        : AppColors.primary.withValues(alpha: 0.12);
     final mainTextColor = isDark
         ? Colors.white
-        : Colors.black.withOpacity(0.85);
-    final subTextColor = mainTextColor.withOpacity(0.9);
-
+        : Colors.black.withValues(alpha: 0.85);
+    final subTextColor = mainTextColor.withValues(alpha: 0.9);
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -176,7 +175,7 @@ class WelcomeScreen extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
+              color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: AppColors.primary),

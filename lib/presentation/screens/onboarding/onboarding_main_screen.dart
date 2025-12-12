@@ -149,7 +149,7 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                                         }
                                       },
                                 icon: const Icon(Icons.arrow_back_ios),
-                                color: Colors.white.withOpacity(0.95),
+                                color: Colors.white.withValues(alpha: 0.95),
                               ),
                             ),
 
@@ -168,8 +168,8 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                                       horizontal: 4,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(
-                                        isActive ? 0.96 : 0.45,
+                                      color: Colors.white.withValues(
+                                        alpha: isActive ? 0.96 : 0.45,
                                       ),
                                       borderRadius: BorderRadius.circular(4),
                                     ),
@@ -195,10 +195,10 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                                   vertical: 8,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.18),
+                                  color: Colors.white.withValues(alpha: 0.18),
                                   borderRadius: BorderRadius.circular(24),
                                   border: Border.all(
-                                    color: Colors.white.withOpacity(0.28),
+                                    color: Colors.white.withValues(alpha: 0.28),
                                     width: 1.0,
                                   ),
                                 ),
@@ -224,7 +224,7 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 13,
-                            color: Colors.white.withOpacity(0.92),
+                            color: Colors.white.withValues(alpha: 0.92),
                             fontWeight: FontWeight.w500,
                           ),
                         ),

@@ -37,14 +37,12 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
     super.dispose();
   }
 
-  double _safe(double v) => v.clamp(0.0, 1.0);
-
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
-        ? Colors.black.withOpacity(0.75)
-        : Colors.white.withOpacity(0.97);
+        ? Colors.black.withValues(alpha: 0.75)
+        : Colors.white.withValues(alpha: 0.97);
 
     return SizedBox.expand(
       child: Padding(
@@ -85,7 +83,7 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha: 0.9),
                                 height: 1.4,
                               ),
                             ),
@@ -144,12 +142,12 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
         color: Colors.white,
         borderRadius: BorderRadius.circular(size / 2),
         border: Border.all(
-          color: AppColors.primary.withOpacity(0.18),
+          color: AppColors.primary.withValues(alpha: 0.18),
           width: 3,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withOpacity(0.18),
+            color: AppColors.primary.withValues(alpha: 0.18),
             blurRadius: 12,
             offset: const Offset(0, 8),
           ),
@@ -159,7 +157,7 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
         child: Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primary.withOpacity(0.08),
+            color: AppColors.primary.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(20),
           ),
           child: const Icon(
@@ -180,7 +178,7 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
     required String subtitle,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
+    final textColor = isDark ? Colors.white : Colors.black.withValues(alpha: 0.85);
 
     return Container(
       width: double.infinity,
@@ -196,7 +194,7 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.12),
+              color: AppColors.primary.withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 20, color: AppColors.primary),
@@ -219,7 +217,7 @@ class _CustomerExplanationScreenState extends State<CustomerExplanationScreen>
                   subtitle,
                   style: TextStyle(
                     fontSize: 13,
-                    color: textColor.withOpacity(0.95),
+                    color: textColor.withValues(alpha: 0.95),
                     height: 1.3,
                   ),
                 ),
