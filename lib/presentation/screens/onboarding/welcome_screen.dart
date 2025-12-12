@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 
@@ -7,17 +8,18 @@ class WelcomeScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-
     final primaryTextColor = Colors.white;
-    final secondaryTextColor = Colors.white.withValues(alpha: 0.9);
+    final secondaryTextColor = Colors.white.withOpacity(0.9);
 
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+    // Transparent top-level so shared gradient shows through.
+    return SizedBox.expand(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
         child: LayoutBuilder(
           builder: (context, constraints) {
+            final heroSize = min(constraints.maxWidth * 0.45, 180.0);
             return SingleChildScrollView(
+              physics: const ClampingScrollPhysics(),
               child: ConstrainedBox(
                 constraints: BoxConstraints(minHeight: constraints.maxHeight),
                 child: Column(
@@ -25,10 +27,9 @@ class WelcomeScreen extends StatelessWidget {
                   children: [
                     const SizedBox(height: 12),
 
-                    // 👑 Top hero + heading
                     Column(
                       children: [
-                        _buildHeroLogo(),
+                        _buildHeroLogo(heroSize),
                         const SizedBox(height: 24),
                         Text(
                           'Welcome to QuickFix',
@@ -52,7 +53,6 @@ class WelcomeScreen extends StatelessWidget {
                       ],
                     ),
 
-                    // 🌟 Simple feature chips
                     Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -61,7 +61,7 @@ class WelcomeScreen extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 15,
                             fontWeight: FontWeight.w600,
-                            color: primaryTextColor.withValues(alpha: 0.95),
+                            color: primaryTextColor.withOpacity(0.95),
                           ),
                         ),
                         const SizedBox(height: 12),
@@ -91,7 +91,7 @@ class WelcomeScreen extends StatelessWidget {
                       ],
                     ),
 
-                    const SizedBox(height: 40), // space above bottom nav
+                    const SizedBox(height: 40),
                   ],
                 ),
               ),
@@ -102,37 +102,33 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  /// 🧩 Hero with BIG APP LOGO inside a glowing circle
-  Widget _buildHeroLogo() {
+  Widget _buildHeroLogo(double size) {
     return SizedBox(
-      height: 180,
+      height: size,
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Outer glow circle
           Container(
-            width: 170,
-            height: 170,
+            width: size * 0.95,
+            height: size * 0.95,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.15),
-                  blurRadius: 16,
+                  color: Colors.black.withOpacity(0.12),
+                  blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(12),
               child: ClipOval(
                 child: Image.asset(
-                  // 🔴 Replace with your real asset path
                   'assets/logo/app_logo.png',
                   fit: BoxFit.contain,
                   errorBuilder: (context, error, stackTrace) {
-                    // Fallback icon so app doesn't crash if asset missing in dev
                     return const Icon(
                       Icons.home_repair_service_outlined,
                       size: 60,
@@ -148,7 +144,6 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  // 💡 Simple, clean feature chip
   Widget _featureChip(
     BuildContext context, {
     required IconData icon,
@@ -157,21 +152,22 @@ class WelcomeScreen extends StatelessWidget {
     required bool isDark,
   }) {
     final bgColor = isDark
-        ? Colors.white.withValues(alpha: 0.06)
-        : Colors.white.withValues(alpha: 0.96);
+        ? Colors.white.withOpacity(0.06)
+        : Colors.white.withOpacity(0.96);
     final borderColor = isDark
-        ? Colors.white.withValues(alpha: 0.12)
-        : AppColors.primary.withValues(alpha: 0.12);
+        ? Colors.white.withOpacity(0.12)
+        : AppColors.primary.withOpacity(0.12);
     final mainTextColor = isDark
         ? Colors.white
-        : Colors.black.withValues(alpha: 0.85);
-    final subTextColor = mainTextColor.withValues(alpha: 0.9);
+        : Colors.black.withOpacity(0.85);
+    final subTextColor = mainTextColor.withOpacity(0.9);
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
       decoration: BoxDecoration(
         color: bgColor,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(14),
         border: Border.all(color: borderColor),
       ),
       child: Row(
@@ -180,8 +176,8 @@ class WelcomeScreen extends StatelessWidget {
             width: 34,
             height: 34,
             decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.12),
-              borderRadius: BorderRadius.circular(12),
+              color: AppColors.primary.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(icon, size: 18, color: AppColors.primary),
           ),

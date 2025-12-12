@@ -1,3 +1,4 @@
+import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:quickfix/core/constants/app_colors.dart';
 
@@ -10,38 +11,42 @@ class HowItWorksScreen extends StatefulWidget {
 
 class _HowItWorksScreenState extends State<HowItWorksScreen>
     with TickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<Offset> _slideAnimation;
-
-  late List<AnimationController> _stepControllers;
-  late List<Animation<double>> _stepAnimations;
+  late final AnimationController _controller;
+  late final Animation<Offset> _slide;
+  late final List<AnimationController> _stepControllers;
+  late final List<Animation<double>> _stepFade;
+  late final List<Animation<Offset>> _stepSlide;
 
   @override
   void initState() {
     super.initState();
 
-    // Main fade+slide like ProviderExplanationScreen
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 900),
+      duration: const Duration(milliseconds: 600),
     );
-
-    _slideAnimation = Tween<Offset>(
-      begin: const Offset(0, 0.15),
+    _slide = Tween<Offset>(
+      begin: const Offset(0, 0.08),
       end: Offset.zero,
     ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOut));
 
-    // Step card animations
     _stepControllers = List.generate(
       4,
       (i) => AnimationController(
         vsync: this,
-        duration: const Duration(milliseconds: 600),
+        duration: const Duration(milliseconds: 420),
       ),
     );
-
-    _stepAnimations = _stepControllers
-        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOutBack))
+    _stepFade = _stepControllers
+        .map((c) => CurvedAnimation(parent: c, curve: Curves.easeOut))
+        .toList();
+    _stepSlide = _stepControllers
+        .map(
+          (c) => Tween<Offset>(
+            begin: const Offset(0, 0.06),
+            end: Offset.zero,
+          ).animate(CurvedAnimation(parent: c, curve: Curves.easeOut)),
+        )
         .toList();
 
     _controller.forward();
@@ -50,7 +55,7 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
 
   Future<void> _animateSteps() async {
     for (int i = 0; i < _stepControllers.length; i++) {
-      await Future.delayed(Duration(milliseconds: 200 + i * 220));
+      await Future.delayed(Duration(milliseconds: 120 + i * 140));
       if (mounted) _stepControllers[i].forward();
     }
   }
@@ -58,176 +63,159 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
   @override
   void dispose() {
     _controller.dispose();
-    for (var c in _stepControllers) {
-      c.dispose();
-    }
+    for (var c in _stepControllers) c.dispose();
     super.dispose();
   }
-
-  double _safe(double v) => v.clamp(0.0, 1.0);
 
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final cardColor = isDark
-        ? Colors.black.withValues(alpha: 0.75)
-        : Colors.white.withValues(alpha: 0.97);
+        ? Colors.black.withOpacity(0.75)
+        : Colors.white.withOpacity(0.97);
 
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+    return SizedBox.expand(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
-        child: AnimatedBuilder(
-          animation: _controller,
-          builder: (_, _) {
-            return Opacity(
-              opacity: _safe(_controller.value),
-              child: SlideTransition(
-                position: _slideAnimation,
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    return SingleChildScrollView(
-                      child: ConstrainedBox(
-                        constraints: BoxConstraints(
-                          minHeight: constraints.maxHeight,
-                        ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        child: FadeTransition(
+          opacity: CurvedAnimation(parent: _controller, curve: Curves.easeOut),
+          child: SlideTransition(
+            position: _slide,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final heroSize = min(constraints.maxWidth * 0.4, 160.0);
+                return SingleChildScrollView(
+                  physics: const ClampingScrollPhysics(),
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      minHeight: constraints.maxHeight,
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const SizedBox(height: 6),
+                        Column(
                           children: [
-                            const SizedBox(height: 6),
-
-                            // 🔹 Hero + title + subtitle (same structure as Provider screen)
-                            Column(
-                              children: [
-                                _buildHero(),
-                                const SizedBox(height: 20),
-                                const Text(
-                                  'How QuickFix Works',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 26,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                const SizedBox(height: 10),
-                                Text(
-                                  '4 simple steps from booking to completion.',
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 15.5,
-                                    color: Colors.white.withValues(alpha: 0.9),
-                                    height: 1.4,
-                                  ),
-                                ),
-                              ],
+                            _buildHero(heroSize),
+                            const SizedBox(height: 20),
+                            const Text(
+                              'How QuickFix Works',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 26,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
                             ),
-
-                            // 🔹 Steps as separate cards (layout matches Provider screen)
-                            Column(
-                              children: [
-                                _buildStepCard(
-                                  context: context,
-                                  index: 0,
-                                  number: 1,
-                                  icon: Icons.login,
-                                  title: 'Login',
-                                  subtitle:
-                                      'Create an account or sign in to get started.',
-                                  cardColor: cardColor,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildStepCard(
-                                  context: context,
-                                  index: 1,
-                                  number: 2,
-                                  icon: Icons.search,
-                                  title: 'Browse & select',
-                                  subtitle:
-                                      'Explore services and choose what you need.',
-                                  cardColor: cardColor,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildStepCard(
-                                  context: context,
-                                  index: 2,
-                                  number: 3,
-                                  icon: Icons.calendar_today,
-                                  title: 'Book & schedule',
-                                  subtitle:
-                                      'Pick the date and time that works best for you.',
-                                  cardColor: cardColor,
-                                ),
-                                const SizedBox(height: 12),
-                                _buildStepCard(
-                                  context: context,
-                                  index: 3,
-                                  number: 4,
-                                  icon: Icons.check_circle,
-                                  title: 'Relax & get it done',
-                                  subtitle:
-                                      'Your professional arrives and completes the job.',
-                                  cardColor: cardColor,
-                                ),
-                              ],
+                            const SizedBox(height: 10),
+                            Text(
+                              '4 simple steps from booking to completion.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 15.5,
+                                color: Colors.white.withOpacity(0.9),
+                                height: 1.4,
+                              ),
                             ),
-
-                            const SizedBox(height: 36),
                           ],
                         ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            );
-          },
+
+                        Column(
+                          children: List.generate(4, (i) {
+                            final params = [
+                              {
+                                'icon': Icons.login,
+                                'title': 'Login',
+                                'subtitle':
+                                    'Create an account or sign in to get started.',
+                              },
+                              {
+                                'icon': Icons.search,
+                                'title': 'Browse & select',
+                                'subtitle':
+                                    'Explore services and choose what you need.',
+                              },
+                              {
+                                'icon': Icons.calendar_today,
+                                'title': 'Book & schedule',
+                                'subtitle':
+                                    'Pick the date and time that works best for you.',
+                              },
+                              {
+                                'icon': Icons.check_circle,
+                                'title': 'Relax & get it done',
+                                'subtitle':
+                                    'Your professional arrives and completes the job.',
+                              },
+                            ];
+                            final item = params[i];
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: FadeTransition(
+                                opacity: _stepFade[i],
+                                child: SlideTransition(
+                                  position: _stepSlide[i],
+                                  child: _buildStepCard(
+                                    context: context,
+                                    number: i + 1,
+                                    icon: item['icon'] as IconData,
+                                    title: item['title'] as String,
+                                    subtitle: item['subtitle'] as String,
+                                    cardColor: cardColor,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }),
+                        ),
+
+                        const SizedBox(height: 36),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // 🔹 Hero icon like other screens (150x150)
-  Widget _buildHero() {
+  Widget _buildHero(double size) {
     return Container(
-      width: 150,
-      height: 150,
+      width: size,
+      height: size,
       decoration: BoxDecoration(
         color: Colors.white,
-        borderRadius: BorderRadius.circular(110),
+        borderRadius: BorderRadius.circular(size / 2),
         border: Border.all(
-          color: AppColors.primary.withValues(alpha: 0.18),
+          color: AppColors.primary.withOpacity(0.18),
           width: 3,
         ),
         boxShadow: [
           BoxShadow(
-            color: AppColors.primary.withValues(alpha: 0.25),
-            blurRadius: 24,
-            offset: const Offset(0, 10),
+            color: AppColors.primary.withOpacity(0.18),
+            blurRadius: 12,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       child: Center(
         child: Container(
-          padding: const EdgeInsets.all(18),
+          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: AppColors.primary.withValues(alpha: 0.08),
-            borderRadius: BorderRadius.circular(24),
+            color: AppColors.primary.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
           ),
-          child: const Icon(
-            Icons.route, // represents steps/journey
-            size: 56,
-            color: AppColors.primary,
-          ),
+          child: const Icon(Icons.route, size: 52, color: AppColors.primary),
         ),
       ),
     );
   }
 
-  // 🔹 Step card – same layout style as Provider service cards
   Widget _buildStepCard({
     required BuildContext context,
-    required int index,
     required int number,
     required IconData icon,
     required String title,
@@ -235,80 +223,67 @@ class _HowItWorksScreenState extends State<HowItWorksScreen>
     required Color cardColor,
   }) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
-    final textColor = isDark ? Colors.white : Colors.black.withValues(alpha: 0.85);
+    final textColor = isDark ? Colors.white : Colors.black.withOpacity(0.85);
 
-    return AnimatedBuilder(
-      animation: _stepAnimations[index],
-      builder: (_, _) {
-        final v = _stepAnimations[index].value;
-        return Transform.scale(
-          scale: v,
-          child: Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(16),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: cardColor,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
             decoration: BoxDecoration(
-              color: cardColor,
-              borderRadius: BorderRadius.circular(18),
+              color: AppColors.primary,
+              borderRadius: BorderRadius.circular(22),
             ),
-            child: Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // Step icon + number (similar size to provider)
-                Container(
-                  width: 44,
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(22),
-                  ),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(icon, size: 18, color: Colors.white),
-                      const SizedBox(height: 2),
-                      Text(
-                        '$number',
-                        style: const TextStyle(
-                          fontSize: 10,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-
-                // Text content
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        title,
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          color: textColor,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        subtitle,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: textColor.withValues(alpha: 0.95),
-                          height: 1.3,
-                        ),
-                      ),
-                    ],
+                Icon(icon, size: 18, color: Colors.white),
+                const SizedBox(height: 2),
+                Text(
+                  '$number',
+                  style: const TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
                   ),
                 ),
               ],
             ),
           ),
-        );
-      },
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                    color: textColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  subtitle,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: textColor.withOpacity(0.95),
+                    height: 1.3,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

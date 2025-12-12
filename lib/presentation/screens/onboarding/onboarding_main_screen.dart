@@ -1,5 +1,4 @@
-// ignore_for_file: use_build_context_synchronously
-
+// onboarding_main_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -31,6 +30,21 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
     SafetyScreen(),
   ];
 
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
+  void _goTo(int page) {
+    if (page < 0 || page >= _pages.length) return;
+    _pageController.animateToPage(
+      page,
+      duration: const Duration(milliseconds: 300),
+      curve: Curves.easeInOut,
+    );
+  }
+
   Future<void> _finishOnboarding() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool('hasSeenOnboarding', true);
@@ -44,144 +58,185 @@ class _OnboardingMainScreenState extends State<OnboardingMainScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      // 👇 Give a solid background so no black shows behind pages
-      backgroundColor: AppColors.primary,
-      body: Stack(
-        children: [
-          // 🔹 Fullscreen PageView behind
-          PageView(
-            controller: _pageController,
-            // 👇 Remove bouncing/overscroll so you can't "pull" to a black page
-            physics: const ClampingScrollPhysics(),
-            onPageChanged: (int page) {
-              setState(() => _currentPage = page);
-            },
-            children: _pages,
+  /// Subtle responsive transform while keeping PageView default scroll behavior.
+  Widget _buildResponsivePage(int index, Widget child) {
+    const double maxTranslateY = 12.0;
+    const double minScale = 0.99;
+
+    return AnimatedBuilder(
+      animation: _pageController,
+      builder: (context, _) {
+        if (!_pageController.hasClients) return SizedBox.expand(child: child);
+        final double page =
+            _pageController.page ?? _pageController.initialPage.toDouble();
+        double diff = index - page;
+        diff = diff.clamp(-1.0, 1.0);
+
+        final double translateY = diff * maxTranslateY * 0.35;
+        final double scale = (1.0 - (diff.abs() * (1.0 - minScale))).clamp(
+          minScale,
+          1.0,
+        );
+
+        return Transform.translate(
+          offset: Offset(0, translateY),
+          child: Transform.scale(
+            scale: scale,
+            alignment: Alignment.center,
+            child: SizedBox.expand(child: child),
           ),
-
-          // 🔹 Floating bottom controls (Skip, dots, Next, helper text)
-          Positioned(
-            left: 0,
-            right: 0,
-            bottom: 0,
-            child: SafeArea(
-              top: false,
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16, right: 16),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // Row: Skip  •  Dots  •  Next
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        // Transparent Skip
-                        TextButton(
-                          onPressed: _finishOnboarding,
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 4,
-                            ),
-                            foregroundColor: Colors.white.withValues(alpha: 0.85),
-                          ),
-                          child: const Text(
-                            'Skip',
-                            style: TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-
-                        // Dots
-                        Row(
-                          children: List.generate(
-                            _pages.length,
-                            (index) => AnimatedContainer(
-                              duration: const Duration(milliseconds: 220),
-                              curve: Curves.easeOut,
-                              width: _currentPage == index ? 18 : 8,
-                              height: 8,
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(
-                                  alpha: _currentPage == index ? 0.9 : 0.45,
-                                ),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                          ),
-                        ),
-
-                        // Semi-transparent "glass" Next/Get started
-                        GestureDetector(
-                          onTap: () {
-                            if (_currentPage == _pages.length - 1) {
-                              _finishOnboarding();
-                            } else {
-                              _pageController.nextPage(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                              );
-                            }
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 18,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withValues(alpha: 0.18),
-                              borderRadius: BorderRadius.circular(24),
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha: 0.35),
-                                width: 1.2,
-                              ),
-                            ),
-                            child: Text(
-                              _currentPage == _pages.length - 1
-                                  ? 'Get started'
-                                  : 'Next',
-                              style: const TextStyle(
-                                fontSize: 14,
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-
-                    const SizedBox(height: 4),
-
-                    // Floating helper text
-                    Text(
-                      'Swipe left or tap Next to continue.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: Colors.white.withValues(alpha: 0.95),
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
   @override
-  void dispose() {
-    _pageController.dispose();
-    super.dispose();
+  Widget build(BuildContext context) {
+    // Paint the gradient once behind all pages so two pages will never have a seam.
+    return Scaffold(
+      body: SizedBox.expand(
+        child: Container(
+          decoration: const BoxDecoration(gradient: AppColors.primaryGradient),
+          child: Stack(
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                itemCount: _pages.length,
+                physics: const PageScrollPhysics(),
+                padEnds:
+                    false, // removes Flutter's edge padding that can create seams
+                clipBehavior: Clip.hardEdge,
+                onPageChanged: (index) => setState(() => _currentPage = index),
+                itemBuilder: (context, index) {
+                  // Each page must be transparent at the top level so the shared gradient shows through
+                  return _buildResponsivePage(index, _pages[index]);
+                },
+              ),
+
+              // Bottom controls: Back • Dots • Next/Get started
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                child: SafeArea(
+                  top: false,
+                  child: Padding(
+                    padding: const EdgeInsets.only(
+                      left: 16,
+                      right: 16,
+                      bottom: 12,
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            AnimatedOpacity(
+                              duration: const Duration(milliseconds: 180),
+                              opacity: _currentPage == 0 ? 0.0 : 1.0,
+                              child: IconButton(
+                                onPressed: _currentPage == 0
+                                    ? null
+                                    : () {
+                                        if (_currentPage > 0) {
+                                          _pageController.previousPage(
+                                            duration: const Duration(
+                                              milliseconds: 280,
+                                            ),
+                                            curve: Curves.easeOut,
+                                          );
+                                        }
+                                      },
+                                icon: const Icon(Icons.arrow_back_ios),
+                                color: Colors.white.withOpacity(0.95),
+                              ),
+                            ),
+
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: List.generate(_pages.length, (index) {
+                                final isActive = index == _currentPage;
+                                return GestureDetector(
+                                  onTap: () => _goTo(index),
+                                  child: AnimatedContainer(
+                                    duration: const Duration(milliseconds: 180),
+                                    curve: Curves.easeOut,
+                                    width: isActive ? 18 : 8,
+                                    height: 8,
+                                    margin: const EdgeInsets.symmetric(
+                                      horizontal: 4,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.white.withOpacity(
+                                        isActive ? 0.96 : 0.45,
+                                      ),
+                                      borderRadius: BorderRadius.circular(4),
+                                    ),
+                                  ),
+                                );
+                              }),
+                            ),
+
+                            GestureDetector(
+                              onTap: () {
+                                if (_currentPage == _pages.length - 1) {
+                                  _finishOnboarding();
+                                } else {
+                                  _pageController.nextPage(
+                                    duration: const Duration(milliseconds: 300),
+                                    curve: Curves.easeInOut,
+                                  );
+                                }
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 18,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.18),
+                                  borderRadius: BorderRadius.circular(24),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.28),
+                                    width: 1.0,
+                                  ),
+                                ),
+                                child: Text(
+                                  _currentPage == _pages.length - 1
+                                      ? 'Get started'
+                                      : 'Next',
+                                  style: const TextStyle(
+                                    fontSize: 14,
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        const SizedBox(height: 8),
+
+                        Text(
+                          'Swipe left or tap Next to continue.',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontSize: 13,
+                            color: Colors.white.withOpacity(0.92),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
