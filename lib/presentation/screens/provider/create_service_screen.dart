@@ -1,5 +1,7 @@
 // ignore_for_file: deprecated_member_use
 
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
 import 'package:flutter/material.dart';
@@ -81,43 +83,132 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
   }
 
   Future<void> _getCurrentLocation() async {
+    if (!mounted) return;
     setState(() {});
 
     try {
+      // 1) Ensure device-level location services are enabled
+      final serviceEnabled = await Geolocator.isLocationServiceEnabled();
+      if (!serviceEnabled) {
+        // Ask user to enable location services
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Location services are disabled. Please enable GPS/location services.',
+              ),
+              backgroundColor: Colors.orange,
+              action: SnackBarAction(
+                label: 'Open',
+                textColor: Colors.white,
+                onPressed: () {
+                  Geolocator.openLocationSettings();
+                },
+              ),
+            ),
+          );
+        }
+        return;
+      }
+
+      // 2) Permission check/request
       LocationPermission permission = await Geolocator.checkPermission();
       if (permission == LocationPermission.denied) {
         permission = await Geolocator.requestPermission();
         if (permission == LocationPermission.denied) {
-          throw Exception('Location permissions are denied');
+          // User denied, show message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Location permission denied.'),
+                backgroundColor: Colors.orange,
+              ),
+            );
+          }
+          return;
         }
       }
 
       if (permission == LocationPermission.deniedForever) {
-        throw Exception('Location permissions are permanently denied');
+        // Permissions permanently denied, prompt user to open app settings
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: const Text(
+                'Location permission permanently denied. Open app settings to allow.',
+              ),
+              backgroundColor: Colors.orange,
+              action: SnackBarAction(
+                label: 'Settings',
+                textColor: Colors.white,
+                onPressed: () {
+                  Geolocator.openAppSettings();
+                },
+              ),
+            ),
+          );
+        }
+        return;
       }
 
-      Position position = await Geolocator.getCurrentPosition(
-        desiredAccuracy: LocationAccuracy.medium,
-        timeLimit: const Duration(seconds: 10),
-      );
+      // 3) Try to get current position with a sensible timeout
+      Position? position;
+      try {
+        position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.best,
+          timeLimit: const Duration(seconds: 10),
+        );
+      } on TimeoutException catch (_) {
+        // Fallback: try last known position
+        position = await Geolocator.getLastKnownPosition();
+      } catch (e) {
+        // Other exceptions (e.g., LocationService disabled unexpectedly)
+        // Fallback to last known if available
+        position = await Geolocator.getLastKnownPosition();
+      }
+
+      if (position == null) {
+        // No position available
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Unable to fetch current location.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
+        return;
+      }
 
       _latitude = position.latitude;
       _longitude = position.longitude;
 
-      // Get address from coordinates
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      // 4) Get human-readable address from coordinates (placemark can timeout)
+      try {
+        final placemarks = await placemarkFromCoordinates(
+          _latitude!,
+          _longitude!,
+        );
 
-      if (placemarks.isNotEmpty) {
-        final placemark = placemarks.first;
-        _currentAddress =
-            '${placemark.street}, ${placemark.locality}, ${placemark.administrativeArea}';
-        _addressController.text = _currentAddress ?? '';
+        if (placemarks.isNotEmpty) {
+          final placemark = placemarks.first;
+          _currentAddress =
+              '${placemark.street ?? ''}, ${placemark.locality ?? ''}, ${placemark.administrativeArea ?? ''}'
+                  .replaceAll(RegExp(r'(^,\s*)|(\s*,\s*$)'), '');
+          _addressController.text = _currentAddress ?? '';
+        }
+      } catch (e) {
+        // placemarkFromCoordinates failed — keep the coordinates, show a message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Could not resolve address from coordinates.'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+        }
       }
     } catch (e) {
-      //debugPrint('Error getting location: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -127,7 +218,9 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         );
       }
     } finally {
-      setState(() {});
+      if (mounted) {
+        setState(() {});
+      }
     }
   }
 
@@ -358,7 +451,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               ),
               const SizedBox(height: 16),
 
-              // // Location Section
+              // // Location Section (kept commented out in original; you can enable this to show refresh/spinner)
               // Card(
               //   color: Colors.white,
               //   elevation: 2,
@@ -415,7 +508,7 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
               // Description
               CustomTextField(
                 controller: _descriptionController,
-                label: 'Description',
+                label: 'Service Description',
                 hintText: 'Describe your service in detail',
                 maxLines: 4,
                 maxLength: 500,
@@ -563,54 +656,61 @@ class _CreateServiceScreenState extends State<CreateServiceScreen> {
         );
       }
 
+      bool serviceCreated = false;
+
+      Future<void> performServiceCreation() async {
+        final success = await serviceProvider.addServiceWithProviderDetails(
+          name: _nameController.text.trim(),
+          description: _descriptionController.text.trim(),
+          category: _selectedCategory,
+          basePrice: double.parse(_basePriceController.text.trim()),
+          imageUrl: '',
+          subServices: _subServices,
+          mobileNumber: _mobileNumberController.text.trim(),
+          latitude: _latitude!,
+          longitude: _longitude!,
+          address: _addressController.text.trim(),
+          providerBusinessName: userModel.businessName ?? userModel.name,
+          providerName: userModel.name,
+          providerEmail: userModel.email,
+        );
+
+        if (success && mounted) {
+          serviceCreated = true;
+
+          await NotificationService.instance.notifyAllCustomersOfNewService(
+            serviceName: _nameController.text.trim(),
+            category: _selectedCategory,
+            serviceId: 'new_service',
+            location: _addressController.text.trim(),
+          );
+
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Service created successfully!'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+
+          await Future.delayed(const Duration(milliseconds: 500));
+          if (mounted) context.go('/provider-dashboard');
+        }
+      }
+
       await _createOrUpdateProviderProfile(currentUser.uid, authProvider);
 
       // ✅ Show rewarded ad BEFORE creating service
       await AdService.instance.showRewarded(
         onReward: (reward) async {
-          // Example: You can apply discount or just allow creation
-          //debugPrint("Reward earned: $reward");
-
-          // Continue with service creation AFTER reward
-          final success = await serviceProvider.addServiceWithProviderDetails(
-            name: _nameController.text.trim(),
-            description: _descriptionController.text.trim(),
-            category: _selectedCategory,
-            basePrice: double.parse(_basePriceController.text.trim()),
-            imageUrl: '',
-            subServices: _subServices,
-            mobileNumber: _mobileNumberController.text.trim(),
-            latitude: _latitude!,
-            longitude: _longitude!,
-            address: _addressController.text.trim(),
-            providerBusinessName: userModel.businessName ?? userModel.name,
-            providerName: userModel.name,
-            providerEmail: userModel.email,
-          );
-
-          if (success) {
-            await NotificationService.instance.notifyAllCustomersOfNewService(
-              serviceName: _nameController.text.trim(),
-              category: _selectedCategory,
-              serviceId: 'new_service',
-              location: _addressController.text.trim(),
-            );
-
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('Service created successfully!'),
-                  backgroundColor: AppColors.success,
-                ),
-              );
-              await Future.delayed(const Duration(milliseconds: 500));
-              if (mounted) {
-                context.go('/provider-dashboard');
-              }
-            }
-          }
+          serviceCreated = true;
+          await performServiceCreation();
         },
       );
+
+      // ✅ FALLBACK: If ad not shown / failed / skipped
+      if (!serviceCreated) {
+        await performServiceCreation();
+      }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

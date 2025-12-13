@@ -1,5 +1,7 @@
 // ignore_for_file: use_build_context_synchronously, unused_local_variable, prefer_final_fields, unused_catch_stack
 
+import 'dart:async';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart' hide AuthProvider;
@@ -36,28 +38,34 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   DateTime? _selectedDate;
 
   final TextEditingController _locationController = TextEditingController();
+  late TextEditingController _issueDetailsController = TextEditingController();
   bool _isFetchingLocation = false;
   bool _isLocationChanged = false;
   String _savedLocationText = '';
 
-  bool _isAfterCutoff([DateTime? now]) {
+  bool _isAfterSixPm([DateTime? now]) {
     final n = now ?? DateTime.now();
-    return n.hour >= 9;
+    return n.hour >= 18;
   }
 
-  // Apply rule: if selected is "today" and now >= 9, move to tomorrow (preserve time-of-day)
-  DateTime _applyCutoffRule(DateTime selected, {DateTime? now}) {
+  // Apply rule: if selected is "today" and now >= 18 (6 PM), move to tomorrow
+  DateTime _applySixPmCutoffRule(DateTime selected, {DateTime? now}) {
     final n = now ?? DateTime.now();
     final isSameDay =
         selected.year == n.year &&
         selected.month == n.month &&
         selected.day == n.day;
 
-    if (isSameDay && _isAfterCutoff(n)) {
-      return DateTime(
+    if (isSameDay && _isAfterSixPm(n)) {
+      final tomorrow = DateTime(
         n.year,
         n.month,
-        n.day + 1,
+        n.day,
+      ).add(const Duration(days: 1));
+      return DateTime(
+        tomorrow.year,
+        tomorrow.month,
+        tomorrow.day,
         selected.hour,
         selected.minute,
         selected.second,
@@ -72,28 +80,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   void initState() {
     super.initState();
 
-    // Debug authentication
-    final user = FirebaseAuth.instance.currentUser;
-    // debugPrint('=== AUTH VERIFICATION ===');
-    // debugPrint('User ID: ${user?.uid}');
-    // debugPrint('Email: ${user?.email}');
-    // debugPrint('Is Authenticated: ${user != null}');
-    // debugPrint('========================');
-
     _provider = widget.provider;
 
-    // If provider not passed, fetch it
     if (_provider == null) {
-      //debugPrint('🔄 Provider not passed, fetching from Firestore...');
       _fetchProviderData();
-    } else {
-      //debugPrint('✅ Provider passed from parent: ${_provider!.businessName}');
     }
 
-    // Load bookings for this service
     _loadBookingData();
+    _issueDetailsController = TextEditingController();
 
-    // Debug initial state
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _fetchCurrentLocation();
     });
@@ -101,59 +96,126 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
   Future<DateTime?> _selectConstrainedDate() async {
     final DateTime now = DateTime.now();
-    final DateTime minDate = _isAfterCutoff(now)
-        ? now.add(const Duration(days: 1)) // after 9 ⇒ start tomorrow
-        : now; // before 9 ⇒ same-day allowed
-    final DateTime maxDate = now.add(const Duration(days: 30));
 
-    final DateTime? pickedDate = await showDatePicker(
+    // ✅ If after 6 PM, force tomorrow
+    final DateTime minDate = now.hour >= 18
+        ? now.add(const Duration(days: 1))
+        : now;
+
+    final DateTime maxDate = minDate.add(const Duration(days: 15));
+
+    return await showDatePicker(
       context: context,
-      initialDate: minDate, // align initial selection with the rule
-      firstDate: minDate, // disallow selecting earlier than min
+      initialDate: minDate,
+      firstDate: minDate,
       lastDate: maxDate,
       helpText: 'Select service date',
       fieldLabelText: 'Service date',
-      errorInvalidText: 'Date must be within 30 days',
+      errorInvalidText: 'Date must be within 15 days',
     );
-
-    return pickedDate;
   }
 
-  // ✅ NEW: Pick time between 9 AM - 6 PM only
-  Future<TimeOfDay?> _selectConstrainedTime() async {
+  // Pick time between 9 AM - 6 PM only
+  Future<TimeOfDay?> _selectConstrainedTime({required DateTime forDate}) async {
+    final now = DateTime.now();
+    final bool isToday =
+        forDate.year == now.year &&
+        forDate.month == now.month &&
+        forDate.day == now.day;
+
+    TimeOfDay minTime;
+    if (isToday) {
+      if (now.hour < 9) {
+        minTime = const TimeOfDay(hour: 9, minute: 0);
+      } else if (now.hour >= 18) {
+        return null;
+      } else {
+        minTime = _roundUpToNext15Minutes(
+          TimeOfDay(hour: now.hour, minute: now.minute),
+        );
+      }
+    } else {
+      minTime = const TimeOfDay(hour: 9, minute: 0);
+    }
+
+    // if (isToday) {
+    //   if (now.hour < 9) {
+    //     minTime = const TimeOfDay(hour: 9, minute: 0);
+    //   } else if (now.hour >= 18) {
+    //     // Should never happen because date picker blocks today
+    //     return null;
+    //   } else {
+    //     minTime = TimeOfDay(hour: now.hour, minute: now.minute);
+    //   }
+    // } else {
+    //   // Future date
+    //   minTime = const TimeOfDay(hour: 9, minute: 0);
+    // }
+
     while (true) {
       final TimeOfDay? pickedTime = await showTimePicker(
         context: context,
-        initialTime: const TimeOfDay(hour: 9, minute: 0),
-        helpText: 'Select service time',
-        errorInvalidText: 'Please select time between 9 AM - 6 PM',
+        initialTime: minTime,
+        helpText: 'Select service time (${minTime.format(context)} onwards)',
         hourLabelText: 'Hour',
         minuteLabelText: 'Minute',
       );
 
-      // If user cancelled, return null
       if (pickedTime == null) return null;
 
-      // ✅ Validate working hours (9 AM - 6 PM)
-      if (_isWithinWorkingHours(pickedTime)) {
-        return pickedTime;
-      } else {
-        // Show error and ask to pick again
+      // ✅ Prevent back time
+      if (!_isWithinWorkingHours(pickedTime)) {
         await _showWorkingHoursError();
+        continue;
       }
+
+      if (isToday) {
+        final pickedMinutes = pickedTime.hour * 60 + pickedTime.minute;
+        final minMinutes = minTime.hour * 60 + minTime.minute;
+
+        if (pickedMinutes < minMinutes) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Please select a future time slot'),
+              backgroundColor: Colors.orange,
+            ),
+          );
+          continue;
+        }
+      }
+
+      return pickedTime;
     }
   }
 
-  // ✅ NEW: Check if time is within working hours
   bool _isWithinWorkingHours(TimeOfDay time) {
-    // Working hours: 9:00 AM to 6:00 PM (18:00)
     const int startHour = 9;
-    const int endHour = 18;
-
+    const int endHour = 18; // exclusive
     return time.hour >= startHour && time.hour < endHour;
   }
 
-  // ✅ NEW: Show working hours error dialog
+  TimeOfDay _roundUpToNext15Minutes(TimeOfDay time) {
+    int minutes = ((time.minute + 14) ~/ 15) * 15; 
+    int hour = time.hour;
+
+    if (minutes == 60) {
+      hour = (hour + 1) % 24;
+      minutes = 0;
+    }
+
+    return TimeOfDay(hour: hour, minute: minutes);
+  }
+
+  // TimeOfDay _roundUpToNext5Minutes(TimeOfDay time) {
+  //   int minutes = ((time.minute + 4) ~/ 5) * 5;
+  //   int hour = time.hour;
+  //   if (minutes == 60) {
+  //     hour = (hour + 1) % 24;
+  //     minutes = 0;
+  //   }
+  //   return TimeOfDay(hour: hour, minute: minutes);
+  // }
+
   Future<void> _showWorkingHoursError() async {
     return await showDialog<void>(
       context: context,
@@ -178,10 +240,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(12),
                 decoration: BoxDecoration(
-                  color: Colors.orange.withValues(alpha: 0.1),
+                  color: Colors.orange.withValues(alpha: 0.08),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: Colors.orange.withValues(alpha: 0.3),
+                    color: Colors.orange.withValues(alpha: 0.2),
                   ),
                 ),
                 child: const Column(
@@ -222,16 +284,17 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
-  // ✅ NEW: Combined date and time picker with constraints
   Future<void> _selectConstrainedDateTime() async {
     try {
       final DateTime? pickedDate = await _selectConstrainedDate();
       if (pickedDate == null) return;
 
-      final TimeOfDay? pickedTime = await _selectConstrainedTime();
+      final TimeOfDay? pickedTime = await _selectConstrainedTime(
+        forDate: pickedDate,
+      );
       if (pickedTime == null) return;
 
-      final DateTime combined = DateTime(
+      DateTime combined = DateTime(
         pickedDate.year,
         pickedDate.month,
         pickedDate.day,
@@ -239,28 +302,31 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         pickedTime.minute,
       );
 
-      // Apply 9AM cutoff shift if needed
-      final DateTime finalDt = _applyCutoffRule(combined);
+      // Apply 6 PM cutoff rule if necessary
+      final DateTime finalDt = _applySixPmCutoffRule(combined);
 
       setState(() {
         _selectedDate = finalDt;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('✅ Scheduled for ${Helpers.formatDateTime(finalDt)}'),
-          backgroundColor: AppColors.success,
-          duration: const Duration(seconds: 2),
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Scheduled for ${Helpers.formatDateTime(finalDt)}'),
+            backgroundColor: AppColors.success,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      //debugPrint('Error selecting date/time: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Error selecting date/time: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error selecting date/time: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
@@ -272,7 +338,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       final locationData = await locationService.getCurrentLocation();
 
       if (locationData != null && mounted) {
-        // Get address from coordinates
         final address = await locationService.getAddressFromCoordinates(
           locationData.latitude!,
           locationData.longitude!,
@@ -280,13 +345,11 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
         if (address != null && mounted) {
           _locationController.text = address;
-          _savedLocationText = address; // ✅ NEW: Mark as saved
-          //debugPrint('✅ Location auto-fetched: $address');
+          _savedLocationText = address;
         }
       }
     } catch (e) {
-      //debugPrint('❌ Error auto-fetching location: $e');
-      // Don't show error - location is optional
+      // Location optional - swallow error
     } finally {
       if (mounted) {
         setState(() => _isFetchingLocation = false);
@@ -294,7 +357,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     }
   }
 
-  // ✅ ENHANCED: Manual location refresh
   Future<void> _refreshLocation() async {
     setState(() => _isFetchingLocation = true);
 
@@ -310,18 +372,18 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
         if (address != null && mounted) {
           _locationController.text = address;
-          _savedLocationText = address; // ✅ NEW: Mark as saved
-          setState(
-            () => _isLocationChanged = false,
-          ); // ✅ NEW: Reset changed flag
+          _savedLocationText = address;
+          setState(() => _isLocationChanged = false);
 
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('✅ Location updated successfully'),
-              backgroundColor: AppColors.success,
-              duration: Duration(seconds: 2),
-            ),
-          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('✅ Location updated successfully'),
+                backgroundColor: AppColors.success,
+                duration: Duration(seconds: 2),
+              ),
+            );
+          }
         }
       }
     } catch (e) {
@@ -344,44 +406,46 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     final currentLocation = _locationController.text.trim();
 
     if (currentLocation.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Location cannot be empty'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location cannot be empty'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
       return;
     }
 
     try {
-      // ✅ Save location logic (you can add backend save here if needed)
       setState(() {
         _savedLocationText = currentLocation;
         _isLocationChanged = false;
       });
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('✅ Location saved successfully'),
-          backgroundColor: AppColors.success,
-          duration: Duration(seconds: 2),
-        ),
-      );
-
-      //debugPrint('✅ Location saved: $currentLocation');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('✅ Location saved successfully'),
+            backgroundColor: AppColors.success,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Failed to save location: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to save location: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
     }
   }
 
   Future<void> _fetchProviderData() async {
     if (widget.service.providerId.isEmpty) {
-      //debugPrint('❌ No provider ID provided');
       return;
     }
 
@@ -390,9 +454,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     });
 
     try {
-      //debugPrint('🔄 Fetching provider data for: ${widget.service.providerId}');
-
-      // ✅ FIRST: Try to get from providers collection
       final providerDoc = await FirebaseFirestore.instance
           .collection('providers')
           .doc(widget.service.providerId)
@@ -400,10 +461,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
       if (providerDoc.exists && providerDoc.data() != null) {
         final providerModel = ProviderModel.fromFireStore(providerDoc);
-        // debugPrint(
-        //   '✅ Provider found in providers collection: ${providerModel.businessName}',
-        // );
-
         if (mounted) {
           setState(() {
             _provider = providerModel;
@@ -413,10 +470,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         return;
       }
 
-      // ✅ FALLBACK: If not found in providers collection, get from user data
-      // debugPrint(
-      //   '⚠️ Provider not found in providers collection, checking user data...',
-      // );
       final userDoc = await FirebaseDatabase.instance
           .ref('users')
           .child(widget.service.providerId)
@@ -424,9 +477,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
 
       if (userDoc.exists && userDoc.value != null) {
         final userData = Map<String, dynamic>.from(userDoc.value as Map);
-        //debugPrint('✅ User data found: ${userData['name']}');
 
-        // Create a temporary provider model from user data and service data
         final tempProvider = ProviderModel(
           id: widget.service.providerId,
           userId: widget.service.providerId,
@@ -457,37 +508,23 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             _provider = tempProvider;
             _isLoadingProvider = false;
           });
-          //debugPrint('✅ Temporary provider model created');
         }
         return;
       }
 
-      //debugPrint('❌ No provider data found anywhere');
       if (mounted) {
         setState(() {
           _provider = null;
           _isLoadingProvider = false;
         });
-      } else {
-        //debugPrint('❌ Provider document does not exist or has no data');
-        if (mounted) {
-          setState(() {
-            _provider = null;
-            _isLoadingProvider = false;
-          });
-        }
       }
     } catch (e, stackTrace) {
-      //debugPrint('❌ Error fetching provider: $e');
-      //debugPrint('Stack trace: $stackTrace');
-
       if (mounted) {
         setState(() {
           _provider = null;
           _isLoadingProvider = false;
         });
 
-        // Show error to user
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('Failed to load provider details: $e'),
@@ -514,7 +551,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
       },
       body: Scaffold(
         backgroundColor: AppColors.background,
-        // ✅ FIXED: Use regular AppBar, not inside CustomScrollView
         appBar: AppBar(
           title: const Text('Service Details'),
           backgroundColor: AppColors.primary,
@@ -523,7 +559,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           actions: [
             IconButton(
               onPressed: () {
-                //debugPrint('🔄 Manual refresh triggered');
                 _fetchProviderData();
                 _loadBookingData();
               },
@@ -534,45 +569,35 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         ),
         body: CustomScrollView(
           slivers: [
-            // ✅ Service Image Header as SliverAppBar
             SliverAppBar(
               expandedHeight: 250,
               pinned: false,
               backgroundColor: AppColors.primary,
-              automaticallyImplyLeading:
-                  false, // Remove back button since we have one in main AppBar
+              automaticallyImplyLeading: false,
               flexibleSpace: FlexibleSpaceBar(background: _buildHeaderImage()),
             ),
 
-            // ✅ CRITICAL FIX: Wrap all content in SliverToBoxAdapter
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // Service Header
                     _buildServiceHeader(),
                     const SizedBox(height: 24),
-
-                    // Provider Details Section
                     _buildProviderSection(),
                     const SizedBox(height: 24),
-
-                    // Contact Information
                     _buildContactSection(),
                     const SizedBox(height: 24),
-
-                    // Booking Details Section (for existing bookings)
-                    _buildBookingDetailsSection(),
-
-                    // Service Description
                     _buildServiceDescription(),
                     const SizedBox(height: 24),
-
                     _buildLocationField(),
-                    const SizedBox(height: 24),
-
+                    const SizedBox(height: 16),
+                    // Item/Issue details input
+                    _buildIssueDetailsField(),
+                    const SizedBox(height: 16),
+                    _buildBookingDetailsSection(),
+                    const SizedBox(height: 16),
                     Card(
                       elevation: 4,
                       margin: const EdgeInsets.symmetric(vertical: 8),
@@ -587,6 +612,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                             horizontal: 20,
                             vertical: 16,
                           ),
+                          decoration: _cardGradientDecoration(),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
@@ -644,7 +670,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                                 ],
                               ),
 
-                              // ✅ NEW: Show working hours info
                               const SizedBox(height: 12),
                               Container(
                                 padding: const EdgeInsets.all(8),
@@ -661,7 +686,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                                     ),
                                     const SizedBox(width: 6),
                                     Text(
-                                      'Available: Next 30 days • 9 AM - 6 PM',
+                                      'Available: Next 15 days • 9 AM - 6 PM',
                                       style: TextStyle(
                                         fontSize: 12,
                                         color: Colors.blue.shade700,
@@ -677,15 +702,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ),
 
-                    // // Sub-services
-                    // if (widget.service.subServices.isNotEmpty) ...[
-                    //   _buildSubServices(),
-                    //   const SizedBox(height: 24),
-                    // ],
-
-                    // Book Service Button
+                    const SizedBox(height: 16),
                     _buildBookServiceButton(context),
-
                     const SizedBox(height: 32),
                   ],
                 ),
@@ -697,35 +715,166 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
+  Widget _buildBookServiceButton(BuildContext context) {
+    final currentUser = FirebaseAuth.instance.currentUser;
+    final isAvailable = widget.service.isAvailableForBooking;
+    final isBooked = widget.service.isBooked;
+
+    // Use BookingProvider to check if current user has booked this service
+    final bookingProvider = Provider.of<BookingProvider>(context);
+    final userBooking = currentUser == null
+        ? null
+        : bookingProvider.getUserBookingForService(
+            currentUser.uid,
+            widget.service.id,
+          );
+
+    // Determine button text & color
+    String buttonText;
+    Color buttonColor;
+
+    if (!isAvailable) {
+      buttonText = 'Service Unavailable';
+      buttonColor = Colors.grey;
+    } else if (userBooking != null) {
+      // Logged-in user has a booking for this service
+      buttonText = 'Service Booked by You';
+      buttonColor = AppColors.success;
+    } else if (isBooked) {
+      // Service is booked by someone else (we don't know who here)
+      buttonText = 'Service Already Booked';
+      buttonColor = Colors.orange;
+    } else {
+      // Available and not booked
+      buttonText = 'Book This Service';
+      buttonColor = AppColors.primary;
+    }
+
+    final bool canBook =
+        isAvailable && !isBooked && userBooking == null && !_isBooking;
+
+    // ✅ FIXED: Return correct gradient container with ElevatedButton
+    return Container(
+      width: double.infinity,
+      height: 56,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          colors: [buttonColor, buttonColor.withValues(alpha: 0.8)],
+        ),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: buttonColor.withValues(alpha: 0.3),
+            blurRadius: 15,
+            offset: const Offset(0, 5),
+          ),
+        ],
+      ),
+      child: ElevatedButton(
+        onPressed: canBook ? () => _bookService(context) : null,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: Colors.transparent,
+          shadowColor: Colors.transparent,
+          disabledBackgroundColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+        ),
+        child: _isBooking
+            ? const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(
+                      color: Colors.white,
+                      strokeWidth: 2,
+                    ),
+                  ),
+                  SizedBox(width: 12),
+                  Text(
+                    'Booking Service...',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ],
+              )
+            : Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    canBook ? Icons.calendar_today : Icons.block,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                  const SizedBox(width: 12),
+                  Text(
+                    buttonText,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                  if (canBook) ...{
+                    const SizedBox(width: 8),
+                    const Icon(
+                      Icons.arrow_forward,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                  },
+                ],
+              ),
+      ),
+    );
+  }
+
+  Decoration _cardGradientDecoration() {
+    return BoxDecoration(
+      gradient: const LinearGradient(
+        begin: Alignment.topLeft,
+        end: Alignment.bottomRight,
+        colors: [
+          Color(0xFFEFF7FF), // very light blue
+          Colors.white,
+        ],
+      ),
+      borderRadius: BorderRadius.circular(12),
+    );
+  }
+
   Widget _buildHeaderImage() {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Service Image
         widget.service.imageUrl.isNotEmpty
             ? CachedNetworkImage(
                 imageUrl: widget.service.imageUrl,
                 fit: BoxFit.cover,
                 placeholder: (context, url) => Container(
-                  color: AppColors.primary.withValues(alpha: 0.1),
+                  color: AppColors.primary.withValues(alpha: 0.08),
                   child: const Center(child: CircularProgressIndicator()),
                 ),
                 errorWidget: (context, url, error) => _buildDefaultHeader(),
               )
             : _buildDefaultHeader(),
-
-        // Gradient Overlay
         Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
-              colors: [Colors.transparent, Colors.black.withValues(alpha: 0.3)],
+              colors: [
+                Colors.transparent,
+                Colors.black.withValues(alpha: 0.28),
+              ],
             ),
           ),
         ),
-
-        // Price Badge
         Positioned(
           top: 100,
           right: 16,
@@ -736,7 +885,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               borderRadius: BorderRadius.circular(25),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.success.withValues(alpha: 0.3),
+                  color: AppColors.success.withValues(alpha: 0.22),
                   blurRadius: 8,
                   offset: const Offset(0, 2),
                 ),
@@ -745,7 +894,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.attach_money, color: Colors.white, size: 18),
+                // Removed extra attach_money icon to avoid double-dollar feeling.
                 Text(
                   Currency.formatUsd(widget.service.basePrice),
                   style: const TextStyle(
@@ -768,7 +917,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [AppColors.primary, AppColors.primary.withValues(alpha: 0.8)],
+          colors: [
+            AppColors.primary,
+            AppColors.primary.withValues(alpha: 0.85),
+          ],
         ),
       ),
       child: Column(
@@ -797,8 +949,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(20),
+        decoration: _cardGradientDecoration(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -810,7 +963,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     vertical: 6,
                   ),
                   decoration: BoxDecoration(
-                    color: AppColors.primary.withValues(alpha: 0.1),
+                    color: AppColors.primary.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -830,8 +983,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ),
                   decoration: BoxDecoration(
                     color: widget.service.isAvailableForBooking
-                        ? AppColors.success.withValues(alpha: 0.1)
-                        : Colors.orange.withValues(alpha: 0.1),
+                        ? AppColors.success.withValues(alpha: 0.08)
+                        : Colors.orange.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Row(
@@ -883,7 +1036,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     color: AppColors.textSecondary,
                   ),
                 ),
-                Icon(Icons.attach_money, size: 18, color: AppColors.success),
+                // Removed attach_money icon to avoid duplicate dollar impression.
                 Text(
                   Currency.formatUsd(widget.service.basePrice),
                   style: TextStyle(
@@ -908,20 +1061,19 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   Widget _buildProviderSection() {
-    // Use ValueKey to force rebuild when provider data changes
     return Card(
       key: ValueKey('provider_${_provider?.id ?? 'null'}_$_isLoadingProvider'),
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(20),
+        decoration: _cardGradientDecoration(),
         child: _buildProviderContent(),
       ),
     );
   }
 
   Widget _buildProviderContent() {
-    // Loading State
     if (_isLoadingProvider) {
       return Column(
         mainAxisSize: MainAxisSize.min,
@@ -964,12 +1116,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           ],
         ),
         const SizedBox(height: 16),
-
-        // Provider Info Row
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Provider Avatar
             CircleAvatar(
               radius: 32,
               backgroundColor: AppColors.primary,
@@ -985,13 +1134,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ),
             ),
             const SizedBox(width: 16),
-
-            // Provider Details
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Business Name
                   Text(
                     providerBusinessName,
                     style: const TextStyle(
@@ -1000,13 +1146,8 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       color: AppColors.textPrimary,
                     ),
                   ),
-
                   const SizedBox(height: 8),
-
-                  // ✅ ENHANCED: Provider Rating from Analytics
                   _buildProviderRating(),
-
-                  // Contact Person (if different)
                   if (providerName != providerBusinessName &&
                       providerName.isNotEmpty) ...[
                     const SizedBox(height: 8),
@@ -1019,8 +1160,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ),
                   ],
-
-                  // Experience
                   if (_provider?.experience?.isNotEmpty == true) ...[
                     const SizedBox(height: 6),
                     Row(
@@ -1051,15 +1190,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   }
 
   Widget _buildContactSection() {
-    // ✅ ENHANCED: Get phone number with proper priority
     final servicePhone = widget.service.mobileNumber;
     final providerPhone = _provider?.mobileNumber ?? '';
 
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(20),
+        decoration: _cardGradientDecoration(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1078,8 +1217,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ],
             ),
             const SizedBox(height: 16),
-
-            // ✅ ENHANCED: Service Mobile Number (Primary Contact)
             if (servicePhone.isNotEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1111,7 +1248,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                               color: AppColors.textPrimary,
                             ),
                           ),
-                          // ✅ NEW: Show business name with phone
                           if (widget.service.providerBusinessName != null &&
                               widget
                                   .service
@@ -1142,8 +1278,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ],
                 ),
               ),
-
-            // ✅ NEW: Alternative contact (if provider phone is different)
             if (providerPhone.isNotEmpty && providerPhone != servicePhone) ...[
               const SizedBox(height: 12),
               Container(
@@ -1192,8 +1326,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 ),
               ),
             ],
-
-            // ✅ NEW: No contact available message
             if (servicePhone.isEmpty && providerPhone.isEmpty)
               Container(
                 padding: const EdgeInsets.all(12),
@@ -1238,8 +1370,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16),
           ),
-          child: Padding(
+          child: Container(
             padding: const EdgeInsets.all(20),
+            decoration: _cardGradientDecoration(),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1258,8 +1391,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ],
                 ),
                 const SizedBox(height: 16),
-
-                // Booking Status
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
@@ -1302,17 +1433,15 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           color: AppColors.textSecondary,
                         ),
                       ),
-                      ...[
-                        const SizedBox(height: 4),
-                        Text(
-                          'Scheduled for: ${Helpers.formatDate(_applyCutoffRule(booking.scheduledDateTime))}',
-                          style: const TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w500,
-                            color: AppColors.textPrimary,
-                          ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Scheduled for: ${Helpers.formatDate(_applySixPmCutoffRule(booking.scheduledDateTime))}',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: AppColors.textPrimary,
                         ),
-                      ],
+                      ),
                       if (booking.description.isNotEmpty) ...[
                         const SizedBox(height: 8),
                         Text(
@@ -1338,8 +1467,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.all(20),
+        decoration: _cardGradientDecoration(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1374,322 +1504,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
     );
   }
 
-  Widget _buildBookServiceButton(BuildContext context) {
-    final isAvailable = widget.service.isAvailableForBooking;
-    final isBooked = widget.service.isBooked;
-
-    String buttonText;
-    Color buttonColor;
-
-    if (isAvailable && !isBooked) {
-      buttonText = 'Book This Service';
-      buttonColor = AppColors.primary;
-    } else if (isBooked) {
-      buttonText = 'Service Already Booked';
-      buttonColor = Colors.orange;
-    } else {
-      buttonText = 'Service Unavailable';
-      buttonColor = Colors.grey;
-    }
-
-    return Container(
-      width: double.infinity,
-      height: 56,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [buttonColor, buttonColor.withValues(alpha: 0.8)],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: buttonColor.withValues(alpha: 0.3),
-            blurRadius: 15,
-            offset: const Offset(0, 5),
-          ),
-        ],
-      ),
-      child: ElevatedButton(
-        onPressed: (isAvailable && !isBooked && !_isBooking)
-            ? () => _bookService(context)
-            : null,
-        style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.transparent,
-          shadowColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
-          ),
-        ),
-        child: _isBooking
-            ? const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      color: Colors.white,
-                      strokeWidth: 2,
-                    ),
-                  ),
-                  SizedBox(width: 12),
-                  Text(
-                    'Booking Service...',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
-              )
-            : Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    isAvailable && !isBooked
-                        ? Icons.calendar_today
-                        : Icons.block,
-                    size: 20,
-                    color: Colors.white,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    buttonText,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  if (isAvailable && !isBooked) ...[
-                    const SizedBox(width: 8),
-                    const Icon(
-                      Icons.arrow_forward,
-                      size: 20,
-                      color: Colors.white,
-                    ),
-                  ],
-                ],
-              ),
-      ),
-    );
-  }
-
-  // Helper methods
-  IconData _getCategoryIcon(String category) {
-    switch (category.toLowerCase()) {
-      case 'plumbing':
-        return Icons.plumbing;
-      case 'electrical':
-        return Icons.electrical_services;
-      case 'cleaning':
-        return Icons.cleaning_services;
-      case 'appliance repair':
-        return Icons.home_repair_service;
-      case 'painting':
-        return Icons.format_paint;
-      case 'carpentry':
-      case 'carepentry':
-        return Icons.construction;
-      default:
-        return Icons.build;
-    }
-  }
-
-  void _makePhoneCall(String phoneNumber) async {
-    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
-    try {
-      if (await canLaunchUrl(phoneUri)) {
-        await launchUrl(phoneUri);
-      }
-    } catch (e) {
-      //debugPrint('Error making phone call: $e');
-    }
-  }
-
-  void _bookService(BuildContext context) async {
-    if (_isBooking || !mounted) return;
-
-    if (_selectedDate == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please select a desired date before booking'),
-          backgroundColor: Colors.orange,
-        ),
-      );
-      return;
-    }
-
-    final selectedTime = TimeOfDay.fromDateTime(_selectedDate!);
-    if (!_isWithinWorkingHours(selectedTime)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Selected time is outside working hours (9 AM - 6 PM)'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-
-    if (_locationController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Please enter your location before booking'),
-          backgroundColor: AppColors.error,
-          duration: Duration(seconds: 3),
-        ),
-      );
-      return;
-    }
-
-    if (_isLocationChanged) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Please save your location changes before booking',
-          ),
-          backgroundColor: Colors.orange,
-          duration: const Duration(seconds: 3),
-          action: SnackBarAction(
-            label: 'SAVE NOW',
-            textColor: Colors.white,
-            onPressed: () async {
-              await _saveLocation();
-            },
-          ),
-        ),
-      );
-    }
-
-    final bool? confirmed = await _showBookingConfirmationDialog(context);
-    if (confirmed != true || !mounted) return;
-
-    setState(() {
-      _isBooking = true;
-    });
-
-    try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Please login to book service')),
-          );
-        }
-        return;
-      }
-
-      final authProvider = context.read<AuthProvider>();
-      final bookingProvider = context.read<BookingProvider>();
-
-      String customerName = 'Customer';
-      String customerPhone = '';
-      String customerEmail = '';
-
-      if (authProvider.userModel != null) {
-        customerName = authProvider.userModel!.name;
-        customerPhone = authProvider.userModel!.phone;
-        customerEmail = authProvider.userModel!.email;
-      } else {
-        customerEmail = user.email ?? '';
-        customerName = user.displayName ?? 'Customer';
-      }
-
-      if (customerName.isEmpty || customerName == 'null') {
-        customerName = 'Customer';
-      }
-
-      // ✅ Show rewarded ad BEFORE booking
-      await AdService.instance.showRewarded(
-        onReward: (reward) async {
-          //debugPrint("Reward earned: $reward");
-
-          // Proceed with booking AFTER reward
-          final booking = await bookingProvider.createBookingWithDetails(
-            customerId: user.uid,
-            providerId: widget.service.providerId,
-            service: widget.service,
-            scheduledDateTime: _selectedDate!,
-            description: widget.service.description.isNotEmpty
-                ? widget.service.description
-                : 'Service booking',
-            customerAddress: _savedLocationText.isNotEmpty
-                ? _savedLocationText
-                : _locationController.text.trim(),
-            customerLatitude: 0.0,
-            customerLongitude: 0.0,
-            totalAmount: widget.service.basePrice,
-            selectedDate: _selectedDate,
-            customerName: customerName,
-            customerPhone: customerPhone,
-            customerEmail: customerEmail,
-            providerName:
-                widget.service.providerBusinessName ??
-                widget.service.providerName ??
-                'Service Provider',
-            providerPhone: widget.service.mobileNumber,
-            providerEmail: widget.service.providerEmail ?? '',
-            serviceName: widget.service.name,
-            serviceCategory: widget.service.category,
-          );
-
-          if (!mounted) return;
-
-          if (booking != null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text('${widget.service.name} booked successfully!'),
-                backgroundColor: AppColors.success,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-
-            _loadBookingData();
-
-            WidgetsBinding.instance.addPostFrameCallback((_) {
-              if (mounted) {
-                Navigator.of(context).pop();
-              }
-            });
-          } else if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  bookingProvider.errorMessage ?? 'Failed to book service',
-                ),
-                backgroundColor: Colors.red,
-                duration: const Duration(seconds: 3),
-              ),
-            );
-          }
-        },
-      );
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to book service: $error'),
-            backgroundColor: Colors.red,
-            duration: const Duration(seconds: 3),
-          ),
-        );
-      }
-    } finally {
-      if (mounted) {
-        setState(() {
-          _isBooking = false;
-        });
-      }
-    }
-  }
-
   Widget _buildLocationField() {
     return Card(
       elevation: 4,
       margin: const EdgeInsets.symmetric(vertical: 8),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-      child: Padding(
+      child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: _cardGradientDecoration(),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -1706,6 +1528,12 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   ),
                 ),
                 const Spacer(),
+                // Refresh button at end of line
+                IconButton(
+                  icon: const Icon(Icons.refresh, size: 20),
+                  onPressed: _refreshLocation,
+                  tooltip: 'Refresh Location',
+                ),
                 if (_isFetchingLocation)
                   const SizedBox(
                     width: 16,
@@ -1731,7 +1559,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 suffixIcon: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    // ✅ NEW: Show save button when location is changed
                     if (_isLocationChanged)
                       IconButton(
                         icon: const Icon(
@@ -1752,7 +1579,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               ),
               style: const TextStyle(fontSize: 14),
               maxLines: 2,
-              // ✅ NEW: Track when user manually changes location
               onChanged: (value) {
                 setState(() {
                   _isLocationChanged = value.trim() != _savedLocationText;
@@ -1772,7 +1598,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                   ),
                 ),
-                // ✅ NEW: Show indicator if location has unsaved changes
                 if (_isLocationChanged)
                   Container(
                     padding: const EdgeInsets.symmetric(
@@ -1796,6 +1621,68 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                     ),
                   ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildIssueDetailsField() {
+    return Card(
+      elevation: 4,
+      margin: const EdgeInsets.symmetric(vertical: 8),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: _cardGradientDecoration(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.report_problem, color: AppColors.primary, size: 20),
+                const SizedBox(width: 8),
+                const Text(
+                  'Item / Issue Details',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black87,
+                  ),
+                ),
+                const Spacer(),
+                const Text(
+                  '(Required)',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: _issueDetailsController,
+              decoration: InputDecoration(
+                hintText:
+                    'Describe the item or issue that needs to be fixed (e.g., "Leaking pipe under kitchen sink").',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 12,
+                ),
+              ),
+              style: const TextStyle(fontSize: 14),
+              maxLines: 3,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Provide concise details so the provider can prepare the right tools/parts.',
+              style: TextStyle(
+                fontSize: 12,
+                color: Colors.grey.shade600,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
         ),
@@ -1857,19 +1744,14 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           );
         }
 
-        // ✅ CRITICAL: Fetch rating from analytics nested object
         double? rating;
         int? totalReviews;
         int? totalServices;
         double? completionRate;
 
-        // ✅ Method 1: Check for analytics object (primary)
         if (data.containsKey('analytics')) {
           final analytics = data['analytics'] as Map<String, dynamic>?;
-          //debugPrint('📊 [ANALYTICS] Found analytics data: $analytics');
-
           if (analytics != null) {
-            // Try different rating field names in analytics
             if (analytics.containsKey('rating')) {
               rating = (analytics['rating'] as num?)?.toDouble();
             } else if (analytics.containsKey('averageRating')) {
@@ -1878,7 +1760,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               rating = (analytics['raitng'] as num?)?.toDouble();
             }
 
-            // Get review/service counts from analytics
             if (analytics.containsKey('totalReviews')) {
               totalReviews = (analytics['totalReviews'] as num?)?.toInt();
             } else if (analytics.containsKey('reviewCount')) {
@@ -1893,14 +1774,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
               completionRate = (analytics['completionRate'] as num?)
                   ?.toDouble();
             }
-
-            // debugPrint(
-            //   '📊 [ANALYTICS] Extracted - Rating: $rating, Reviews: $totalReviews, Services: $totalServices',
-            // );
           }
         }
 
-        // ✅ Method 2: Fallback to root-level fields
         if (rating == null || rating == 0.0) {
           if (data.containsKey('rating')) {
             rating = (data['rating'] as num?)?.toDouble();
@@ -1911,10 +1787,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
           if (data.containsKey('totalReviews')) {
             totalReviews = (data['totalReviews'] as num?)?.toInt();
           }
-
-          // debugPrint(
-          //   '📊 [FALLBACK] Root-level - Rating: $rating, Reviews: $totalReviews',
-          // );
         }
 
         final bool hasRating = rating != null && rating > 0;
@@ -1922,14 +1794,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
         final displayReviews = totalReviews ?? 0;
         final displayServices = totalServices ?? 0;
 
-        // debugPrint(
-        //   '🎯 [FINAL] Rating: $displayRating, Has Rating: $hasRating, Reviews: $displayReviews',
-        // );
-
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ✅ Main Rating Display
             Row(
               children: [
                 Icon(
@@ -1958,13 +1825,10 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                 ],
               ],
             ),
-
-            // ✅ Additional Analytics Info (if available)
             if (hasRating) ...[
               const SizedBox(height: 4),
               Row(
                 children: [
-                  // Services completed
                   if (displayServices > 0) ...[
                     Icon(
                       Icons.check_circle,
@@ -1977,8 +1841,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       style: TextStyle(fontSize: 12, color: Colors.grey[600]),
                     ),
                   ],
-
-                  // Completion rate
                   if (completionRate != null && completionRate > 0) ...[
                     if (displayServices > 0) const SizedBox(width: 12),
                     Icon(Icons.trending_up, size: 14, color: AppColors.primary),
@@ -2020,7 +1882,7 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
+                color: AppColors.primary.withValues(alpha: 0.08),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Column(
@@ -2036,11 +1898,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                   const SizedBox(height: 4),
                   Row(
                     children: [
-                      Icon(
-                        Icons.attach_money,
-                        size: 16,
-                        color: AppColors.success,
-                      ),
                       Text(
                         Currency.formatUsd(widget.service.basePrice),
                         style: TextStyle(
@@ -2049,8 +1906,9 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           color: AppColors.success,
                         ),
                       ),
+                      const SizedBox(width: 8),
                       Text(
-                        ' (Base Price)',
+                        '(Base Price)',
                         style: TextStyle(
                           fontSize: 12,
                           color: AppColors.textSecondary,
@@ -2058,7 +1916,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 8),
                   Row(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -2080,7 +1937,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                           overflow: TextOverflow.ellipsis,
                         ),
                       ),
-                      // ✅ NEW: Show save status indicator
                       if (_isLocationChanged)
                         Container(
                           padding: const EdgeInsets.symmetric(
@@ -2102,7 +1958,6 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         ),
                     ],
                   ),
-                  // Add selected date display here
                   if (_selectedDate != null) ...[
                     const SizedBox(height: 8),
                     Text(
@@ -2111,6 +1966,16 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
                         fontSize: 14,
                         color: AppColors.textPrimary,
                         fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                  if (_issueDetailsController.text.trim().isNotEmpty) ...[
+                    const SizedBox(height: 8),
+                    Text(
+                      'Issue details: ${_issueDetailsController.text.trim()}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
                       ),
                     ),
                   ],
@@ -2162,49 +2027,298 @@ class _ServiceDetailScreenState extends State<ServiceDetailScreen> {
   @override
   void dispose() {
     _locationController.dispose();
+    _issueDetailsController.dispose();
     super.dispose();
   }
-}
 
-// ✅ Update helper methods to work with enum
-Color _getStatusColor(BookingStatus status) {
-  switch (status) {
-    case BookingStatus.pending:
-      return Colors.orange;
-    case BookingStatus.confirmed:
-      return Colors.blue;
-    case BookingStatus.inProgress:
-      return Colors.yellow;
-    case BookingStatus.completed:
-      return AppColors.success;
-    case BookingStatus.cancelled:
-      return AppColors.error;
-    case BookingStatus.refunded:
-      return AppColors.error;
-    case BookingStatus.paymentPending:
-      return AppColors.error;
-    case BookingStatus.paid:
-      return AppColors.success;
+  IconData _getCategoryIcon(String category) {
+    switch (category.toLowerCase()) {
+      case 'plumbing':
+        return Icons.plumbing;
+      case 'electrical':
+        return Icons.electrical_services;
+      case 'cleaning':
+        return Icons.cleaning_services;
+      case 'appliance repair':
+        return Icons.home_repair_service;
+      case 'painting':
+        return Icons.format_paint;
+      case 'carpentry':
+      case 'carepentry':
+        return Icons.construction;
+      default:
+        return Icons.build;
+    }
   }
-}
 
-IconData _getStatusIcon(BookingStatus status) {
-  switch (status) {
-    case BookingStatus.pending:
-      return Icons.schedule;
-    case BookingStatus.confirmed:
-      return Icons.check_circle;
-    case BookingStatus.inProgress:
-      return Icons.hourglass_empty;
-    case BookingStatus.completed:
-      return Icons.done_all;
-    case BookingStatus.cancelled:
-      return Icons.cancel;
-    case BookingStatus.refunded:
-      return Icons.money_off;
-    case BookingStatus.paymentPending:
-      return Icons.payments;
-    case BookingStatus.paid:
-      return Icons.verified;
+  void _makePhoneCall(String phoneNumber) async {
+    final Uri phoneUri = Uri(scheme: 'tel', path: phoneNumber);
+    try {
+      if (await canLaunchUrl(phoneUri)) {
+        await launchUrl(phoneUri);
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  void _bookService(BuildContext context) async {
+    if (_isBooking || !mounted) return;
+
+    // ✅ Validation 1: Date selected
+    if (_selectedDate == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please select a desired date before booking'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
+    // ✅ Validation 2: Time within working hours
+    final selectedTime = TimeOfDay.fromDateTime(_selectedDate!);
+    if (!_isWithinWorkingHours(selectedTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Selected time is outside working hours (9 AM - 6 PM)'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
+    // ✅ Validation 3: Location entered
+    if (_locationController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please enter your location before booking'),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    // ✅ Validation 4: Issue details entered
+    if (_issueDetailsController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please describe the item or issue to be fixed'),
+          backgroundColor: AppColors.error,
+          duration: Duration(seconds: 3),
+        ),
+      );
+      return;
+    }
+
+    // ✅ Validation 5: Location saved
+    if (_isLocationChanged) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: const Text(
+            'Please save your location changes before booking',
+          ),
+          backgroundColor: Colors.orange,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: 'SAVE NOW',
+            textColor: Colors.white,
+            onPressed: () async => await _saveLocation(),
+          ),
+        ),
+      );
+      return;
+    }
+
+    // ✅ Show confirmation dialog
+    final bool? confirmed = await _showBookingConfirmationDialog(context);
+    if (confirmed != true || !mounted) return;
+
+    setState(() {
+      _isBooking = true;
+    });
+
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Please login to book service')),
+          );
+        }
+        return;
+      }
+
+      final authProvider = context.read<AuthProvider>();
+      final bookingProvider = context.read<BookingProvider>();
+
+      String customerName = 'Customer';
+      String customerPhone = '';
+      String customerEmail = '';
+
+      if (authProvider.userModel != null) {
+        customerName = authProvider.userModel!.name;
+        customerPhone = authProvider.userModel!.phone;
+        customerEmail = authProvider.userModel!.email;
+      } else {
+        customerEmail = user.email ?? '';
+        customerName = user.displayName ?? 'Customer';
+      }
+
+      if (customerName.isEmpty || customerName == 'null') {
+        customerName = 'Customer';
+      }
+
+      Future<void> performBooking({
+        required User user,
+        required BookingProvider bookingProvider,
+        required String customerName,
+        required String customerPhone,
+        required String customerEmail,
+      }) async {
+        final booking = await bookingProvider.createBookingWithDetails(
+          customerId: user.uid,
+          providerId: widget.service.providerId,
+          service: widget.service,
+          scheduledDateTime: _selectedDate!,
+          description: widget.service.description, // provider description
+          customerDescription: _issueDetailsController.text
+              .trim(), // customer issue
+          customerAddress: _savedLocationText.isNotEmpty
+              ? _savedLocationText
+              : _locationController.text.trim(),
+          customerLatitude: 0.0,
+          customerLongitude: 0.0,
+          totalAmount: widget.service.basePrice,
+          selectedDate: _selectedDate,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          customerEmail: customerEmail,
+          providerName:
+              widget.service.providerBusinessName ??
+              widget.service.providerName ??
+              'Service Provider',
+          providerPhone: widget.service.mobileNumber,
+          providerEmail: widget.service.providerEmail ?? '',
+          serviceName: widget.service.name,
+          serviceCategory: widget.service.category,
+        );
+
+        if (!mounted) return;
+
+        if (booking != null) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('${widget.service.name} booked successfully!'),
+              backgroundColor: AppColors.success,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+
+          _loadBookingData();
+
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) Navigator.of(context).pop();
+          });
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                bookingProvider.errorMessage ?? 'Failed to book service',
+              ),
+              backgroundColor: Colors.red,
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+
+      // ✅ Show rewarded ad BEFORE booking
+      bool bookingTriggered = false;
+
+      await AdService.instance.showRewarded(
+        onReward: (reward) async {
+          bookingTriggered = true;
+          await performBooking(
+            user: user,
+            bookingProvider: bookingProvider,
+            customerName: customerName,
+            customerPhone: customerPhone,
+            customerEmail: customerEmail,
+          );
+        },
+      );
+
+      // ✅ FALLBACK: If ad failed / skipped / not shown
+      if (!bookingTriggered) {
+        await performBooking(
+          user: user,
+          bookingProvider: bookingProvider,
+          customerName: customerName,
+          customerPhone: customerPhone,
+          customerEmail: customerEmail,
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to book service: $error'),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 3),
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isBooking = false;
+        });
+      }
+    }
+  }
+
+  // Helper functions for status colors/icons (unchanged)
+  Color _getStatusColor(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return Colors.orange;
+      case BookingStatus.confirmed:
+        return Colors.blue;
+      case BookingStatus.inProgress:
+        return Colors.yellow;
+      case BookingStatus.completed:
+        return AppColors.success;
+      case BookingStatus.cancelled:
+        return AppColors.error;
+      case BookingStatus.refunded:
+        return AppColors.error;
+      case BookingStatus.paymentPending:
+        return AppColors.error;
+      case BookingStatus.paid:
+        return AppColors.success;
+    }
+  }
+
+  IconData _getStatusIcon(BookingStatus status) {
+    switch (status) {
+      case BookingStatus.pending:
+        return Icons.schedule;
+      case BookingStatus.confirmed:
+        return Icons.check_circle;
+      case BookingStatus.inProgress:
+        return Icons.hourglass_empty;
+      case BookingStatus.completed:
+        return Icons.done_all;
+      case BookingStatus.cancelled:
+        return Icons.cancel;
+      case BookingStatus.refunded:
+        return Icons.money_off;
+      case BookingStatus.paymentPending:
+        return Icons.payments;
+      case BookingStatus.paid:
+        return Icons.verified;
+    }
   }
 }

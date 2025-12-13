@@ -97,6 +97,7 @@ class BookingModel {
   final DateTime? ratedAt;
   final double? _developerCommission;
   final double? _providerAmount;
+  final String customerDescription;
 
   BookingModel({
     this.paymentDate,
@@ -149,6 +150,7 @@ class BookingModel {
     this.ratedAt,
     double? developerCommission,
     double? providerAmount,
+    required this.customerDescription,
   }) : _developerCommission = developerCommission,
        _providerAmount = providerAmount;
 
@@ -181,6 +183,7 @@ class BookingModel {
           ? (data['completedAt'] as Timestamp).toDate()
           : null,
       paymentId: data['paymentId'],
+      customerDescription: data['customerDescription'] ?? '',
       cancellationReason: data['cancellationReason'],
       metadata: data['metaData'],
       customerName: data['customerName']?.toString(),
@@ -288,6 +291,7 @@ class BookingModel {
       'customerRating': customerRating,
       'hasCustomerReview': hasCustomerReview,
       'ratedAt': ratedAt != null ? Timestamp.fromDate(ratedAt!) : null,
+      'customerDescription': customerDescription,
       'developerCommission': developerCommission,
       'providerAmount': providerAmount,
     };
@@ -400,6 +404,7 @@ extension BookingModelCopyWith on BookingModel {
     double? customerRating,
     bool? hasCustomerReview,
     DateTime? ratedAt,
+    String? customerDescription,
   }) {
     return BookingModel(
       paymentInitiatedAt: paymentInitiatedAt ?? this.paymentInitiatedAt,
@@ -452,6 +457,7 @@ extension BookingModelCopyWith on BookingModel {
       customerRating: customerRating ?? this.customerRating,
       hasCustomerReview: hasCustomerReview ?? this.hasCustomerReview,
       ratedAt: ratedAt ?? this.ratedAt,
+      customerDescription: customerDescription ?? this.customerDescription
     );
   }
 }

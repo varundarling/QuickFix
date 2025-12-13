@@ -252,9 +252,9 @@ class _ServiceCardState extends State<ServiceCard>
                     const SizedBox(height: 16),
                     _buildDescription(),
                     const SizedBox(height: 16),
-                    if (widget.service.address != null &&
-                        widget.service.address!.isNotEmpty)
-                      _buildLocationInfo(distance),
+                    // if (widget.service.address != null &&
+                    //     widget.service.address!.isNotEmpty)
+                    //   _buildLocationInfo(distance),
                     if (widget.service.subServices.isNotEmpty) ...[
                       const SizedBox(height: 16),
                       _buildSubServices(),
@@ -615,78 +615,78 @@ class _ServiceCardState extends State<ServiceCard>
     );
   }
 
-  Widget _buildLocationInfo(double? distance) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            AppColors.primary.withValues(alpha: 0.1),
-            AppColors.primary.withValues(alpha: 0.05),
-          ],
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: const BoxDecoration(
-              color: AppColors.primary,
-              borderRadius: BorderRadius.all(Radius.circular(12)),
-            ),
-            child: const Icon(Icons.location_on, size: 18, color: Colors.white),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Service Location',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppColors.primary,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  widget.service.address ?? '',
-                  style: const TextStyle(
-                    fontSize: 14,
-                    color: AppColors.textPrimary,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          if (distance != null) ...[
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: const BoxDecoration(
-                color: AppColors.primary,
-                borderRadius: BorderRadius.all(Radius.circular(16)),
-              ),
-              child: Text(
-                '${distance.toStringAsFixed(1)} km',
-                style: const TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
-                  color: Colors.white,
-                ),
-              ),
-            ),
-          ],
-        ],
-      ),
-    );
-  }
+  // Widget _buildLocationInfo(double? distance) {
+  //   return Container(
+  //     padding: const EdgeInsets.all(16),
+  //     decoration: BoxDecoration(
+  //       gradient: LinearGradient(
+  //         colors: [
+  //           AppColors.primary.withValues(alpha: 0.1),
+  //           AppColors.primary.withValues(alpha: 0.05),
+  //         ],
+  //       ),
+  //       borderRadius: BorderRadius.circular(16),
+  //       border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+  //     ),
+  //     child: Row(
+  //       children: [
+  //         Container(
+  //           padding: const EdgeInsets.all(8),
+  //           decoration: const BoxDecoration(
+  //             color: AppColors.primary,
+  //             borderRadius: BorderRadius.all(Radius.circular(12)),
+  //           ),
+  //           child: const Icon(Icons.location_on, size: 18, color: Colors.white),
+  //         ),
+  //         const SizedBox(width: 12),
+  //         Expanded(
+  //           child: Column(
+  //             crossAxisAlignment: CrossAxisAlignment.start,
+  //             children: [
+  //               Text(
+  //                 'Service Location',
+  //                 style: TextStyle(
+  //                   fontSize: 12,
+  //                   color: AppColors.primary,
+  //                   fontWeight: FontWeight.w600,
+  //                 ),
+  //               ),
+  //               const SizedBox(height: 2),
+  //               Text(
+  //                 widget.service.address ?? '',
+  //                 style: const TextStyle(
+  //                   fontSize: 14,
+  //                   color: AppColors.textPrimary,
+  //                   fontWeight: FontWeight.w500,
+  //                 ),
+  //                 maxLines: 1,
+  //                 overflow: TextOverflow.ellipsis,
+  //               ),
+  //             ],
+  //           ),
+  //         ),
+  //         if (distance != null) ...[
+  //           const SizedBox(width: 12),
+  //           Container(
+  //             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+  //             decoration: const BoxDecoration(
+  //               color: AppColors.primary,
+  //               borderRadius: BorderRadius.all(Radius.circular(16)),
+  //             ),
+  //             child: Text(
+  //               '${distance.toStringAsFixed(1)} km',
+  //               style: const TextStyle(
+  //                 fontSize: 12,
+  //                 fontWeight: FontWeight.w600,
+  //                 color: Colors.white,
+  //               ),
+  //             ),
+  //           ),
+  //         ],
+  //       ],
+  //     ),
+  //   );
+  // }
 
   Widget _buildSubServices() {
     return Container(

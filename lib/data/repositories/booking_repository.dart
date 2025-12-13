@@ -30,6 +30,7 @@ class BookingRepository {
         // Add commission fields here
         developerCommission: developerCommission,
         providerAmount: providerAmount,
+        customerDescription: booking.customerDescription,
       );
 
       await bookingsCollection

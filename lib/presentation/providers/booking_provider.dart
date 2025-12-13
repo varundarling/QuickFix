@@ -1273,6 +1273,7 @@ class BookingProvider extends ChangeNotifier {
     required double rating,
     DateTime? selectedDate,
     DateTime? bookedDate,
+    required String customerDescription,
   }) async {
     try {
       _setLoading(true);
@@ -1295,6 +1296,7 @@ class BookingProvider extends ChangeNotifier {
         status: BookingStatus.pending,
         createdAt: DateTime.now(),
         selectedDate: selectedDate,
+        customerDescription: customerDescription,
       );
 
       final firestoreData = booking.toFireStore();
@@ -1365,6 +1367,7 @@ class BookingProvider extends ChangeNotifier {
     required String providerEmail,
     required String serviceName,
     required String serviceCategory,
+    required String customerDescription,
   }) async {
     try {
       _setLoading(true);
@@ -1401,6 +1404,7 @@ class BookingProvider extends ChangeNotifier {
         customerLongitude: customerLongitude,
         createdAt: DateTime.now(),
         selectedDate: selectedDate,
+        customerDescription: customerDescription,
         // ✅ CRITICAL: Store customer details properly
         customerName: customerDataMap['customerName']!,
         customerPhone: customerDataMap['customerPhone']!,
